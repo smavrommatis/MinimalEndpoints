@@ -3,13 +3,14 @@
   <PropertyGroup>
     <!-- Package metadata -->
     <PackageId>MinimalEndpoints</PackageId>
-    <Version>1.0.0</Version>
+    <Version>0.1.0</Version>
     <Authors>S. Mavrommatis</Authors>
     <Description>Minimal endpoints library with source generators</Description>
 
     <!-- Include analyzer/generator in package -->
     <IncludeBuildOutput>true</IncludeBuildOutput>
     <DevelopmentDependency>false</DevelopmentDependency>
+    <PackageOutputPath>$(MSBuildThisFileDirectory)..\..\artifacts</PackageOutputPath>
   </PropertyGroup>
 
   <ItemGroup>

@@ -6,3 +6,4 @@
 Rule ID | Category | Severity | Notes
 --------|----------|----------|-------
 MINEP001 | MinimalEndpoints | Error | EntryPointAnalyzer
+MINEP002 | MinimalEndpoints | Error | MultipleAttributesAnalyzer

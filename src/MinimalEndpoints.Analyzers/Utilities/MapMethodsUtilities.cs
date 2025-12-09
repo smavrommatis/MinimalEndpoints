@@ -16,10 +16,20 @@ internal static class MapMethodsUtilities
         { WellKnownTypes.Annotations.MapHeadAttributeName, ("HEAD", "MapHead") }
     }.ToFrozenDictionary();
 
+    public static AttributeData[] GetMapMethodsAttributes(this INamedTypeSymbol symbol)
+    {
+        return symbol.GetAttributes()
+            .Where(attribute =>
+                attribute.AttributeClass != null
+                && attribute.AttributeClass.IsMapMethodsAttribute()
+            )
+            .ToArray();
+    }
+
     public static MapMethodsAttributeInfo GetMapMethodsAttributeInfo(this INamedTypeSymbol symbol)
     {
         var attributeData = symbol.GetAttributes()
-            .FirstOrDefault(attribute =>
+            .SingleOrDefault(attribute =>
                 attribute.AttributeClass != null
                 && attribute.AttributeClass.IsMapMethodsAttribute()
             );

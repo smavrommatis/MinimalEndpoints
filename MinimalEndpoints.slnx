@@ -10,6 +10,7 @@
     <Project Path="src/MinimalEndpoints/MinimalEndpoints.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/MinimalEndpoints.Analyzers.Tests/MinimalEndpoints.Analyzers.Tests.csproj" />
   </Folder>
   <Folder Name="/Soluction Items/">
     <File Path="Directory.Build.props" />
