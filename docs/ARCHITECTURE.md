@@ -56,15 +56,21 @@ public class GetUsersEndpoint
 
 **Key Classes**:
 - `MapMethodsBaseAttribute` - Base class for all mapping attributes
+  - Contains common properties: `Pattern`, `Lifetime`, `EntryPoint`, `ServiceType`, `Group`
+  - All HTTP-specific attributes inherit from this base class
+  - This inheritance pattern allows analyzers to check for any mapping attribute using a single base type
 - `MapGetAttribute`, `MapPostAttribute`, etc. - HTTP method-specific attributes
+  - Each specifies its HTTP method(s) in the constructor
+  - Example: `[MapGet("/route")]` is equivalent to `[MapMethods("/route", "GET")]`
 - `MapMethodsAttribute` - For custom HTTP method combinations
+  - Allows specifying multiple methods: `[MapMethods("/route", new[] { "GET", "POST" })]`
 
 **Properties**:
 - `Pattern` - Route pattern (e.g., "/api/users/{id}")
-- `Lifetime` - DI service lifetime (Singleton, Scoped, Transient)
-- `GroupPrefix` - Optional route prefix
-- `EntryPoint` - Custom entry point method name
-- `ServiceType` - Interface type for DI registration
+- `Lifetime` - DI service lifetime (Singleton, Scoped, Transient) - default is Scoped
+- `EntryPoint` - Custom entry point method name (default: "Handle" or "HandleAsync")
+- `ServiceType` - Interface type for DI registration (enables interface-based injection)
+- `Group` - Type of `IEndpointGroup` for shared configuration and route prefixing
 
 ### 2. Analyzer Layer
 
@@ -100,7 +106,7 @@ Report diagnostics to IDE
 **`MapMethodsUtilities`**:
 - Extracts MapMethods attribute metadata
 - Maps attribute types to HTTP methods
-- Handles named arguments (GroupPrefix, EntryPoint, ServiceType)
+- Handles named arguments (EntryPoint, ServiceType)
 
 **`EndpointUtilities`**:
 - Finds entry point methods (Handle, HandleAsync, or custom)

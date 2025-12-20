@@ -3,9 +3,24 @@
   <PropertyGroup>
     <!-- Package metadata -->
     <PackageId>Blackeye.MinimalEndpoints</PackageId>
-    <Version>0.1.10</Version>
+    <Version>1.0.0</Version>
     <Authors>S. Mavrommatis</Authors>
-    <Description>Minimal endpoints library with source generators</Description>
+    <Company>Blackeye</Company>
+    <Product>MinimalEndpoints</Product>
+    <Description>Elegant, class-based endpoints for ASP.NET Core Minimal APIs with zero runtime overhead. Organize your endpoints as classes with source generators and Roslyn analyzers for compile-time validation.</Description>
+    <Copyright>Copyright (c) 2025 S. Mavrommatis</Copyright>
+    <PackageLicenseExpression>BSD-2-Clause</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/smavrommatis/MinimalEndpoints</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/smavrommatis/MinimalEndpoints</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>aspnetcore;minimal-api;endpoints;source-generator;roslyn-analyzer;web-api;rest-api</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>icon.png</PackageIcon>
+    <PackageReleaseNotes>See https://github.com/smavrommatis/MinimalEndpoints/blob/main/CHANGELOG.md</PackageReleaseNotes>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
 
     <!-- Include analyzer/generator in package -->
     <IncludeBuildOutput>true</IncludeBuildOutput>
@@ -15,6 +30,14 @@
 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Include README in package -->
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+
+    <!-- Include icon if it exists (optional - create a 128x128 PNG icon) -->
+    <None Include="..\..\icon.png" Pack="true" PackagePath="\" Condition="Exists('..\..\icon.png')" />
   </ItemGroup>
 
   <ItemGroup>

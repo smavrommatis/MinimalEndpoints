@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
@@ -25,8 +26,7 @@ public class AmbiguousRouteAnalyzer : DiagnosticAnalyzer
     private static void AnalyzeCompilationStart(CompilationStartAnalysisContext context)
     {
         // Collect all groups first to build hierarchy
-        var groupsDict = new Dictionary<INamedTypeSymbol, GroupInfo>(SymbolEqualityComparer.Default);
-        var syncLockGroups = new object();
+        var groupsDict = new ConcurrentDictionary<INamedTypeSymbol, GroupInfo>(SymbolEqualityComparer.Default);
 
         // Collect groups
         context.RegisterSymbolAction(symbolContext =>
@@ -46,21 +46,17 @@ public class AmbiguousRouteAnalyzer : DiagnosticAnalyzer
                     .FirstOrDefault(arg => arg.Key == "ParentGroup");
                 var parentGroup = parentGroupArg.Value.Value as INamedTypeSymbol;
 
-                lock (syncLockGroups)
+                groupsDict.TryAdd(namedTypeSymbol, new GroupInfo
                 {
-                    groupsDict[namedTypeSymbol] = new GroupInfo
-                    {
-                        Symbol = namedTypeSymbol,
-                        Prefix = prefix,
-                        ParentGroup = parentGroup
-                    };
-                }
+                    Symbol = namedTypeSymbol,
+                    Prefix = prefix,
+                    ParentGroup = parentGroup
+                });
             }
         }, SymbolKind.NamedType);
 
         // Collect all endpoints across the compilation
-        var endpoints = new List<EndpointRouteInfo>();
-        var syncLock = new object();
+        var endpoints = new ConcurrentBag<EndpointRouteInfo>();
 
         context.RegisterSymbolAction(symbolContext =>
         {
@@ -94,17 +90,14 @@ public class AmbiguousRouteAnalyzer : DiagnosticAnalyzer
                     continue;
                 }
 
-                lock (syncLock)
+                endpoints.Add(new EndpointRouteInfo
                 {
-                    endpoints.Add(new EndpointRouteInfo
-                    {
-                        ClassName = namedTypeSymbol.Name,
-                        RoutePattern = pattern,
-                        HttpMethod = method,
-                        Location = location,
-                        GroupType = groupType
-                    });
-                }
+                    ClassName = namedTypeSymbol.Name,
+                    RoutePattern = pattern,
+                    HttpMethod = method,
+                    Location = location,
+                    GroupType = groupType
+                });
             }
         }, SymbolKind.NamedType);
 
@@ -152,7 +145,7 @@ public class AmbiguousRouteAnalyzer : DiagnosticAnalyzer
         });
     }
 
-    private static string BuildFullPath(string pattern, INamedTypeSymbol groupType, Dictionary<INamedTypeSymbol, GroupInfo> groups)
+    private static string BuildFullPath(string pattern, INamedTypeSymbol groupType, ConcurrentDictionary<INamedTypeSymbol, GroupInfo> groups)
     {
         if (groupType == null)
         {

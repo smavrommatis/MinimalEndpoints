@@ -153,3 +153,9 @@ repomix.config.json
 *.claude*
 **/node_modules/
 artifacts
+
+# Analysis and temporary documentation files
+ANALYSIS_REPORT.md
+
+#BenchmarkDotNet Artifacts
+BenchmarkDotNet.Artifacts/

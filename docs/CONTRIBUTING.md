@@ -16,7 +16,7 @@ First off, thank you for considering contributing to MinimalEndpoints! It's peop
 
 ## Code of Conduct
 
-This project and everyone participating in it is governed by our Code of Conduct. By participating, you are expected to uphold this code. Please report unacceptable behavior to [conduct@example.com](mailto:conduct@example.com).
+This project and everyone participating in it is governed by our Code of Conduct. By participating, you are expected to uphold this code. Please report unacceptable behavior via [GitHub Issues](https://github.com/smavrommatis/MinimalEndpoints/issues) or email to [sotirios.mavrommatis+conduct@gmail.com](mailto:sotirios.mavrommatis+conduct@gmail.com).
 
 ### Our Standards
 

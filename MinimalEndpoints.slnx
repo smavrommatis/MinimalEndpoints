@@ -1,8 +1,15 @@
 <Solution>
+  <Folder Name="/bechmarks/">
+    <Project Path="benchmarks/MinimalEndpoints.Benchmarks.csproj" />
+  </Folder>
   <Folder Name="/docs/">
     <File Path="docs/ARCHITECTURE.md" />
+    <File Path="docs/COMPARISONS.md" />
     <File Path="docs/CONTRIBUTING.md" />
     <File Path="docs/EXAMPLES.md" />
+    <File Path="docs/MIGRATION.md" />
+    <File Path="docs/PERFORMANCE.md" />
+    <File Path="docs/TROUBLESHOOTING.md" />
   </Folder>
   <Folder Name="/docs/diagnostics/">
     <File Path="docs/diagnostics/MINEP001.md" />
@@ -11,6 +18,12 @@
     <File Path="docs/diagnostics/MINEP004.md" />
     <File Path="docs/diagnostics/MINEP005.md" />
     <File Path="docs/diagnostics/MINEP006.md" />
+  </Folder>
+  <Folder Name="/docs/examples/">
+    <File Path="docs/examples/01-getting-started.md" />
+    <File Path="docs/examples/02-basic-endpoints.md" />
+    <File Path="docs/examples/11-aspnetcore-integration.md" />
+    <File Path="docs/examples/README.md" />
   </Folder>
   <Folder Name="/samples/">
     <File Path="samples/README.md" />
@@ -26,8 +39,16 @@
     <Project Path="tests/MinimalEndpoints.Analyzers.Tests/MinimalEndpoints.Analyzers.Tests.csproj" />
   </Folder>
   <Folder Name="/Soluction Items/">
+    <File Path=".editorconfig" />
+    <File Path=".gitattributes" />
+    <File Path=".gitignore" />
+    <File Path="CHANGELOG.md" />
     <File Path="Directory.Build.props" />
+    <File Path="global.json" />
+    <File Path="LICENSE" />
     <File Path="nuget.config" />
     <File Path="README.md" />
+    <File Path="run-coverage.ps1" />
+    <File Path="SECURITY.md" />
   </Folder>
 </Solution>
