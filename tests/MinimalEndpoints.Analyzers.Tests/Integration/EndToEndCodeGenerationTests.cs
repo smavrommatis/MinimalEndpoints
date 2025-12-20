@@ -497,6 +497,170 @@ public class ConfigurableServiceEndpoint : IConfigurableService, IConfigurableEn
         Assert.DoesNotContain("IConfigurableService.Configure", generatedCode);
     }
 
+    [Fact]
+    public void GeneratedCode_HandlesNestedGenerics_Correctly()
+    {
+        // Arrange
+        var code = @"
+namespace TestApp.Endpoints;
+
+public class Result<T>
+{
+    public T Value { get; set; }
+}
+
+public class Option<T>
+{
+    public T Value { get; set; }
+}
+
+[MapGet(""/nested"")]
+public class NestedGenericEndpoint
+{
+    public Task<Result<Option<string>>> HandleAsync()
+    {
+        return Task.FromResult(new Result<Option<string>>());
+    }
+}";
+
+        // Act
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
+
+        var (generatedCode, _) = GenerateCodeAndCompile(compilation);
+
+        // Assert
+        Assert.NotNull(generatedCode);
+        Assert.Contains("Task<", generatedCode);
+        Assert.Contains("Result<", generatedCode);
+        Assert.Contains("Option<", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratedCode_HandlesTupleTypes_Correctly()
+    {
+        // Arrange
+        var code = @"
+namespace TestApp.Endpoints;
+
+[MapGet(""/tuple"")]
+public class TupleEndpoint
+{
+    public Task<IResult> HandleAsync((int id, string name) data)
+    {
+        return Task.FromResult(Results.Ok(data));
+    }
+}";
+
+        // Act
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
+
+        var (generatedCode, _) = GenerateCodeAndCompile(compilation);
+
+        // Assert
+        Assert.NotNull(generatedCode);
+        Assert.Contains("(int id, string name)", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratedCode_HandlesNullableReferenceTypes_Correctly()
+    {
+        // Arrange
+        var code = @"
+#nullable enable
+namespace TestApp.Endpoints;
+
+[MapPost(""/nullable"")]
+public class NullableEndpoint
+{
+    public Task<IResult> HandleAsync(string? optionalParam, string requiredParam)
+    {
+        return Task.FromResult(Results.Ok());
+    }
+}";
+
+        // Act
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
+
+        var (generatedCode, _) = GenerateCodeAndCompile(compilation);
+
+        // Assert
+        Assert.NotNull(generatedCode);
+        Assert.Contains("string? optionalParam", generatedCode);
+        Assert.Contains("string requiredParam", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratedCode_HandlesMultipleParameterCollisions_WithEndpointInstanceAndApp()
+    {
+        // Arrange
+        var code = @"
+namespace TestApp.Endpoints;
+
+[MapGet(""/collision"")]
+public class MultiCollisionEndpoint
+{
+    public Task<IResult> HandleAsync(string endpointInstance, string app, string builder)
+    {
+        return Task.FromResult(Results.Ok());
+    }
+}";
+
+        // Act
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
+
+        var (generatedCode, _) = GenerateCodeAndCompile(compilation);
+
+        // Assert
+        Assert.NotNull(generatedCode);
+        // Should rename all conflicting parameters
+        Assert.Contains("endpointInstance1", generatedCode);
+        Assert.Contains("string endpointInstance", generatedCode);
+        Assert.Contains("string app", generatedCode);
+        Assert.Contains("string builder", generatedCode);
+    }
+
+    [Fact]
+    public void FindEntryPoint_WithOverloadedMethods_SelectsCorrectOne()
+    {
+        // Arrange
+        var code = @"
+namespace TestApp.Endpoints;
+
+[MapGet(""/overload"")]
+public class OverloadedEndpoint
+{
+    public IResult Handle()
+    {
+        return Results.Ok();
+    }
+
+    public Task<IResult> HandleAsync()
+    {
+        return Task.FromResult(Results.Ok());
+    }
+}";
+
+        // Act
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
+
+        var (generatedCode, _) = GenerateCodeAndCompile(compilation);
+
+        // Assert
+        Assert.NotNull(generatedCode);
+        // Should prefer HandleAsync over Handle
+        Assert.Contains("HandleAsync()", generatedCode);
+    }
+
     private (string generatedCode, IEnumerable<Diagnostic> diagnostics) GenerateCodeAndCompile(
         CSharpCompilation compilation,
         bool validateCompilation = true

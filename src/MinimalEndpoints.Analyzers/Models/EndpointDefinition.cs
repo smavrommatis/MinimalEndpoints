@@ -1,3 +1,4 @@
+using System.Text;
 using Microsoft.CodeAnalysis;
 using MinimalEndpoints.Analyzers.Utilities;
 
@@ -5,11 +6,29 @@ namespace MinimalEndpoints.Analyzers.Models;
 
 internal sealed class EndpointDefinition
 {
+    private string _mappingEndpointMethodName;
+
     public TypeDefinition ClassType { get; set; }
 
     public bool IsConfigurable { get; set; }
 
-    public string MappingEndpointMethodName => $"Map__{ClassType.FullName.Replace(".", "_").Replace("+", "_")}";
+    public string MappingEndpointMethodName
+    {
+        get
+        {
+            if (_mappingEndpointMethodName == null)
+            {
+                // Use StringBuilder for better performance than chained Replace
+                var sb = new StringBuilder("Map__", ClassType.FullName.Length + 10);
+                foreach (var ch in ClassType.FullName)
+                {
+                    sb.Append(ch == '.' || ch == '+' ? '_' : ch);
+                }
+                _mappingEndpointMethodName = sb.ToString();
+            }
+            return _mappingEndpointMethodName;
+        }
+    }
 
     public MapMethodsAttributeDefinition MapMethodsAttribute { get; set; }
 

@@ -1,6 +1,6 @@
 using System.Collections.Immutable;
+using System.Text;
 using MinimalEndpoints.Analyzers.Models;
-using SymbolDisplayFormat = Microsoft.CodeAnalysis.SymbolDisplayFormat;
 
 namespace MinimalEndpoints.Analyzers.Utilities;
 
@@ -194,12 +194,26 @@ internal static class EndpointCodeGenerator
 
     public static string BuildParameterAttributes(ParameterInfo parameter, HashSet<string> usings)
     {
-        var attributes = parameter.Attributes
-            .Select(attr => attr.ToDisplayString(usings))
-            .Where(attr => !string.IsNullOrEmpty(attr))
-            .ToList();
+        if (parameter.Attributes.Count == 0)
+        {
+            return string.Empty;
+        }
 
-        return attributes.Count > 0 ? string.Join(" ", attributes) + " " : "";
+        var sb = new StringBuilder();
+        foreach (var attr in parameter.Attributes)
+        {
+            var attrString = attr.ToDisplayString(usings);
+            if (!string.IsNullOrEmpty(attrString))
+            {
+                if (sb.Length > 0)
+                {
+                    sb.Append(' ');
+                }
+                sb.Append(attrString);
+            }
+        }
+
+        return sb.Length > 0 ? sb.Append(' ').ToString() : string.Empty;
     }
 
     private static string GetLifetimeMethodName(ServiceLifetime lifetime) => lifetime switch

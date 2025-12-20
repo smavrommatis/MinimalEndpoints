@@ -18,12 +18,19 @@ internal static class MapMethodsUtilities
 
     public static AttributeData[] GetMapMethodAttributes(this INamedTypeSymbol symbol)
     {
-        return symbol.GetAttributes()
-            .Where(attribute =>
-                attribute.AttributeClass != null
-                && attribute.AttributeClass.IsMapMethodsAttribute()
-            )
-            .ToArray();
+        // Use array instead of LINQ for better performance
+        var attributes = symbol.GetAttributes();
+        var result = new List<AttributeData>(attributes.Length);
+
+        foreach (var attribute in attributes)
+        {
+            if (attribute.AttributeClass != null && attribute.AttributeClass.IsMapMethodsAttribute())
+            {
+                result.Add(attribute);
+            }
+        }
+
+        return result.ToArray();
     }
 
     public static MapMethodsAttributeDefinition GetMapMethodAttributeDefinition(this AttributeData attributeData)

@@ -10,6 +10,7 @@ namespace MinimalEndpoints.Analyzers.Models;
 public class TypeDefinition
 {
     private readonly string _fullName;
+    private readonly Dictionary<int, string> _displayStringCache = new();
 
     /// <summary>
     /// The fully qualified type name (e.g., "System.Threading.Tasks.Task&lt;int&gt;")
@@ -24,12 +25,34 @@ public class TypeDefinition
     /// <summary>
     /// Returns the type name simplified based on the provided using directives.
     /// If a namespace is in the usings set, it will be omitted from the type name.
+    /// Results are cached for performance.
     /// </summary>
     /// <param name="availableUsings">Set of namespace strings that are available via using directives</param>
     /// <returns>Simplified type name (e.g., "Task&lt;int&gt;" instead of "System.Threading.Tasks.Task&lt;int&gt;")</returns>
     public string ToDisplayString(HashSet<string> availableUsings)
     {
-        return SimplifyTypeName(_fullName, availableUsings);
+        // Create a cache key based on the usings set
+        var cacheKey = ComputeUsingsHashCode(availableUsings);
+
+        if (_displayStringCache.TryGetValue(cacheKey, out var cached))
+        {
+            return cached;
+        }
+
+        var result = SimplifyTypeName(_fullName, availableUsings);
+        _displayStringCache[cacheKey] = result;
+        return result;
+    }
+
+    private static int ComputeUsingsHashCode(HashSet<string> usings)
+    {
+        // Use XOR of hash codes for a simple, order-independent hash
+        var hash = 0;
+        foreach (var u in usings)
+        {
+            hash ^= u.GetHashCode();
+        }
+        return hash;
     }
 
     /// <summary>
