@@ -25,4 +25,15 @@ internal static class Diagnostics
         isEnabledByDefault: true,
         description: "Endpoints must not have more than one MapMethods attribute."
     );
+
+    public static readonly DiagnosticDescriptor ServiceTypeMissingEntryPoint = new DiagnosticDescriptor(
+        id: "MINEP003",
+        title: "ServiceType interface missing entry point method",
+        messageFormat:
+        "The ServiceType '{0}' specified for endpoint '{1}' does not contain the entry point method '{2}'. The interface must declare this method with a compatible signature.",
+        category: "MinimalEndpoints",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "When ServiceType is specified, the interface must contain the entry point method that will be called."
+    );
 }

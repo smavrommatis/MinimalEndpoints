@@ -1,4 +1,4 @@
-﻿; Unshipped analyzer release
+﻿﻿; Unshipped analyzer release
 ; https://github.com/dotnet/roslyn-analyzers/blob/main/src/Microsoft.CodeAnalysis.Analyzers/ReleaseTrackingAnalyzers.Help.md
 
 ### New Rules
@@ -7,3 +7,4 @@ Rule ID | Category | Severity | Notes
 --------|----------|----------|-------
 MINEP001 | MinimalEndpoints | Error | EntryPointAnalyzer
 MINEP002 | MinimalEndpoints | Error | MultipleAttributesAnalyzer
+MINEP003 | MinimalEndpoints | Error | ServiceTypeValidationAnalyzer

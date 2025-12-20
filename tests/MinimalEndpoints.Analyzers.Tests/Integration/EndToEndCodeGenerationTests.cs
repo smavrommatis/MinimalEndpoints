@@ -315,6 +315,188 @@ public class TransientEndpoint
         Assert.Contains("services.AddTransient<TestApp.Endpoints.TransientEndpoint>", generatedCode);
     }
 
+    [Fact]
+    public void GeneratedMethodName_ForNestedClass_UsesCorrectFormat()
+    {
+        // Arrange
+        var code = @"
+namespace TestApp.Endpoints;
+
+public class OuterClass
+{
+    [MapGet(""/nested"")]
+    public class NestedEndpoint
+    {
+        public Task<IResult> HandleAsync()
+        {
+            return Task.FromResult(Results.Ok());
+        }
+    }
+}";
+
+        // Act
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
+
+        var (generatedCode, _) = GenerateCodeAndCompile(compilation);
+
+        // Assert
+        Assert.NotNull(generatedCode);
+        // Nested class should use + separator which is replaced with _
+        Assert.Contains("Map__TestApp_Endpoints_OuterClass_NestedEndpoint", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratedMethodName_ForLongNamespace_GeneratesCorrectly()
+    {
+        // Arrange
+        var code = @"
+namespace Very.Long.Deeply.Nested.Namespace.Structure.For.Testing.Purposes;
+
+[MapGet(""/long"")]
+public class LongNamespaceEndpoint
+{
+    public Task<IResult> HandleAsync()
+    {
+        return Task.FromResult(Results.Ok());
+    }
+}";
+
+        // Act
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
+
+        var (generatedCode, _) = GenerateCodeAndCompile(compilation);
+
+        // Assert
+        Assert.NotNull(generatedCode);
+        Assert.Contains("Map__Very_Long_Deeply_Nested_Namespace_Structure_For_Testing_Purposes_LongNamespaceEndpoint", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratedMethodName_IsUnique_ForDifferentEndpoints()
+    {
+        // Arrange
+        var code = @"
+namespace TestApp.Api
+{
+    [MapGet(""/users"")]
+    public class GetUsersEndpoint
+    {
+        public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok());
+    }
+}
+
+namespace TestApp.Admin
+{
+    [MapGet(""/users"")]
+    public class GetUsersEndpoint
+    {
+        public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok());
+    }
+}";
+
+        // Act
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
+
+        var (generatedCode, _) = GenerateCodeAndCompile(compilation);
+
+        // Assert
+        Assert.NotNull(generatedCode);
+        // Both should have different method names due to different namespaces
+        Assert.Contains("Map__TestApp_Api_GetUsersEndpoint", generatedCode);
+        Assert.Contains("Map__TestApp_Admin_GetUsersEndpoint", generatedCode);
+
+        // Verify they are registered separately
+        Assert.Contains("services.AddScoped<TestApp.Api.GetUsersEndpoint>", generatedCode);
+        Assert.Contains("services.AddScoped<TestApp.Admin.GetUsersEndpoint>", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratedMethodName_ForSpecialCharacters_EscapesCorrectly()
+    {
+        // Arrange - Test with underscores in namespace/class names
+        var code = @"
+namespace Test_App.End_Points;
+
+[MapGet(""/test"")]
+public class Test_Endpoint
+{
+    public Task<IResult> HandleAsync()
+    {
+        return Task.FromResult(Results.Ok());
+    }
+}";
+
+        // Act
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
+
+        var (generatedCode, _) = GenerateCodeAndCompile(compilation);
+
+        // Assert
+        Assert.NotNull(generatedCode);
+        // Underscores should be preserved
+        Assert.Contains("Map__Test_App_End_Points_Test_Endpoint", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratedCode_HandlesServiceTypeWithConfigurableEndpoint_Correctly()
+    {
+        // Arrange
+        var code = @"
+namespace TestApp.Endpoints;
+
+public interface IConfigurableService
+{
+    Task<IResult> HandleAsync();
+}
+
+[MapGet(""/configurable-service"", ServiceType = typeof(IConfigurableService))]
+public class ConfigurableServiceEndpoint : IConfigurableService, IConfigurableEndpoint
+{
+    public Task<IResult> HandleAsync()
+    {
+        return Task.FromResult(Results.Ok());
+    }
+
+    public static void Configure(IApplicationBuilder app, IEndpointConventionBuilder endpoint)
+    {
+        endpoint.WithTags(""configured"");
+    }
+}";
+
+        // Act
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
+
+        var (generatedCode, _) = GenerateCodeAndCompile(compilation);
+
+        // Assert
+        Assert.NotNull(generatedCode);
+
+        // Should register with interface
+        Assert.True(
+            generatedCode.Contains("AddScoped<TestApp.Endpoints.IConfigurableService, TestApp.Endpoints.ConfigurableServiceEndpoint>") ||
+            generatedCode.Contains("AddScoped<IConfigurableService, ConfigurableServiceEndpoint>"),
+            "Should contain service registration with interface"
+        );
+
+        // Should call Configure on the concrete class, not the interface
+        Assert.True(
+            generatedCode.Contains("ConfigurableServiceEndpoint.Configure(app, endpoint)") ||
+            generatedCode.Contains("TestApp.Endpoints.ConfigurableServiceEndpoint.Configure(app, endpoint)"),
+            "Should call Configure on concrete class"
+        );
+        Assert.DoesNotContain("IConfigurableService.Configure", generatedCode);
+    }
+
     private (string generatedCode, IEnumerable<Diagnostic> diagnostics) GenerateCodeAndCompile(
         CSharpCompilation compilation,
         bool validateCompilation = true

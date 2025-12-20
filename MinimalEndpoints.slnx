@@ -2,6 +2,7 @@
   <Folder Name="/docs/">
     <File Path="docs/CONTRIBUTING.md" />
     <File Path="docs/EXAMPLES.md" />
+    <File Path="docs/IMPROVEMENT_CHECKLIST.md" />
   </Folder>
   <Folder Name="/samples/">
     <Project Path="samples/MinimalEndpoints.Sample/MinimalEndpoints.Sample.csproj" />

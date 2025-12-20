@@ -13,7 +13,8 @@ public class MinimalEndpointsAnalyzer : DiagnosticAnalyzer
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
     [
         Diagnostics.MissingEntryPoint,
-        Diagnostics.MultipleAttributesDetected
+        Diagnostics.MultipleAttributesDetected,
+        Diagnostics.ServiceTypeMissingEntryPoint
     ];
 
     public override void Initialize(AnalysisContext context)
@@ -69,6 +70,47 @@ public class MinimalEndpointsAnalyzer : DiagnosticAnalyzer
             );
 
             context.ReportDiagnostic(missingEntryPointDiagnostic);
+            return;
         }
+
+        // Validate ServiceType if specified
+        if (!string.IsNullOrEmpty(mapMethodsAttributeDefinition.ServiceName))
+        {
+            var serviceTypeSymbol = GetServiceTypeSymbol(attributes[0], context.Compilation);
+            if (serviceTypeSymbol != null)
+            {
+                var interfaceHasMethod = serviceTypeSymbol.GetMembers()
+                    .OfType<IMethodSymbol>()
+                    .Any(m => m.Name == entryPoint.Name &&
+                              !m.IsStatic &&
+                              m.DeclaredAccessibility == Accessibility.Public);
+
+                if (!interfaceHasMethod)
+                {
+                    var serviceTypeDiagnostic = Diagnostic.Create(
+                        Diagnostics.ServiceTypeMissingEntryPoint,
+                        classDeclaration.Identifier.GetLocation(),
+                        serviceTypeSymbol.Name,
+                        namedTypeSymbol.Name,
+                        entryPoint.Name
+                    );
+
+                    context.ReportDiagnostic(serviceTypeDiagnostic);
+                }
+            }
+        }
+    }
+
+    private static INamedTypeSymbol GetServiceTypeSymbol(AttributeData attributeData, Compilation compilation)
+    {
+        var serviceTypeArg = attributeData.NamedArguments
+            .FirstOrDefault(arg => arg.Key == "ServiceType");
+
+        if (serviceTypeArg.Value.Value is INamedTypeSymbol serviceType)
+        {
+            return serviceType;
+        }
+
+        return null;
     }
 }
