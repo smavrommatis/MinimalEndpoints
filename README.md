@@ -213,7 +213,7 @@ public class GetAdminUsersEndpoint : IConfigurableEndpoint
 
     public static void Configure(
         IApplicationBuilder app,
-        IEndpointConventionBuilder endpoint)
+        RouteHandlerBuilder endpoint)
     {
         endpoint
             .RequireAuthorization("AdminPolicy")
@@ -479,6 +479,90 @@ global using MinimalEndpoints.Annotations;
 
 ---
 
+## 📊 Diagnostics
+
+MinimalEndpoints includes built-in Roslyn analyzers that catch common mistakes at design-time:
+
+### MINEP001: Missing Entry Point Method
+Ensures your endpoint class has a valid entry point method (`Handle`, `HandleAsync`, or custom).
+
+```csharp
+// ❌ Error: No entry point method
+[MapGet("/users")]
+public class GetUsersEndpoint
+{
+    // Missing HandleAsync method!
+}
+```
+
+[Learn more →](docs/diagnostics/MINEP001.md)
+
+### MINEP002: Multiple MapMethods Attributes
+Prevents multiple mapping attributes on the same class.
+
+```csharp
+// ❌ Error: Multiple attributes
+[MapGet("/users")]
+[MapPost("/users")]  // Can't have both!
+public class UsersEndpoint { }
+```
+
+[Learn more →](docs/diagnostics/MINEP002.md)
+
+### MINEP003: ServiceType Interface Validation
+Ensures the interface specified in `ServiceType` contains the entry point method.
+
+```csharp
+// ❌ Error: Interface missing HandleAsync
+public interface IGetUsers { }
+
+[MapGet("/users", ServiceType = typeof(IGetUsers))]
+public class GetUsersEndpoint : IGetUsers
+{
+    public Task<IResult> HandleAsync() => ...;
+}
+```
+
+[Learn more →](docs/diagnostics/MINEP003.md)
+
+### MINEP004: Ambiguous Route Patterns
+Warns about duplicate route patterns that would cause routing conflicts.
+
+```csharp
+// ⚠️ Warning: Ambiguous routes
+[MapGet("/users")]
+public class GetUsersEndpoint { }
+
+[MapGet("/users")]  // Same route!
+public class ListUsersEndpoint { }
+```
+
+[Learn more →](docs/diagnostics/MINEP004.md)
+
+---
+
+## 📚 Examples & Samples
+
+### Sample Projects
+
+Explore complete working examples in the `samples/` directory:
+
+- **[Basic Sample](samples/MinimalEndpoints.Sample/)** - Simple CRUD operations
+- **[Advanced Sample](samples/MinimalEndpoints.AdvancedSample/)** - IConfigurableEndpoint, validation, OpenAPI
+- **[Real-World Sample](samples/MinimalEndpoints.RealWorldSample/)** - Production-ready with database, auth, Docker
+
+### Quick Examples
+
+See [EXAMPLES.md](docs/EXAMPLES.md) for detailed examples including:
+- Authentication & Authorization
+- File Uploads
+- Background Jobs
+- Health Checks
+- OpenAPI/Swagger Integration
+- And more...
+
+---
+
 ## 🧪 Testing
 
 Endpoints are easy to test because they're just classes:
@@ -556,6 +640,16 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - 💬 [Discussions](https://github.com/yourusername/MinimalEndpoints/discussions)
 - 🐛 [Issue Tracker](https://github.com/yourusername/MinimalEndpoints/issues)
 - 📧 [Email](mailto:sotirios.mavrommatis@gmail.com)
+
+### Reporting Analyzer Issues
+
+If you encounter issues with any of the built-in analyzers (MINEP001-004):
+
+1. **Unexpected warnings?** Check the [diagnostic documentation](docs/diagnostics/) for suppression options
+2. **False positives?** [Report them](https://github.com/yourusername/MinimalEndpoints/issues/new?labels=analyzer) - we'll investigate and improve the analyzer
+3. **Questions?** Start a [discussion](https://github.com/yourusername/MinimalEndpoints/discussions)
+
+We continuously improve analyzer accuracy based on community feedback!
 
 ---
 

@@ -68,6 +68,12 @@ public class TypeDefinition
             return GetSpecialTypeName(symbol.SpecialType);
         }
 
+        // Handle tuple types
+        if (symbol is INamedTypeSymbol { IsTupleType: true } tupleType)
+        {
+            return BuildTupleTypeName(tupleType);
+        }
+
         // Handle array types
         if (symbol is IArrayTypeSymbol arrayType)
         {
@@ -97,6 +103,29 @@ public class TypeDefinition
         return string.IsNullOrEmpty(namespaceName) || namespaceName == "<global namespace>"
             ? typeName
             : $"{namespaceName}.{typeName}";
+    }
+
+    private static string BuildTupleTypeName(INamedTypeSymbol tupleType)
+    {
+        var elements = tupleType.TupleElements;
+        if (elements.IsDefaultOrEmpty)
+        {
+            // Fallback to regular generic type representation
+            return BuildGenericTypeName(tupleType);
+        }
+
+        var elementTypes = elements
+            .Select(e =>
+            {
+                var typeName = BuildFullTypeName(e.Type);
+                // Include element name if it has one (e.g., (int id, string name))
+                return string.IsNullOrEmpty(e.Name) || e.Name.StartsWith("Item")
+                    ? typeName
+                    : $"{typeName} {e.Name}";
+            })
+            .ToList();
+
+        return $"({string.Join(", ", elementTypes)})";
     }
 
     private static string BuildGenericTypeName(INamedTypeSymbol namedType)
@@ -162,6 +191,12 @@ public class TypeDefinition
 
     private static string SimplifyTypeName(string fullTypeName, HashSet<string> availableUsings)
     {
+        // Handle tuple types (int id, string name)
+        if (fullTypeName.StartsWith("(") && fullTypeName.EndsWith(")"))
+        {
+            return SimplifyTupleType(fullTypeName, availableUsings);
+        }
+
         // Handle nullable types
         if (fullTypeName.EndsWith("?"))
         {
@@ -186,6 +221,73 @@ public class TypeDefinition
 
         // Handle regular types (try to remove namespace if it's in usings)
         return SimplifyRegularType(fullTypeName, availableUsings);
+    }
+
+    private static string SimplifyTupleType(string tupleTypeName, HashSet<string> availableUsings)
+    {
+        // Remove outer parentheses
+        var innerContent = tupleTypeName.Substring(1, tupleTypeName.Length - 2);
+
+        // Parse tuple elements (considering nested tuples and generics)
+        var elements = ParseTupleElements(innerContent);
+
+        // Simplify each element
+        var simplifiedElements = elements.Select(element =>
+        {
+            // Check if element has a name (e.g., "int id" or "string name")
+            var parts = element.Trim().Split(new[] { ' ' }, 2);
+            if (parts.Length == 2)
+            {
+                // Has name: "Type name"
+                var simplifiedType = SimplifyTypeName(parts[0], availableUsings);
+                return $"{simplifiedType} {parts[1]}";
+            }
+            else
+            {
+                // No name: just "Type"
+                return SimplifyTypeName(element.Trim(), availableUsings);
+            }
+        }).ToList();
+
+        return $"({string.Join(", ", simplifiedElements)})";
+    }
+
+    private static List<string> ParseTupleElements(string tupleContent)
+    {
+        var result = new List<string>();
+        var current = new StringBuilder();
+        var depth = 0; // Track nesting depth (parentheses and angle brackets)
+
+        foreach (var ch in tupleContent)
+        {
+            if (ch == '(' || ch == '<')
+            {
+                depth++;
+                current.Append(ch);
+            }
+            else if (ch == ')' || ch == '>')
+            {
+                depth--;
+                current.Append(ch);
+            }
+            else if (ch == ',' && depth == 0)
+            {
+                // Top-level comma - split here
+                result.Add(current.ToString());
+                current.Clear();
+            }
+            else
+            {
+                current.Append(ch);
+            }
+        }
+
+        if (current.Length > 0)
+        {
+            result.Add(current.ToString());
+        }
+
+        return result;
     }
 
     private static string SimplifyGenericType(string genericTypeName, HashSet<string> availableUsings)

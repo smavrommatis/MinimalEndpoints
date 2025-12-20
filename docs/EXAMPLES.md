@@ -231,7 +231,7 @@ public class GetAdminUsersEndpoint : IConfigurableEndpoint
 
     public static void Configure(
         IApplicationBuilder app,
-        IEndpointConventionBuilder endpoint)
+        RouteHandlerBuilder endpoint)
     {
         endpoint
             .RequireAuthorization("AdminPolicy")
@@ -568,7 +568,7 @@ public class ListProductsEndpoint : IConfigurableEndpoint
         return Results.Ok(products);
     }
 
-    public static void Configure(IApplicationBuilder app, IEndpointConventionBuilder endpoint)
+    public static void Configure(IApplicationBuilder app, RouteHandlerBuilder endpoint)
     {
         endpoint
             .WithTags("Products")
@@ -597,7 +597,7 @@ public class GetProductEndpoint : IConfigurableEndpoint
             : Results.NotFound();
     }
 
-    public static void Configure(IApplicationBuilder app, IEndpointConventionBuilder endpoint)
+    public static void Configure(IApplicationBuilder app, RouteHandlerBuilder endpoint)
     {
         endpoint
             .WithTags("Products")
@@ -638,7 +638,7 @@ public class CreateProductEndpoint : IConfigurableEndpoint
         return Results.Created($"/products/{created.Id}", created);
     }
 
-    public static void Configure(IApplicationBuilder app, IEndpointConventionBuilder endpoint)
+    public static void Configure(IApplicationBuilder app, RouteHandlerBuilder endpoint)
     {
         endpoint
             .WithTags("Products")
@@ -676,7 +676,7 @@ public class UpdateProductEndpoint : IConfigurableEndpoint
         return Results.Ok(updated);
     }
 
-    public static void Configure(IApplicationBuilder app, IEndpointConventionBuilder endpoint)
+    public static void Configure(IApplicationBuilder app, RouteHandlerBuilder endpoint)
     {
         endpoint
             .WithTags("Products")
@@ -706,7 +706,7 @@ public class DeleteProductEndpoint : IConfigurableEndpoint
         return Results.NoContent();
     }
 
-    public static void Configure(IApplicationBuilder app, IEndpointConventionBuilder endpoint)
+    public static void Configure(IApplicationBuilder app, RouteHandlerBuilder endpoint)
     {
         endpoint
             .WithTags("Products")
@@ -773,7 +773,7 @@ public class GetUsersEndpoint : IGetUsersEndpoint, IConfigurableEndpoint
         return Results.Ok(users);
     }
 
-    public static void Configure(IApplicationBuilder app, IEndpointConventionBuilder endpoint)
+    public static void Configure(IApplicationBuilder app, RouteHandlerBuilder endpoint)
     {
         endpoint
             .WithName("GetUsers")
@@ -860,7 +860,7 @@ public class SubmitDataEndpoint : IConfigurableEndpoint
         return Results.Ok(new { submitted = true });
     }
 
-    public static void Configure(IApplicationBuilder app, IEndpointConventionBuilder endpoint)
+    public static void Configure(IApplicationBuilder app, RouteHandlerBuilder endpoint)
     {
         endpoint
             .RequireRateLimiting("fixed")
@@ -901,7 +901,7 @@ public class AdminReportsEndpoint : IConfigurableEndpoint
         return Results.Ok(reports);
     }
 
-    public static void Configure(IApplicationBuilder app, IEndpointConventionBuilder endpoint)
+    public static void Configure(IApplicationBuilder app, RouteHandlerBuilder endpoint)
     {
         endpoint
             .RequireAuthorization(policy => policy
@@ -964,7 +964,7 @@ public class CreateUserEndpoint : IConfigurableEndpoint
         return TypedResults.Created($"/api/users/{user.Id}", user);
     }
 
-    public static void Configure(IApplicationBuilder app, IEndpointConventionBuilder endpoint)
+    public static void Configure(IApplicationBuilder app, RouteHandlerBuilder endpoint)
     {
         endpoint
             .WithName("CreateUser")
@@ -1036,7 +1036,7 @@ public class FileUploadEndpoint : IConfigurableEndpoint
         return Results.Ok(new { fileId, fileName = file.FileName, description });
     }
 
-    public static void Configure(IApplicationBuilder app, IEndpointConventionBuilder endpoint)
+    public static void Configure(IApplicationBuilder app, RouteHandlerBuilder endpoint)
     {
         endpoint
             .WithName("UploadFile")
@@ -1076,7 +1076,7 @@ public class TriggerOrderProcessingEndpoint : IConfigurableEndpoint
         return Task.FromResult(Results.Ok(new { jobId, status = "queued" }));
     }
 
-    public static void Configure(IApplicationBuilder app, IEndpointConventionBuilder endpoint)
+    public static void Configure(IApplicationBuilder app, RouteHandlerBuilder endpoint)
     {
         endpoint
             .RequireAuthorization("JobTrigger")

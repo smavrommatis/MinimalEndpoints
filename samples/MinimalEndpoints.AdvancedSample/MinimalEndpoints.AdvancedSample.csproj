@@ -7,11 +7,14 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.1" />
-    <PackageReference Include="Scalar.AspNetCore" Version="2.11.8" />
-
     <ProjectReference Include="..\..\src\MinimalEndpoints\MinimalEndpoints.csproj" />
     <ProjectReference Include="..\..\src\MinimalEndpoints.Analyzers\MinimalEndpoints.Analyzers.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.1" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.0" />
+  </ItemGroup>
+
 </Project>
+

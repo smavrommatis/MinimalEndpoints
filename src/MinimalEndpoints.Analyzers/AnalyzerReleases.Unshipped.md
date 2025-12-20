@@ -8,3 +8,4 @@ Rule ID | Category | Severity | Notes
 MINEP001 | MinimalEndpoints | Error | EntryPointAnalyzer
 MINEP002 | MinimalEndpoints | Error | MultipleAttributesAnalyzer
 MINEP003 | MinimalEndpoints | Error | ServiceTypeValidationAnalyzer
+MINEP004 | MinimalEndpoints | Warning | AmbiguousRouteAnalyzer

@@ -7,8 +7,8 @@ namespace MinimalEndpoints;
 /// </summary>
 /// <remarks>
 /// Implement this interface on your endpoint class to provide custom configuration
-/// for the endpoint convention builder. The <see cref="Configure"/> method will be
-/// automatically called by the generated code after the endpoint is mapped.
+/// for the route handler. The <see cref="Configure"/> method will be automatically
+/// called by the generated code after the endpoint is mapped.
 /// </remarks>
 /// <example>
 /// <code>
@@ -20,13 +20,14 @@ namespace MinimalEndpoints;
 ///         return Task.FromResult(Results.Ok(new[] { "User1", "User2" }));
 ///     }
 ///
-///     public static void Configure(IApplicationBuilder app, IEndpointConventionBuilder endpoint)
+///     public static void Configure(IApplicationBuilder app, RouteHandlerBuilder endpoint)
 ///     {
 ///         endpoint
 ///             .WithName("GetUsers")
 ///             .WithTags("Users")
 ///             .RequireAuthorization()
-///             .CacheOutput(x => x.Expire(TimeSpan.FromMinutes(5)));
+///             .CacheOutput(x => x.Expire(TimeSpan.FromMinutes(5)))
+///             .Produces&lt;User[]&gt;(StatusCodes.Status200OK);
 ///     }
 /// }
 /// </code>
@@ -34,9 +35,10 @@ namespace MinimalEndpoints;
 public interface IConfigurableEndpoint
 {
     /// <summary>
-    /// Configures the endpoint convention builder with additional settings.
+    /// Configures the route handler with additional settings such as metadata,
+    /// authorization, caching, and OpenAPI documentation.
     /// </summary>
     /// <param name="app">The application builder instance.</param>
-    /// <param name="endpoint">The endpoint convention builder to configure.</param>
-    static abstract void Configure(IApplicationBuilder app, IEndpointConventionBuilder endpoint);
+    /// <param name="endpoint">The route handler builder to configure.</param>
+    static abstract void Configure(IApplicationBuilder app, RouteHandlerBuilder endpoint);
 }

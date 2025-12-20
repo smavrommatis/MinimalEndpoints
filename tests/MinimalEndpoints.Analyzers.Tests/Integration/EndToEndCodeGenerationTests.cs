@@ -122,7 +122,7 @@ public class ConfigurableEndpoint : IConfigurableEndpoint
         return Task.FromResult(Results.Ok());
     }
 
-    public static void Configure(IApplicationBuilder app, IEndpointConventionBuilder endpoint)
+    public static void Configure(IApplicationBuilder app, RouteHandlerBuilder endpoint)
     {
         endpoint.WithTags(""test"");
     }
@@ -465,7 +465,7 @@ public class ConfigurableServiceEndpoint : IConfigurableService, IConfigurableEn
         return Task.FromResult(Results.Ok());
     }
 
-    public static void Configure(IApplicationBuilder app, IEndpointConventionBuilder endpoint)
+    public static void Configure(IApplicationBuilder app, RouteHandlerBuilder endpoint)
     {
         endpoint.WithTags(""configured"");
     }
@@ -562,7 +562,39 @@ public class TupleEndpoint
 
         // Assert
         Assert.NotNull(generatedCode);
+        // Should use tuple syntax, not ValueTuple<int, string>
         Assert.Contains("(int id, string name)", generatedCode);
+        Assert.DoesNotContain("ValueTuple", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratedCode_HandlesUnnamedTupleTypes_Correctly()
+    {
+        // Arrange
+        var code = @"
+namespace TestApp.Endpoints;
+
+[MapGet(""/tuple"")]
+public class UnnamedTupleEndpoint
+{
+    public Task<IResult> HandleAsync((int, string) data)
+    {
+        return Task.FromResult(Results.Ok(data));
+    }
+}";
+
+        // Act
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
+
+        var (generatedCode, _) = GenerateCodeAndCompile(compilation);
+
+        // Assert
+        Assert.NotNull(generatedCode);
+        // Should use tuple syntax even without names
+        Assert.Contains("(int, string)", generatedCode);
+        Assert.DoesNotContain("ValueTuple", generatedCode);
     }
 
     [Fact]

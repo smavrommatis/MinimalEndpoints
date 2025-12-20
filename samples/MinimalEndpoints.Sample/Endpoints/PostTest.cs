@@ -10,7 +10,7 @@ public class PostTest: IConfigurableEndpoint
         return Results.Ok();
     }
 
-    public static void Configure(IApplicationBuilder app, IEndpointConventionBuilder endpoint)
+    public static void Configure(IApplicationBuilder app, RouteHandlerBuilder endpoint)
     {
         endpoint
             .WithTags("test-group");

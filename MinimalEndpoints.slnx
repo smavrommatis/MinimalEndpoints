@@ -3,9 +3,16 @@
     <File Path="docs/ARCHITECTURE.md" />
     <File Path="docs/CONTRIBUTING.md" />
     <File Path="docs/EXAMPLES.md" />
-    <File Path="docs/IMPROVEMENT_CHECKLIST.md" />
+  </Folder>
+  <Folder Name="/docs/diagnostics/">
+    <File Path="docs/diagnostics/MINEP001.md" />
+    <File Path="docs/diagnostics/MINEP002.md" />
+    <File Path="docs/diagnostics/MINEP003.md" />
+    <File Path="docs/diagnostics/MINEP004.md" />
   </Folder>
   <Folder Name="/samples/">
+    <File Path="samples/README.md" />
+    <Project Path="samples/MinimalEndpoints.AdvancedSample/MinimalEndpoints.AdvancedSample.csproj" />
     <Project Path="samples/MinimalEndpoints.Sample/MinimalEndpoints.Sample.csproj" />
   </Folder>
   <Folder Name="/src/">

@@ -45,6 +45,21 @@ internal static class Diagnostics
         description: "When ServiceType is specified, the interface must contain the entry point method that will be called." +
         "The interface method should match the signature of the endpoint's entry point." +
         "Example: public interface IMyEndpoint { Task<IResult> HandleAsync(); }.",
-        helpLinkUri: "https://github.com/yourusername/MinimalEndpoints/docs/MINEP003.md"
+        helpLinkUri: "https://github.com/yourusername/MinimalEndpoints/docs/diagnostics/MINEP003.md"
+    );
+
+    public static readonly DiagnosticDescriptor AmbiguousRoutes = new DiagnosticDescriptor(
+        id: "MINEP004",
+        title: "Ambiguous route pattern detected",
+        messageFormat:
+        "Endpoint '{0}' has route pattern '{1}' that conflicts with endpoint '{2}'. " +
+        "Multiple endpoints with the same HTTP method and route pattern will cause routing ambiguity.",
+        category: "MinimalEndpoints",
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: "Multiple endpoints should not have identical route patterns for the same HTTP method. " +
+        "This will cause routing ambiguity and unpredictable behavior at runtime. " +
+        "Consider using different route patterns, route constraints, or consolidating the endpoints.",
+        helpLinkUri: "https://github.com/yourusername/MinimalEndpoints/docs/diagnostics/MINEP004.md"
     );
 }

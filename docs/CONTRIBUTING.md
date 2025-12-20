@@ -65,7 +65,7 @@ Unsure where to begin? You can start by looking through `good-first-issue` and `
 
 ### Prerequisites
 
-- .NET 8.0 SDK or later
+- .NET 10.0 SDK or later
 - Visual Studio 2022 / VS Code / Rider
 - Git
 

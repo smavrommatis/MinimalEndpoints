@@ -15,7 +15,7 @@ namespace TestNamespace;
 
 public class TestEndpoint : MinimalEndpoints.IConfigurableEndpoint
 {
-    public static void Configure(IApplicationBuilder app, IEndpointConventionBuilder endpoint)
+    public static void Configure(IApplicationBuilder app, RouteHandlerBuilder endpoint)
     {
     }
 }";

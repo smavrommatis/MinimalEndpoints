@@ -355,7 +355,7 @@ public interface IConfigurableEndpoint
 {
     static abstract void Configure(
         IApplicationBuilder app,
-        IEndpointConventionBuilder endpoint);
+        RouteHandlerBuilder endpoint);
 }
 ```
 
@@ -416,7 +416,7 @@ services.AddScoped<IGetUsers, GetUsersEndpoint>();
 ```
 Blackeye.MinimalEndpoints.nupkg
 ├── lib/
-│   └── net8.0/
+│   └── net10.0/
 │       └── MinimalEndpoints.dll
 ├── analyzers/
 │   └── dotnet/
