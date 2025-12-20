@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Text;
+using Microsoft.CodeAnalysis;
 using MinimalEndpoints.Analyzers.Models;
 
 namespace MinimalEndpoints.Analyzers.Utilities;
@@ -14,17 +15,64 @@ internal static class EndpointCodeGenerator
             return null;
         }
 
+        // Collect unique groups from all endpoints
+        var directGroups = endpoints
+            .Select(e => e.MapMethodsAttribute.GroupType)
+            .Where(g => g != null)
+            .Distinct(SymbolEqualityComparer.Default)
+            .Cast<INamedTypeSymbol>()
+            .ToList();
+
+        // Collect all groups including parent groups (recursively)
+        var allGroups = CollectAllGroups(directGroups);
+
         var fileScope = CreateFileScope(namespaceName, className)
-            .AddMinimalEndpointsRegistrationMethod(endpoints);
+            .AddMinimalEndpointsRegistrationMethod(endpoints, allGroups);
+
+        // Add group mapping methods
+        foreach (var group in allGroups)
+        {
+            fileScope.AddGroupMapMethod(group);
+        }
 
         foreach (var endpoint in endpoints)
         {
             fileScope.AddMinimalEndpointMapMethod(endpoint);
         }
 
-        fileScope.AddMinimalEndpointsMapAllMethods(endpoints);
+        fileScope.AddMinimalEndpointsMapAllMethods(endpoints, allGroups);
 
         return fileScope;
+    }
+
+    private static List<INamedTypeSymbol> CollectAllGroups(List<INamedTypeSymbol> directGroups)
+    {
+        var allGroups = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
+
+        void CollectGroup(INamedTypeSymbol group)
+        {
+            if (!allGroups.Add(group))
+                return; // Already visited
+
+            // Get parent group and add it recursively
+            var mapGroupAttr = group.GetAttributes()
+                .FirstOrDefault(a => a.AttributeClass?.Name == "MapGroupAttribute");
+            var parentGroupArg = mapGroupAttr?.NamedArguments
+                .FirstOrDefault(arg => arg.Key == "ParentGroup");
+            var parentGroup = parentGroupArg?.Value.Value as INamedTypeSymbol;
+
+            if (parentGroup != null)
+            {
+                CollectGroup(parentGroup);
+            }
+        }
+
+        foreach (var group in directGroups)
+        {
+            CollectGroup(group);
+        }
+
+        return allGroups.ToList();
     }
 
     public static CSharpFileScope CreateFileScope(string namespaceName, string className)
@@ -54,8 +102,8 @@ internal static class EndpointCodeGenerator
             .AddClassAttribute("[GeneratedCode(\"MinimalEndpoints.Analyzers.EndpointGenerator\", \"1.0.0\")]");
     }
 
-    public static CSharpFileScope AddMinimalEndpointsRegistrationMethod(this CSharpFileScope fileScope,
-        ImmutableArray<EndpointDefinition> endpoints)
+    private static CSharpFileScope AddMinimalEndpointsRegistrationMethod(this CSharpFileScope fileScope,
+        ImmutableArray<EndpointDefinition> endpoints, List<INamedTypeSymbol> groups)
     {
         if (endpoints.IsEmpty)
         {
@@ -71,6 +119,19 @@ internal static class EndpointCodeGenerator
 
         var usings = fileScope.GetAvailableUsings();
 
+        // Register groups first (as singletons since they're typically stateless)
+        foreach (var group in groups)
+        {
+            var groupTypeName = new TypeDefinition(group).ToDisplayString(usings);
+            method.AddLine($"services.AddSingleton<{groupTypeName}>();");
+        }
+
+        if (groups.Any())
+        {
+            method.AddEmptyLine();
+        }
+
+        // Register endpoints
         foreach (var endpoint in endpoints)
         {
             var lifetime = GetLifetimeMethodName(endpoint.MapMethodsAttribute.Lifetime);
@@ -88,15 +149,69 @@ internal static class EndpointCodeGenerator
         return fileScope;
     }
 
-    public static CSharpFileScope AddMinimalEndpointMapMethod(this CSharpFileScope fileScope,
+    public static CSharpFileScope AddGroupMapMethod(this CSharpFileScope fileScope, INamedTypeSymbol groupSymbol)
+    {
+        var usings = fileScope.GetAvailableUsings();
+        var groupTypeName = new TypeDefinition(groupSymbol).ToDisplayString(usings);
+
+        // Generate method name with full namespace like endpoints do
+        var groupTypeDefinition = new TypeDefinition(groupSymbol);
+        var methodNameBuilder = new StringBuilder("MapGroup__", groupTypeDefinition.FullName.Length + 10);
+        foreach (var ch in groupTypeDefinition.FullName)
+        {
+            methodNameBuilder.Append(ch == '.' || ch == '+' ? '_' : ch);
+        }
+        var methodName = methodNameBuilder.ToString();
+
+        // Get the MapGroup attribute to extract the prefix and parent
+        var mapGroupAttr = groupSymbol.GetAttributes()
+            .FirstOrDefault(a => a.AttributeClass?.Name == "MapGroupAttribute");
+
+        var prefix = mapGroupAttr?.ConstructorArguments.FirstOrDefault().Value as string ?? "/";
+
+        // Get parent group if specified
+        var parentGroupArg = mapGroupAttr?.NamedArguments
+            .FirstOrDefault(arg => arg.Key == "ParentGroup");
+        var parentGroup = parentGroupArg?.Value.Value as INamedTypeSymbol;
+
+        // Determine parameters: if has parent, need parent group parameter
+        var parameters = parentGroup != null
+            ? "this IEndpointRouteBuilder builder, IApplicationBuilder app, RouteGroupBuilder parentGroup"
+            : "this IEndpointRouteBuilder builder, IApplicationBuilder app";
+
+        var method = fileScope.AddMethod(
+            modifiers: "public static",
+            returnType: "RouteGroupBuilder",
+            methodName: methodName,
+            parameters: parameters
+        );
+
+        // Map to parent group or main builder
+        var builderExpression = parentGroup != null ? "parentGroup" : "builder";
+
+        method.AddLine($"var group = {builderExpression}.MapGroup(\"{prefix}\");");
+        method.AddLine($"var groupInstance = app.ApplicationServices.GetRequiredService<{groupTypeName}>();");
+        method.AddLine($"groupInstance.ConfigureGroup(group);");
+        method.AddLine($"return group;");
+
+        return fileScope;
+    }
+
+    private static CSharpFileScope AddMinimalEndpointMapMethod(this CSharpFileScope fileScope,
         EndpointDefinition endpoint)
     {
         const string instanceParameterBaseName = "endpointInstance";
+
+        // Determine parameters: if endpoint has a group, include it
+        var methodParameters = endpoint.MapMethodsAttribute.GroupType != null
+            ? "this IEndpointRouteBuilder builder, IApplicationBuilder app, RouteGroupBuilder group"
+            : "this IEndpointRouteBuilder builder, IApplicationBuilder app";
+
         var method = fileScope.AddMethod(
             modifiers: "public static",
             returnType: "IEndpointRouteBuilder",
             methodName: endpoint.MappingEndpointMethodName,
-            parameters: "this IEndpointRouteBuilder builder, IApplicationBuilder app"
+            parameters: methodParameters
         );
 
         var usings = fileScope.GetAvailableUsings();
@@ -106,7 +221,6 @@ internal static class EndpointCodeGenerator
         var methodArguments = endpoint.EntryPoint.Parameters.Count > 0
             ? string.Join(", ", endpoint.EntryPoint.Parameters.Select(p => p.Key))
             : "";
-
 
         var instanceParameterName = "endpointInstance";
         var index = 0;
@@ -131,17 +245,20 @@ internal static class EndpointCodeGenerator
 
         var pattern = endpoint.MapMethodsAttribute.Pattern;
 
+        // Determine the builder to use (group parameter or main builder)
+        var builderExpression = endpoint.MapMethodsAttribute.GroupType != null ? "group" : "builder";
+
         if (endpoint.MapMethodsAttribute.Methods.Length > 1)
         {
             var methods = string.Join(", ",
                 endpoint.MapMethodsAttribute.Methods.Select(m => $"\"{m.ToUpperInvariant()}\""));
             method.AddLine(
-                $"var endpoint = builder.MapMethods(\"{pattern}\", [{methods}], Handler);");
+                $"var endpoint = {builderExpression}.MapMethods(\"{pattern}\", [{methods}], Handler);");
         }
         else
         {
             method.AddLine(
-                $"var endpoint = builder.{endpoint.MapMethodsAttribute.EndpointBuilderMethodName}(\"{pattern}\", Handler);");
+                $"var endpoint = {builderExpression}.{endpoint.MapMethodsAttribute.EndpointBuilderMethodName}(\"{pattern}\", Handler);");
         }
 
         if (endpoint.IsConfigurable)
@@ -159,8 +276,8 @@ internal static class EndpointCodeGenerator
         return index <= 0 ? name : $"{name}{index}";
     }
 
-    public static void AddMinimalEndpointsMapAllMethods(this CSharpFileScope fileScope,
-        ImmutableArray<EndpointDefinition> endpoints)
+    private static void AddMinimalEndpointsMapAllMethods(this CSharpFileScope fileScope,
+        ImmutableArray<EndpointDefinition> endpoints, List<INamedTypeSymbol> groups)
     {
         var method = fileScope.AddMethod(
             modifiers: "public static",
@@ -172,12 +289,118 @@ internal static class EndpointCodeGenerator
         method.AddLine(
             "var builder = app as IEndpointRouteBuilder ?? throw new ArgumentException(\"IApplicationBuilder is not an IEndpointRouteBuilder\");");
 
+        if (groups.Any())
+        {
+            method.AddEmptyLine();
+            method.AddLine("// Create and configure groups in hierarchy order");
+
+            // Sort groups by hierarchy: parents before children
+            var sortedGroups = TopologicalSortGroups(groups);
+
+            foreach (var group in sortedGroups)
+            {
+                // Generate variable name and method name with full namespace
+                var groupTypeDefinition = new TypeDefinition(group);
+                var groupVarNameBuilder = new StringBuilder("group_", groupTypeDefinition.FullName.Length + 10);
+                var mapGroupMethodNameBuilder = new StringBuilder("MapGroup__", groupTypeDefinition.FullName.Length + 10);
+
+                foreach (var ch in groupTypeDefinition.FullName)
+                {
+                    var replacementChar = (ch == '.' || ch == '+') ? '_' : ch;
+                    groupVarNameBuilder.Append(replacementChar);
+                    mapGroupMethodNameBuilder.Append(replacementChar);
+                }
+
+                var groupVarName = groupVarNameBuilder.ToString();
+                var mapGroupMethodName = mapGroupMethodNameBuilder.ToString();
+
+                // Get parent group if any
+                var mapGroupAttr = group.GetAttributes()
+                    .FirstOrDefault(a => a.AttributeClass?.Name == "MapGroupAttribute");
+                var parentGroupArg = mapGroupAttr?.NamedArguments
+                    .FirstOrDefault(arg => arg.Key == "ParentGroup");
+                var parentGroup = parentGroupArg?.Value.Value as INamedTypeSymbol;
+
+                if (parentGroup != null)
+                {
+                    // Generate parent variable name with full namespace
+                    var parentTypeDefinition = new TypeDefinition(parentGroup);
+                    var parentVarNameBuilder = new StringBuilder("group_", parentTypeDefinition.FullName.Length + 10);
+                    foreach (var ch in parentTypeDefinition.FullName)
+                    {
+                        parentVarNameBuilder.Append((ch == '.' || ch == '+') ? '_' : ch);
+                    }
+                    var parentVarName = parentVarNameBuilder.ToString();
+
+                    method.AddLine($"var {groupVarName} = builder.{mapGroupMethodName}(app, {parentVarName});");
+                }
+                else
+                {
+                    method.AddLine($"var {groupVarName} = builder.{mapGroupMethodName}(app);");
+                }
+            }
+
+            method.AddEmptyLine();
+        }
+
+        method.AddLine("// Map endpoints");
         foreach (var endpoint in endpoints)
         {
-            method.AddLine($"builder.{endpoint.MappingEndpointMethodName}(app);");
+            if (endpoint.MapMethodsAttribute.GroupType != null)
+            {
+                // Generate group variable name with full namespace
+                var groupTypeDefinition = new TypeDefinition(endpoint.MapMethodsAttribute.GroupType);
+                var groupVarNameBuilder = new StringBuilder("group_", groupTypeDefinition.FullName.Length + 10);
+                foreach (var ch in groupTypeDefinition.FullName)
+                {
+                    groupVarNameBuilder.Append((ch == '.' || ch == '+') ? '_' : ch);
+                }
+                var groupVarName = groupVarNameBuilder.ToString();
+
+                method.AddLine($"builder.{endpoint.MappingEndpointMethodName}(app, {groupVarName});");
+            }
+            else
+            {
+                method.AddLine($"builder.{endpoint.MappingEndpointMethodName}(app);");
+            }
         }
 
         method.AddLine("return app;");
+    }
+
+    private static List<INamedTypeSymbol> TopologicalSortGroups(List<INamedTypeSymbol> groups)
+    {
+        var sorted = new List<INamedTypeSymbol>();
+        var visited = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
+
+        void Visit(INamedTypeSymbol group)
+        {
+            if (visited.Contains(group))
+                return;
+
+            visited.Add(group);
+
+            // Visit parent first
+            var mapGroupAttr = group.GetAttributes()
+                .FirstOrDefault(a => a.AttributeClass?.Name == "MapGroupAttribute");
+            var parentGroupArg = mapGroupAttr?.NamedArguments
+                .FirstOrDefault(arg => arg.Key == "ParentGroup");
+            var parentGroup = parentGroupArg?.Value.Value as INamedTypeSymbol;
+
+            if (parentGroup != null && groups.Contains(parentGroup, SymbolEqualityComparer.Default))
+            {
+                Visit(parentGroup);
+            }
+
+            sorted.Add(group);
+        }
+
+        foreach (var group in groups)
+        {
+            Visit(group);
+        }
+
+        return sorted;
     }
 
     private static List<string> BuildParameterList(EndpointDefinition endpoint, HashSet<string> usings)

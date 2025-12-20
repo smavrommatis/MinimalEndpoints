@@ -93,22 +93,22 @@ internal static class MapMethodsUtilities
         string[] methods
         )
     {
-        string groupPrefix = null;
         string entryPoint = null;
         string serviceName = null;
+        INamedTypeSymbol groupType = null;
 
         foreach (var namedArg in attributeData.NamedArguments)
         {
             switch (namedArg.Key)
             {
-                case "GroupPrefix" when namedArg.Value.Value is string prefix:
-                    groupPrefix = prefix;
-                    break;
                 case "EntryPoint" when namedArg.Value.Value is string entry:
                     entryPoint = entry;
                     break;
                 case "ServiceType" when namedArg.Value.Value is INamedTypeSymbol serviceType:
                     serviceName = serviceType.ToDisplayString();
+                    break;
+                case "Group" when namedArg.Value.Value is INamedTypeSymbol group:
+                    groupType = group;
                     break;
             }
         }
@@ -119,9 +119,9 @@ internal static class MapMethodsUtilities
             EndpointBuilderMethodName = endpointBuilderMethodName,
             Methods = methods,
             Lifetime = lifetime,
-            GroupPrefix = groupPrefix,
             EntryPoint = entryPoint,
-            ServiceName = serviceName
+            ServiceName = serviceName,
+            GroupType = groupType
         };
     }
 

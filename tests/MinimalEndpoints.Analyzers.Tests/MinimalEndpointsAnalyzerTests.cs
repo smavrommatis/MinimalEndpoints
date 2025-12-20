@@ -513,9 +513,328 @@ public class GetData3Endpoint
         Assert.Equal(3, warnings.Count);
     }
 
+    [Fact]
+    public void AmbiguousRoutes_WithGroupHierarchy_DetectsConflicts()
+    {
+        // Arrange
+        var code = @"
+namespace TestApp;
+
+[MapGroup(""/api"")]
+public class ApiGroup : IEndpointGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group) { }
+}
+
+[MapGroup(""/v1"", ParentGroup = typeof(ApiGroup))]
+public class V1Group : IEndpointGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group) { }
+}
+
+[MapGet(""/products"", Group = typeof(V1Group))]
+public class GetProductsV1Endpoint
+{
+    public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok());
+}
+
+[MapGet(""/api/v1/products"")]
+public class GetProductsV1DirectEndpoint
+{
+    public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok());
+}";
+
+        // Act
+        var diagnostics = GetDiagnostics(code);
+
+        // Assert - Both resolve to /api/v1/products
+        var warning = Assert.Single(diagnostics, d => d.Id == "MINEP004");
+        Assert.Equal(DiagnosticSeverity.Warning, warning.Severity);
+    }
+
+    [Fact]
+    public void AmbiguousRoutes_WithDifferentGroupHierarchies_NoConflict()
+    {
+        // Arrange
+        var code = @"
+namespace TestApp;
+
+[MapGroup(""/api"")]
+public class ApiGroup : IEndpointGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group) { }
+}
+
+[MapGroup(""/v1"", ParentGroup = typeof(ApiGroup))]
+public class V1Group : IEndpointGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group) { }
+}
+
+[MapGroup(""/v2"", ParentGroup = typeof(ApiGroup))]
+public class V2Group : IEndpointGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group) { }
+}
+
+[MapGet(""/products"", Group = typeof(V1Group))]
+public class GetProductsV1Endpoint
+{
+    public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok());
+}
+
+[MapGet(""/products"", Group = typeof(V2Group))]
+public class GetProductsV2Endpoint
+{
+    public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok());
+}";
+
+        // Act
+        var diagnostics = GetDiagnostics(code);
+
+        // Assert - /api/v1/products vs /api/v2/products - no conflict
+        Assert.DoesNotContain(diagnostics, d => d.Id == "MINEP004");
+    }
+
     #endregion
 
-    #region Helper Methods
+    #region MINEP005 - Invalid Group Type Tests
+
+    [Fact]
+    public void InvalidGroupType_WithValidGroup_NoError()
+    {
+        // Arrange
+        var code = @"
+namespace TestApp;
+
+[MapGroup(""/api/v1"")]
+public class ApiV1Group : IEndpointGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group) { }
+}
+
+[MapGet(""/products"", Group = typeof(ApiV1Group))]
+public class GetProductsEndpoint
+{
+    public Task<IResult> HandleAsync()
+    {
+        return Task.FromResult(Results.Ok());
+    }
+}";
+
+        // Act
+        var diagnostics = GetDiagnostics(code);
+
+        // Assert
+        Assert.DoesNotContain(diagnostics, d => d.Id == "MINEP005");
+    }
+
+    [Fact]
+    public void InvalidGroupType_WithoutMapGroupAttribute_ReportsError()
+    {
+        // Arrange
+        var code = @"
+namespace TestApp;
+
+// Missing [MapGroup] attribute
+public class ApiV1Group : IEndpointGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group) { }
+}
+
+[MapGet(""/products"", Group = typeof(ApiV1Group))]
+public class GetProductsEndpoint
+{
+    public Task<IResult> HandleAsync()
+    {
+        return Task.FromResult(Results.Ok());
+    }
+}";
+
+        // Act
+        var diagnostics = GetDiagnostics(code);
+
+        // Assert
+        var error = Assert.Single(diagnostics, d => d.Id == "MINEP005");
+        Assert.Equal(DiagnosticSeverity.Error, error.Severity);
+        Assert.Contains("ApiV1Group", error.GetMessage());
+        Assert.Contains("GetProductsEndpoint", error.GetMessage());
+    }
+
+    [Fact]
+    public void InvalidGroupType_WithoutIEndpointGroup_ReportsError()
+    {
+        // Arrange
+        var code = @"
+namespace TestApp;
+
+[MapGroup(""/api/v1"")]
+public class ApiV1Group // Missing : IEndpointGroup
+{
+}
+
+[MapGet(""/products"", Group = typeof(ApiV1Group))]
+public class GetProductsEndpoint
+{
+    public Task<IResult> HandleAsync()
+    {
+        return Task.FromResult(Results.Ok());
+    }
+}";
+
+        // Act
+        var diagnostics = GetDiagnostics(code);
+
+        // Assert
+        var error = Assert.Single(diagnostics, d => d.Id == "MINEP005");
+        Assert.Equal(DiagnosticSeverity.Error, error.Severity);
+    }
+
+    [Fact]
+    public void InvalidGroupType_WithNeitherAttributeNorInterface_ReportsError()
+    {
+        // Arrange
+        var code = @"
+namespace TestApp;
+
+// Missing both [MapGroup] and IEndpointGroup
+public class ApiV1Group
+{
+}
+
+[MapGet(""/products"", Group = typeof(ApiV1Group))]
+public class GetProductsEndpoint
+{
+    public Task<IResult> HandleAsync()
+    {
+        return Task.FromResult(Results.Ok());
+    }
+}";
+
+        // Act
+        var diagnostics = GetDiagnostics(code);
+
+        // Assert
+        var error = Assert.Single(diagnostics, d => d.Id == "MINEP005");
+        Assert.Equal(DiagnosticSeverity.Error, error.Severity);
+    }
+
+    #endregion
+
+    #region MINEP006 - Cyclic Group Hierarchy Tests
+
+    [Fact]
+    public void CyclicGroupHierarchy_WithDirectCycle_ReportsError()
+    {
+        // Arrange
+        var code = @"
+namespace TestApp;
+
+[MapGroup(""/api"", ParentGroup = typeof(ApiGroup))]
+public class ApiGroup : IEndpointGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group) { }
+}";
+        // Act
+        var diagnostics = GetDiagnostics(code);
+
+        // Assert
+        var error = Assert.Single(diagnostics, d => d.Id == "MINEP006");
+        Assert.Equal(DiagnosticSeverity.Error, error.Severity);
+        Assert.Contains("ApiGroup", error.GetMessage());
+    }
+
+    [Fact]
+    public void CyclicGroupHierarchy_WithTwoLevelCycle_ReportsError()
+    {
+        // Arrange
+        var code = @"
+namespace TestApp;
+
+[MapGroup(""/api"", ParentGroup = typeof(V1Group))]
+public class ApiGroup : IEndpointGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group) { }
+}
+
+[MapGroup(""/v1"", ParentGroup = typeof(ApiGroup))]
+public class V1Group : IEndpointGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group) { }
+}";
+        // Act
+        var diagnostics = GetDiagnostics(code);
+
+        // Assert
+        var errors = diagnostics.Where(d => d.Id == "MINEP006").ToList();
+        Assert.NotEmpty(errors);
+        Assert.All(errors, e => Assert.Equal(DiagnosticSeverity.Error, e.Severity));
+    }
+
+    [Fact]
+    public void CyclicGroupHierarchy_WithThreeLevelCycle_ReportsError()
+    {
+        // Arrange
+        var code = @"
+namespace TestApp;
+
+[MapGroup(""/api"", ParentGroup = typeof(V2Group))]
+public class ApiGroup : IEndpointGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group) { }
+}
+
+[MapGroup(""/v1"", ParentGroup = typeof(ApiGroup))]
+public class V1Group : IEndpointGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group) { }
+}
+
+[MapGroup(""/v2"", ParentGroup = typeof(V1Group))]
+public class V2Group : IEndpointGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group) { }
+}";
+        // Act
+        var diagnostics = GetDiagnostics(code);
+
+        // Assert
+        var errors = diagnostics.Where(d => d.Id == "MINEP006").ToList();
+        Assert.NotEmpty(errors);
+    }
+
+    [Fact]
+    public void CyclicGroupHierarchy_WithValidHierarchy_NoError()
+    {
+        // Arrange
+        var code = @"
+namespace TestApp;
+
+[MapGroup(""/api"")]
+public class ApiGroup : IEndpointGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group) { }
+}
+
+[MapGroup(""/v1"", ParentGroup = typeof(ApiGroup))]
+public class V1Group : IEndpointGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group) { }
+}
+
+[MapGroup(""/products"", ParentGroup = typeof(V1Group))]
+public class ProductsGroup : IEndpointGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group) { }
+}";
+        // Act
+        var diagnostics = GetDiagnostics(code);
+
+        // Assert
+        Assert.DoesNotContain(diagnostics, d => d.Id == "MINEP006");
+    }
+
+    #endregion
 
     private List<Diagnostic> GetDiagnostics(string code)
     {
@@ -525,7 +844,11 @@ public class GetData3Endpoint
 
         var minimalEndpointsAnalyzer = new MinimalEndpointsAnalyzer();
         var ambiguousRouteAnalyzer = new AmbiguousRouteAnalyzer();
-        var analyzers = ImmutableArray.Create<DiagnosticAnalyzer>(minimalEndpointsAnalyzer, ambiguousRouteAnalyzer);
+        var groupHierarchyAnalyzer = new GroupHierarchyAnalyzer();
+        var analyzers = ImmutableArray.Create<DiagnosticAnalyzer>(
+            minimalEndpointsAnalyzer,
+            ambiguousRouteAnalyzer,
+            groupHierarchyAnalyzer);
 
         var compilationWithAnalyzer = compilation.WithAnalyzers(analyzers);
 
@@ -536,6 +859,5 @@ public class GetData3Endpoint
             .ToList();
     }
 
-    #endregion
 }
 

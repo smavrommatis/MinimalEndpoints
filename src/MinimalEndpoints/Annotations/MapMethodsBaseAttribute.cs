@@ -10,7 +10,7 @@ namespace MinimalEndpoints.Annotations;
 /// This abstract class provides common functionality for all endpoint mapping attributes.
 /// Use specific derived attributes like <see cref="MapGetAttribute"/>, <see cref="MapPostAttribute"/>, etc.
 /// </remarks>
-[AttributeUsage(AttributeTargets.Class, Inherited = true, AllowMultiple =  false)]
+[AttributeUsage(AttributeTargets.Class)]
 public abstract class MapMethodsBaseAttribute : Attribute
 {
     /// <summary>
@@ -31,14 +31,6 @@ public abstract class MapMethodsBaseAttribute : Attribute
     /// <value>The service lifetime. Default is <see cref="ServiceLifetime.Scoped"/>.</value>
     public ServiceLifetime Lifetime { get; }
 
-    /// <summary>
-    /// Gets or sets an optional route prefix to prepend to the endpoint pattern.
-    /// </summary>
-    /// <value>A string prefix that will be prepended to the pattern, or null for no prefix.</value>
-    /// <example>
-    /// Setting <c>GroupPrefix = "api/v1"</c> with <c>Pattern = "/users"</c> results in route <c>"/api/v1/users"</c>.
-    /// </example>
-    public string? GroupPrefix { get; set; }
 
     /// <summary>
     /// Gets or sets the name of the entry point method to invoke.
@@ -86,6 +78,36 @@ public abstract class MapMethodsBaseAttribute : Attribute
     /// </code>
     /// </example>
     public Type? ServiceType { get; set; }
+
+    /// <summary>
+    /// Gets or sets the endpoint group type that defines shared configuration and route prefix.
+    /// </summary>
+    /// <value>
+    /// The type of a class decorated with <see cref="MapGroupAttribute"/> implementing <see cref="IEndpointGroup"/>,
+    /// or null if this endpoint is not part of a group.
+    /// </value>
+    /// <remarks>
+    /// When specified, this endpoint will be mapped within the route group, inheriting the group's
+    /// route prefix and any shared configuration defined in the group's <see cref="IEndpointGroup.ConfigureGroup"/> method.
+    /// The group type must be decorated with <see cref="MapGroupAttribute"/> and implement <see cref="IEndpointGroup"/>.
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// [MapGroup("/api/v1")]
+    /// public class ApiV1Group : IEndpointGroup
+    /// {
+    ///     public void ConfigureGroup(RouteGroupBuilder group)
+    ///     {
+    ///         group.RequireAuthorization();
+    ///     }
+    /// }
+    ///
+    /// [MapGet("/products", Group = typeof(ApiV1Group))]
+    /// public class ListProductsEndpoint { }
+    /// // Results in route: /api/v1/products with authorization required
+    /// </code>
+    /// </example>
+    public Type? Group { get; set; }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="MapMethodsBaseAttribute"/> class.

@@ -14,7 +14,8 @@ public class MinimalEndpointsAnalyzer : DiagnosticAnalyzer
     [
         Diagnostics.MissingEntryPoint,
         Diagnostics.MultipleAttributesDetected,
-        Diagnostics.ServiceTypeMissingEntryPoint
+        Diagnostics.ServiceTypeMissingEntryPoint,
+        Diagnostics.InvalidGroupType
     ];
 
     public override void Initialize(AnalysisContext context)
@@ -99,6 +100,40 @@ public class MinimalEndpointsAnalyzer : DiagnosticAnalyzer
                 }
             }
         }
+
+        // Validate Group if specified
+        var groupTypeSymbol = GetGroupTypeSymbol(attributes[0]);
+        if (groupTypeSymbol != null)
+        {
+            ValidateGroupType(context, classDeclaration, namedTypeSymbol, groupTypeSymbol);
+        }
+    }
+
+    private static void ValidateGroupType(
+        SyntaxNodeAnalysisContext context,
+        ClassDeclarationSyntax classDeclaration,
+        INamedTypeSymbol endpointSymbol,
+        INamedTypeSymbol groupTypeSymbol)
+    {
+        // Check if group type has MapGroupAttribute
+        var hasMapGroupAttribute = groupTypeSymbol.GetAttributes()
+            .Any(attr => attr.AttributeClass?.Name == "MapGroupAttribute");
+
+        // Check if group type implements IEndpointGroup
+        var implementsIEndpointGroup = groupTypeSymbol.AllInterfaces
+            .Any(i => i.Name == "IEndpointGroup");
+
+        if (!hasMapGroupAttribute || !implementsIEndpointGroup)
+        {
+            var diagnostic = Diagnostic.Create(
+                Diagnostics.InvalidGroupType,
+                classDeclaration.Identifier.GetLocation(),
+                groupTypeSymbol.Name,
+                endpointSymbol.Name
+            );
+
+            context.ReportDiagnostic(diagnostic);
+        }
     }
 
     private static INamedTypeSymbol GetServiceTypeSymbol(AttributeData attributeData)
@@ -109,6 +144,19 @@ public class MinimalEndpointsAnalyzer : DiagnosticAnalyzer
         if (serviceTypeArg.Value.Value is INamedTypeSymbol serviceType)
         {
             return serviceType;
+        }
+
+        return null;
+    }
+
+    private static INamedTypeSymbol GetGroupTypeSymbol(AttributeData attributeData)
+    {
+        var groupArg = attributeData.NamedArguments
+            .FirstOrDefault(arg => arg.Key == "Group");
+
+        if (groupArg.Value.Value is INamedTypeSymbol groupType)
+        {
+            return groupType;
         }
 
         return null;

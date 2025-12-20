@@ -1,12 +1,13 @@
 using MinimalEndpoints.Annotations;
 using MinimalEndpoints.AdvancedSample.Services;
+using MinimalEndpoints.AdvancedSample.Groups;
 
 namespace MinimalEndpoints.AdvancedSample.Endpoints;
 
 /// <summary>
 /// Lists all products with optional filtering
 /// </summary>
-[MapGet("/api/products")]
+[MapGet("/", Group = typeof(ProductsGroup))]
 public class ListProductsEndpoint : IConfigurableEndpoint
 {
     private readonly IProductRepository _repository;

@@ -73,7 +73,7 @@ Unsure where to begin? You can start by looking through `good-first-issue` and `
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/MinimalEndpoints.git
+git clone https://github.com/blackeye/MinimalEndpoints.git
 cd MinimalEndpoints
 
 # Restore dependencies

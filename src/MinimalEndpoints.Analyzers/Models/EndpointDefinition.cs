@@ -6,8 +6,6 @@ namespace MinimalEndpoints.Analyzers.Models;
 
 internal sealed class EndpointDefinition
 {
-    private string _mappingEndpointMethodName;
-
     public TypeDefinition ClassType { get; set; }
 
     public bool IsConfigurable { get; set; }
@@ -16,7 +14,7 @@ internal sealed class EndpointDefinition
     {
         get
         {
-            if (_mappingEndpointMethodName == null)
+            if (field == null)
             {
                 // Use StringBuilder for better performance than chained Replace
                 var sb = new StringBuilder("Map__", ClassType.FullName.Length + 10);
@@ -24,15 +22,15 @@ internal sealed class EndpointDefinition
                 {
                     sb.Append(ch == '.' || ch == '+' ? '_' : ch);
                 }
-                _mappingEndpointMethodName = sb.ToString();
+                field = sb.ToString();
             }
-            return _mappingEndpointMethodName;
+            return field;
         }
     }
 
-    public MapMethodsAttributeDefinition MapMethodsAttribute { get; set; }
+    public MapMethodsAttributeDefinition MapMethodsAttribute { get; private set; }
 
-    public MethodInfo EntryPoint { get; set;  }
+    public MethodInfo EntryPoint { get; private set;  }
 
 
     public static EndpointDefinition Create(INamedTypeSymbol symbol, IMethodSymbol entryPoint,

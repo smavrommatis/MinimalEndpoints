@@ -125,6 +125,7 @@ internal sealed class CSharpFileScope
         sb.AppendLine("}");
     }
 
+
     /// <summary>
     /// Builds all method bodies
     /// </summary>

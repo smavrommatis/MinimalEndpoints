@@ -3,7 +3,7 @@
 > **Elegant, class-based endpoints for ASP.NET Core Minimal APIs with zero runtime overhead**
 
 [![NuGet](https://img.shields.io/nuget/v/Blackeye.MinimalEndpoints)](https://www.nuget.org/packages/Blackeye.MinimalEndpoints)
-[![Build](https://img.shields.io/github/actions/workflow/status/yourusername/MinimalEndpoints/build.yml)](https://github.com/yourusername/MinimalEndpoints/actions)
+[![Build](https://img.shields.io/github/actions/workflow/status/blackeye/MinimalEndpoints/build.yml)](https://github.com/blackeye/MinimalEndpoints/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 MinimalEndpoints brings the benefits of class-based organization to ASP.NET Core Minimal APIs while maintaining their simplicity and performance. Using **source generators** and **Roslyn analyzers**, it provides compile-time code generation with zero runtime overhead.
@@ -182,6 +182,90 @@ public class ConfigEndpoint { }
 public class GuidEndpoint { }
 ```
 
+### Endpoint Groups
+
+Group related endpoints with shared configuration using `IEndpointGroup`:
+
+```csharp
+// Define a group
+[MapGroup("/api/v1", GroupName = "V1 API")]
+public class ApiV1Group : IEndpointGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group)
+    {
+        group.RequireAuthorization()
+             .WithOpenApi()
+             .WithRateLimiter("fixed");
+    }
+}
+
+// Use the group
+[MapGet("/products", Group = typeof(ApiV1Group))]
+public class ListProductsEndpoint
+{
+    public Task<IResult> HandleAsync() { }
+}
+// Results in: /api/v1/products with authorization and rate limiting
+```
+
+**Benefits of Groups:**
+- **DRY**: Define route prefix once
+- **Shared Config**: Authorization, rate limiting, CORS, etc.
+- **Type-Safe**: Compile-time checking with `typeof()`
+- **Versioning**: Easy API versioning (`/api/v1`, `/api/v2`)
+
+#### Hierarchical Groups
+
+Groups can have parent groups, creating multi-level route structures:
+
+```csharp
+// Root group
+[MapGroup("/api")]
+public class ApiGroup : IEndpointGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group)
+    {
+        group.WithOpenApi();
+    }
+}
+
+// Child group with parent
+[MapGroup("/v1", ParentGroup = typeof(ApiGroup))]
+public class V1Group : IEndpointGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group)
+    {
+        group.RequireAuthorization();
+    }
+}
+
+// Grandchild group
+[MapGroup("/admin", ParentGroup = typeof(V1Group))]
+public class AdminGroup : IEndpointGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group)
+    {
+        group.RequireAuthorization("Admin");
+    }
+}
+
+// Endpoint uses the deepest group
+[MapGet("/users", Group = typeof(AdminGroup))]
+public class ListAdminUsersEndpoint
+{
+    public Task<IResult> HandleAsync() { }
+}
+// Results in: /api/v1/admin/users
+// With OpenAPI + Authorization + Admin Authorization
+```
+
+**Hierarchical Groups Features:**
+- **Nested Configuration**: Parent configurations cascade to children
+- **API Versioning**: Organize by version hierarchies
+- **Feature Modules**: Group by business domains
+- **Compile-Time Validation**: Cycle detection prevents circular hierarchies (MINEP006)
+
+
 ### Service Interface
 
 Register as an interface instead of concrete class:
@@ -324,6 +408,9 @@ While you type, Roslyn analyzers check for common mistakes:
 - ✅ **MINEP001**: Ensures entry point method exists
 - ✅ **MINEP002**: Detects multiple mapping attributes
 - ✅ **MINEP003**: Validates ServiceType interface compatibility
+- ✅ **MINEP004**: Warns about ambiguous route patterns
+- ✅ **MINEP005**: Validates group types implement IEndpointGroup
+- ✅ **MINEP006**: Detects cyclic group hierarchies
 
 All validation happens at design-time with helpful error messages and quick fixes.
 
@@ -539,6 +626,34 @@ public class ListUsersEndpoint { }
 
 [Learn more →](docs/diagnostics/MINEP004.md)
 
+### MINEP005: Invalid Group Type
+Validates that groups implement `IEndpointGroup` and have `[MapGroup]` attribute.
+
+```csharp
+// ❌ Error: Invalid group type
+public class ApiGroup { }  // Missing IEndpointGroup and [MapGroup]
+
+[MapGet("/users", Group = typeof(ApiGroup))]
+public class GetUsersEndpoint { }
+```
+
+[Learn more →](docs/diagnostics/MINEP005.md)
+
+### MINEP006: Cyclic Group Hierarchy
+Detects circular parent-child relationships in group hierarchies.
+
+```csharp
+// ❌ Error: Cyclic hierarchy
+[MapGroup("/api", ParentGroup = typeof(V1Group))]
+public class ApiGroup : IEndpointGroup { }
+
+[MapGroup("/v1", ParentGroup = typeof(ApiGroup))]
+public class V1Group : IEndpointGroup { }
+// Cycle: ApiGroup → V1Group → ApiGroup
+```
+
+[Learn more →](docs/diagnostics/MINEP006.md)
+
 ---
 
 ## 📚 Examples & Samples
@@ -612,7 +727,7 @@ Contributions are welcome! Please read [CONTRIBUTING.md](docs/CONTRIBUTING.md) f
 ### Building from Source
 
 ```bash
-git clone https://github.com/yourusername/MinimalEndpoints.git
+git clone https://github.com/blackeye/MinimalEndpoints.git
 cd MinimalEndpoints
 dotnet build
 dotnet test
@@ -637,17 +752,17 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 📮 Support
 
 - 📚 [Documentation](docs/)
-- 💬 [Discussions](https://github.com/yourusername/MinimalEndpoints/discussions)
-- 🐛 [Issue Tracker](https://github.com/yourusername/MinimalEndpoints/issues)
+- 💬 [Discussions](https://github.com/blackeye/MinimalEndpoints/discussions)
+- 🐛 [Issue Tracker](https://github.com/blackeye/MinimalEndpoints/issues)
 - 📧 [Email](mailto:sotirios.mavrommatis@gmail.com)
 
 ### Reporting Analyzer Issues
 
-If you encounter issues with any of the built-in analyzers (MINEP001-004):
+If you encounter issues with any of the built-in analyzers (MINEP001-006):
 
 1. **Unexpected warnings?** Check the [diagnostic documentation](docs/diagnostics/) for suppression options
-2. **False positives?** [Report them](https://github.com/yourusername/MinimalEndpoints/issues/new?labels=analyzer) - we'll investigate and improve the analyzer
-3. **Questions?** Start a [discussion](https://github.com/yourusername/MinimalEndpoints/discussions)
+2. **False positives?** [Report them](https://github.com/blackeye/MinimalEndpoints/issues/new?labels=analyzer) - we'll investigate and improve the analyzer
+3. **Questions?** Start a [discussion](https://github.com/blackeye/MinimalEndpoints/discussions)
 
 We continuously improve analyzer accuracy based on community feedback!
 

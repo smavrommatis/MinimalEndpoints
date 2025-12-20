@@ -9,6 +9,8 @@
     <File Path="docs/diagnostics/MINEP002.md" />
     <File Path="docs/diagnostics/MINEP003.md" />
     <File Path="docs/diagnostics/MINEP004.md" />
+    <File Path="docs/diagnostics/MINEP005.md" />
+    <File Path="docs/diagnostics/MINEP006.md" />
   </Folder>
   <Folder Name="/samples/">
     <File Path="samples/README.md" />

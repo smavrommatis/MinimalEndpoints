@@ -21,9 +21,9 @@ namespace MinimalEndpoints.Annotations;
 ///         _repository = repository;
 ///     }
 ///
-///     public async Task&lt;IResult&gt; HandleAsync(int id, CancellationToken cancellationToken)
+///     public async Task&lt;IResult&gt; HandleAsync(int id, CancellationToken ct)
 ///     {
-///         var deleted = await _repository.DeleteAsync(id, cancellationToken);
+///         var deleted = await _repository.DeleteAsync(id, ct);
 ///         return deleted ? Results.NoContent() : Results.NotFound();
 ///     }
 /// }

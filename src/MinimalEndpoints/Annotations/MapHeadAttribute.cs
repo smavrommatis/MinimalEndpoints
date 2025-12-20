@@ -22,9 +22,9 @@ namespace MinimalEndpoints.Annotations;
 ///         _repository = repository;
 ///     }
 ///
-///     public async Task&lt;IResult&gt; HandleAsync(int id, CancellationToken cancellationToken)
+///     public async Task&lt;IResult&gt; HandleAsync(int id, CancellationToken ct)
 ///     {
-///         var exists = await _repository.ExistsAsync(id, cancellationToken);
+///         var exists = await _repository.ExistsAsync(id, ct);
 ///         return exists ? Results.Ok() : Results.NotFound();
 ///     }
 /// }

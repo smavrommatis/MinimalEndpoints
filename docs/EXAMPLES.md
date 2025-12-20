@@ -11,6 +11,8 @@
 8. [Multiple HTTP Methods](#multiple-http-methods)
 9. [Different Lifetimes](#different-lifetimes)
 10. [Complex Types](#complex-types)
+11. [Endpoint Groups](#endpoint-groups)
+12. [Hierarchical Groups](#hierarchical-groups)
 
 ---
 
@@ -1135,3 +1137,472 @@ builder.Services.AddHealthChecks()
     .AddCheck<DatabaseHealthCheck>("database")
     .AddCheck<RedisHealthCheck>("redis");
 ```
+
+---
+
+## Endpoint Groups
+
+Group related endpoints with shared configuration:
+
+### Basic Group
+
+```csharp
+using MinimalEndpoints;
+using MinimalEndpoints.Annotations;
+
+// Define the group
+[MapGroup("/api/v1", GroupName = "V1 API")]
+public class ApiV1Group : IEndpointGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group)
+    {
+        group.RequireAuthorization()
+             .WithOpenApi()
+             .WithTags("V1");
+    }
+}
+
+// Use the group in endpoints
+[MapGet("/products", Group = typeof(ApiV1Group))]
+public class ListProductsEndpoint
+{
+    public Task<IResult> HandleAsync()
+    {
+        // Results in route: /api/v1/products
+        // With authorization, OpenAPI, and "V1" tag
+        return Task.FromResult(Results.Ok(new[] { "Product1", "Product2" }));
+    }
+}
+
+[MapGet("/products/{id}", Group = typeof(ApiV1Group))]
+public class GetProductEndpoint
+{
+    public Task<IResult> HandleAsync(int id)
+    {
+        // Also uses /api/v1 prefix with same configuration
+        return Task.FromResult(Results.Ok(new { id, name = "Product" }));
+    }
+}
+```
+
+### Group with Rate Limiting
+
+```csharp
+using System.Threading.RateLimiting;
+using MinimalEndpoints;
+using MinimalEndpoints.Annotations;
+
+// Configure in Program.cs
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddFixedWindowLimiter("api", opt =>
+    {
+        opt.Window = TimeSpan.FromMinutes(1);
+        opt.PermitLimit = 100;
+    });
+});
+
+// Define group with rate limiting
+[MapGroup("/api", GroupName = "Public API")]
+public class PublicApiGroup : IEndpointGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group)
+    {
+        group.RequireRateLimiting("api")
+             .WithOpenApi();
+    }
+}
+
+[MapGet("/status", Group = typeof(PublicApiGroup))]
+public class GetStatusEndpoint
+{
+    public Task<IResult> HandleAsync()
+    {
+        return Task.FromResult(Results.Ok(new { status = "healthy" }));
+    }
+}
+```
+
+### Group with CORS
+
+```csharp
+using MinimalEndpoints;
+using MinimalEndpoints.Annotations;
+
+// Configure in Program.cs
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("ApiPolicy", policy =>
+    {
+        policy.WithOrigins("https://example.com")
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
+
+// Define group with CORS
+[MapGroup("/api/external")]
+public class ExternalApiGroup : IEndpointGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group)
+    {
+        group.RequireCors("ApiPolicy")
+             .WithOpenApi();
+    }
+}
+
+[MapGet("/data", Group = typeof(ExternalApiGroup))]
+public class GetExternalDataEndpoint
+{
+    public Task<IResult> HandleAsync()
+    {
+        return Task.FromResult(Results.Ok(new { data = "public" }));
+    }
+}
+```
+
+### Multiple API Versions
+
+```csharp
+using MinimalEndpoints;
+using MinimalEndpoints.Annotations;
+
+// V1 API Group
+[MapGroup("/api/v1", GroupName = "V1")]
+public class ApiV1Group : IEndpointGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group)
+    {
+        group.WithTags("V1")
+             .WithOpenApi();
+    }
+}
+
+// V2 API Group
+[MapGroup("/api/v2", GroupName = "V2")]
+public class ApiV2Group : IEndpointGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group)
+    {
+        group.WithTags("V2")
+             .WithOpenApi()
+             .RequireRateLimiting("strict");
+    }
+}
+
+// V1 Endpoint
+[MapGet("/products", Group = typeof(ApiV1Group))]
+public class ListProductsV1Endpoint
+{
+    public Task<IResult> HandleAsync()
+    {
+        return Task.FromResult(Results.Ok(new[] { "V1Product" }));
+    }
+}
+
+// V2 Endpoint with new features
+[MapGet("/products", Group = typeof(ApiV2Group))]
+public class ListProductsV2Endpoint
+{
+    public Task<IResult> HandleAsync([FromQuery] bool includeDetails = false)
+    {
+        return Task.FromResult(Results.Ok(new
+        {
+            products = new[] { "V2Product" },
+            details = includeDetails ? "Enhanced data" : null
+        }));
+    }
+}
+```
+
+---
+
+## Hierarchical Groups
+
+Create multi-level group hierarchies with cascading configuration:
+
+### Basic Hierarchy
+
+```csharp
+using MinimalEndpoints;
+using MinimalEndpoints.Annotations;
+
+// Root group
+[MapGroup("/api")]
+public class ApiGroup : IEndpointGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group)
+    {
+        group.WithOpenApi();  // Applies to all descendants
+    }
+}
+
+// Child group
+[MapGroup("/v1", ParentGroup = typeof(ApiGroup))]
+public class V1Group : IEndpointGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group)
+    {
+        group.RequireAuthorization();  // Applies to all V1 endpoints
+    }
+}
+
+// Endpoint uses child group
+[MapGet("/products", Group = typeof(V1Group))]
+public class ListProductsEndpoint
+{
+    public Task<IResult> HandleAsync()
+    {
+        // Route: /api/v1/products
+        // Configuration: OpenAPI + Authorization
+        return Task.FromResult(Results.Ok(new[] { "Product1" }));
+    }
+}
+```
+
+### Three-Level Hierarchy
+
+```csharp
+using MinimalEndpoints;
+using MinimalEndpoints.Annotations;
+
+// Level 1: Root
+[MapGroup("/api")]
+public class ApiGroup : IEndpointGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group)
+    {
+        group.WithOpenApi()
+             .WithTags("API");
+    }
+}
+
+// Level 2: Version
+[MapGroup("/v1", ParentGroup = typeof(ApiGroup))]
+public class V1Group : IEndpointGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group)
+    {
+        group.RequireAuthorization()
+             .WithTags("V1");
+    }
+}
+
+// Level 3: Feature/Module
+[MapGroup("/admin", ParentGroup = typeof(V1Group))]
+public class AdminGroup : IEndpointGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group)
+    {
+        group.RequireAuthorization("Admin")
+             .WithTags("Admin")
+             .RequireRateLimiting("admin");
+    }
+}
+
+// Endpoint at deepest level
+[MapGet("/users", Group = typeof(AdminGroup))]
+public class ListAdminUsersEndpoint
+{
+    private readonly IUserRepository _userRepo;
+
+    public ListAdminUsersEndpoint(IUserRepository userRepo)
+    {
+        _userRepo = userRepo;
+    }
+
+    public async Task<IResult> HandleAsync()
+    {
+        // Route: /api/v1/admin/users
+        // Configuration: OpenAPI + Auth + Admin Auth + Rate Limiting + Tags
+        var users = await _userRepo.GetAllAsync();
+        return Results.Ok(users);
+    }
+}
+```
+
+### Multiple Branches
+
+```csharp
+using MinimalEndpoints;
+using MinimalEndpoints.Annotations;
+
+// Root group
+[MapGroup("/api")]
+public class ApiGroup : IEndpointGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group)
+    {
+        group.WithOpenApi();
+    }
+}
+
+// Branch 1: Public API (V1)
+[MapGroup("/v1", ParentGroup = typeof(ApiGroup))]
+public class V1Group : IEndpointGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group)
+    {
+        group.WithTags("V1");
+    }
+}
+
+// Branch 2: Internal API (V2)
+[MapGroup("/v2", ParentGroup = typeof(ApiGroup))]
+public class V2Group : IEndpointGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group)
+    {
+        group.RequireAuthorization()
+             .WithTags("V2");
+    }
+}
+
+// Sub-branch: V1 Products
+[MapGroup("/products", ParentGroup = typeof(V1Group))]
+public class V1ProductsGroup : IEndpointGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group)
+    {
+        group.WithTags("Products");
+    }
+}
+
+// Sub-branch: V2 Products (with auth)
+[MapGroup("/products", ParentGroup = typeof(V2Group))]
+public class V2ProductsGroup : IEndpointGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group)
+    {
+        group.WithTags("Products");
+    }
+}
+
+// Endpoint in V1 branch
+[MapGet("/", Group = typeof(V1ProductsGroup))]
+public class ListProductsV1Endpoint
+{
+    public Task<IResult> HandleAsync()
+    {
+        // Route: /api/v1/products
+        // No auth required
+        return Task.FromResult(Results.Ok(new[] { "Product1" }));
+    }
+}
+
+// Endpoint in V2 branch
+[MapGet("/", Group = typeof(V2ProductsGroup))]
+public class ListProductsV2Endpoint
+{
+    public Task<IResult> HandleAsync()
+    {
+        // Route: /api/v2/products
+        // Auth required (from V2Group)
+        return Task.FromResult(Results.Ok(new[] { "Product1", "Product2" }));
+    }
+}
+```
+
+### Feature Module Organization
+
+```csharp
+using MinimalEndpoints;
+using MinimalEndpoints.Annotations;
+
+// Root API group
+[MapGroup("/api")]
+public class ApiGroup : IEndpointGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group)
+    {
+        group.WithOpenApi()
+             .RequireAuthorization();
+    }
+}
+
+// Orders module
+[MapGroup("/orders", ParentGroup = typeof(ApiGroup))]
+public class OrdersGroup : IEndpointGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group)
+    {
+        group.WithTags("Orders")
+             .RequireRateLimiting("orders");
+    }
+}
+
+// Products module
+[MapGroup("/products", ParentGroup = typeof(ApiGroup))]
+public class ProductsGroup : IEndpointGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group)
+    {
+        group.WithTags("Products");
+    }
+}
+
+// Users module
+[MapGroup("/users", ParentGroup = typeof(ApiGroup))]
+public class UsersGroup : IEndpointGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group)
+    {
+        group.WithTags("Users")
+             .RequireAuthorization("UserManagement");
+    }
+}
+
+// Orders endpoints
+[MapGet("/", Group = typeof(OrdersGroup))]
+public class ListOrdersEndpoint
+{
+    public Task<IResult> HandleAsync()
+    {
+        // Route: /api/orders
+        return Task.FromResult(Results.Ok(Array.Empty<object>()));
+    }
+}
+
+[MapGet("/{id}", Group = typeof(OrdersGroup))]
+public class GetOrderEndpoint
+{
+    public Task<IResult> HandleAsync(int id)
+    {
+        // Route: /api/orders/{id}
+        return Task.FromResult(Results.Ok(new { id }));
+    }
+}
+
+// Products endpoints
+[MapGet("/", Group = typeof(ProductsGroup))]
+public class ListProductsEndpoint
+{
+    public Task<IResult> HandleAsync()
+    {
+        // Route: /api/products
+        return Task.FromResult(Results.Ok(Array.Empty<object>()));
+    }
+}
+```
+
+### Benefits Demonstrated
+
+**Hierarchical groups provide:**
+
+1. **Nested Configuration**: Parent settings cascade to children
+2. **Organized Structure**: Clear module/feature boundaries
+3. **Reusable Configuration**: Define once at parent level
+4. **API Versioning**: Easy to version by hierarchy
+5. **Type-Safety**: Compile-time validation with MINEP006 (cycle detection)
+
+**Example hierarchy:**
+```
+ApiGroup (/api)                          [OpenAPI]
+  ├─ V1Group (/api/v1)                   [OpenAPI + Auth]
+  │   ├─ OrdersGroup (/api/v1/orders)    [OpenAPI + Auth + RateLimit]
+  │   └─ ProductsGroup (/api/v1/products)[OpenAPI + Auth]
+  └─ V2Group (/api/v2)                   [OpenAPI + AdminAuth]
+      └─ ProductsGroup (/api/v2/products)[OpenAPI + AdminAuth + Cache]
+```
+
+

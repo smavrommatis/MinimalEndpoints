@@ -16,7 +16,7 @@ internal static class Diagnostics
         description: "Endpoints must have a valid entry point method to handle requests." +
         "The method should be public, non-static, and return IResult or Task<IResult>." +
         "Example: public async Task<IResult> HandleAsync() { return Results.Ok(); }.",
-        helpLinkUri: "https://github.com/yourusername/MinimalEndpoints/docs/MINEP001.md"
+        helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/docs/MINEP001.md"
     );
 
     public static readonly DiagnosticDescriptor MultipleAttributesDetected = new DiagnosticDescriptor(
@@ -30,7 +30,7 @@ internal static class Diagnostics
         isEnabledByDefault: true,
         description: "Endpoints must not have more than one MapMethods attribute. " +
         "If you need to handle multiple HTTP methods, use [MapMethods(\"/route\", new[] { \"GET\", \"POST\" })].",
-        helpLinkUri: "https://github.com/yourusername/MinimalEndpoints/docs/MINEP002.md"
+        helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/docs/MINEP002.md"
     );
 
     public static readonly DiagnosticDescriptor ServiceTypeMissingEntryPoint = new DiagnosticDescriptor(
@@ -45,7 +45,7 @@ internal static class Diagnostics
         description: "When ServiceType is specified, the interface must contain the entry point method that will be called." +
         "The interface method should match the signature of the endpoint's entry point." +
         "Example: public interface IMyEndpoint { Task<IResult> HandleAsync(); }.",
-        helpLinkUri: "https://github.com/yourusername/MinimalEndpoints/docs/diagnostics/MINEP003.md"
+        helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/docs/diagnostics/MINEP003.md"
     );
 
     public static readonly DiagnosticDescriptor AmbiguousRoutes = new DiagnosticDescriptor(
@@ -60,6 +60,37 @@ internal static class Diagnostics
         description: "Multiple endpoints should not have identical route patterns for the same HTTP method. " +
         "This will cause routing ambiguity and unpredictable behavior at runtime. " +
         "Consider using different route patterns, route constraints, or consolidating the endpoints.",
-        helpLinkUri: "https://github.com/yourusername/MinimalEndpoints/docs/diagnostics/MINEP004.md"
+        helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/docs/diagnostics/MINEP004.md",
+        customTags: WellKnownDiagnosticTags.CompilationEnd
+    );
+
+    public static readonly DiagnosticDescriptor InvalidGroupType = new DiagnosticDescriptor(
+        id: "MINEP005",
+        title: "Invalid endpoint group type",
+        messageFormat:
+        "The Group type '{0}' specified for endpoint '{1}' does not implement IEndpointGroup or is not decorated with MapGroupAttribute. " +
+        "Ensure the group class implements IEndpointGroup and has the [MapGroup] attribute.",
+        category: "MinimalEndpoints",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "Endpoint groups must implement IEndpointGroup interface and be decorated with MapGroupAttribute." +
+        "Example: [MapGroup(\"/api/v1\")] public class ApiV1Group : IEndpointGroup { }.",
+        helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/docs/diagnostics/MINEP005.md"
+    );
+
+    public static readonly DiagnosticDescriptor CyclicGroupHierarchy = new DiagnosticDescriptor(
+        id: "MINEP006",
+        title: "Cyclic group hierarchy detected",
+        messageFormat:
+        "Group '{0}' has a cyclic hierarchy: {1}. " +
+        "Group hierarchies must not contain cycles.",
+        category: "MinimalEndpoints",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "Group hierarchies must be acyclic. A group cannot directly or indirectly reference itself as a parent. " +
+        "Example of invalid hierarchy: GroupA -> GroupB -> GroupC -> GroupA (cycle). " +
+        "Ensure each group's ParentGroup property forms a proper tree structure without cycles.",
+        helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/docs/diagnostics/MINEP006.md",
+        customTags: WellKnownDiagnosticTags.CompilationEnd
     );
 }

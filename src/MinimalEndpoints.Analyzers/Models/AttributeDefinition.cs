@@ -8,11 +8,11 @@ namespace MinimalEndpoints.Analyzers.Models;
 /// </summary>
 internal sealed class AttributeDefinition
 {
-    public TypeDefinition AttributeType { get; }
-    public List<AttributeArgument> ConstructorArguments { get; }
-    public List<AttributeNamedArgument> NamedArguments { get; }
+    private TypeDefinition AttributeType { get; }
+    private List<AttributeArgument> ConstructorArguments { get; }
+    private List<AttributeNamedArgument> NamedArguments { get; }
 
-    public AttributeDefinition(
+    private AttributeDefinition(
         TypeDefinition attributeType,
         List<AttributeArgument> constructorArguments,
         List<AttributeNamedArgument> namedArguments)
@@ -36,9 +36,7 @@ internal sealed class AttributeDefinition
 
         // Process constructor arguments
         var constructorArgs = attributeData.ConstructorArguments
-            .Select(arg => new AttributeArgument(
-                arg.Type != null ? new TypeDefinition(arg.Type) : null,
-                FormatArgumentValue(arg)
+            .Select(arg => new AttributeArgument(FormatArgumentValue(arg)
             ))
             .ToList();
 
@@ -46,7 +44,6 @@ internal sealed class AttributeDefinition
         var namedArgs = attributeData.NamedArguments
             .Select(arg => new AttributeNamedArgument(
                 arg.Key,
-                arg.Value.Type != null ? new TypeDefinition(arg.Value.Type) : null,
                 FormatArgumentValue(arg.Value)
             ))
             .ToList();
@@ -129,19 +126,31 @@ internal sealed class AttributeDefinition
 
     private static string FormatFloat(object value)
     {
-        if (value == null) return "null";
+        if (value == null)
+        {
+            return "null";
+        }
+
         return ((float)value).ToString("G", CultureInfo.InvariantCulture) + "f";
     }
 
     private static string FormatDouble(object value)
     {
-        if (value == null) return "null";
+        if (value == null)
+        {
+            return "null";
+        }
+
         return ((double)value).ToString("G", CultureInfo.InvariantCulture) + "d";
     }
 
     private static string FormatDecimal(object value)
     {
-        if (value == null) return "null";
+        if (value == null)
+        {
+            return "null";
+        }
+
         return ((decimal)value).ToString("G", CultureInfo.InvariantCulture) + "m";
     }
 
@@ -200,12 +209,10 @@ internal sealed class AttributeDefinition
 /// </summary>
 internal sealed class AttributeArgument
 {
-    public TypeDefinition Type { get; }
     public string Value { get; }
 
-    public AttributeArgument(TypeDefinition type, string value)
+    public AttributeArgument(string value)
     {
-        Type = type;
         Value = value;
     }
 }
@@ -216,13 +223,11 @@ internal sealed class AttributeArgument
 internal sealed class AttributeNamedArgument
 {
     public string Name { get; }
-    public TypeDefinition Type { get; }
     public string Value { get; }
 
-    public AttributeNamedArgument(string name, TypeDefinition type, string value)
+    public AttributeNamedArgument(string name, string value)
     {
         Name = name;
-        Type = type;
         Value = value;
     }
 }

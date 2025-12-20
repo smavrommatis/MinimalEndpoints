@@ -12,7 +12,7 @@ Warning
 
 - **v1.0.0 (2025-12-20)**: Initial implementation. Route parameters are normalized to `{param}` regardless of name or constraints. This means `/users/{id:int}` and `/users/{userId:int}` are both treated as `/users/{param}` and flagged as ambiguous.
 
-> **Note**: If this behavior causes issues in your scenario, please [report it](https://github.com/yourusername/MinimalEndpoints/issues/new?labels=analyzer,MINEP004) so we can improve the analyzer. See the [When to Suppress](#when-to-suppress) section for workarounds.
+> **Note**: If this behavior causes issues in your scenario, please [report it](https://github.com/blackeye/MinimalEndpoints/issues/new?labels=analyzer,MINEP004) so we can improve the analyzer. See the [When to Suppress](#when-to-suppress) section for workarounds.
 
 ## Description
 
@@ -421,7 +421,7 @@ If you encounter a scenario where MINEP004 produces a **false positive** (warns 
 
 ### How to Report
 
-**GitHub Issue**: [Create an issue](https://github.com/yourusername/MinimalEndpoints/issues/new?labels=analyzer,MINEP004&template=analyzer-issue.md)
+**GitHub Issue**: [Create an issue](https://github.com/blackeye/MinimalEndpoints/issues/new?labels=analyzer,MINEP004&template=analyzer-issue.md)
 
 **Include:**
 1. The route patterns that triggered the warning

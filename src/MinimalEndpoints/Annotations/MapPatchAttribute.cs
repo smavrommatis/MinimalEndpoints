@@ -26,9 +26,9 @@ namespace MinimalEndpoints.Annotations;
 ///     public async Task&lt;IResult&gt; HandleAsync(
 ///         int id,
 ///         [FromBody] PatchUserRequest request,
-///         CancellationToken cancellationToken)
+///         CancellationToken ct)
 ///     {
-///         var updated = await _repository.PatchAsync(id, request, cancellationToken);
+///         var updated = await _repository.PatchAsync(id, request, ct);
 ///         return updated ? Results.NoContent() : Results.NotFound();
 ///     }
 /// }

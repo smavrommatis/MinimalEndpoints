@@ -55,7 +55,6 @@ public class TestClass
         Assert.Equal("MapGet", result.EndpointBuilderMethodName);
         Assert.Single(result.Methods);
         Assert.Contains("GET", result.Methods);
-        Assert.Null(result.GroupPrefix);
         Assert.Null(result.EntryPoint);
         Assert.Null(result.ServiceName);
     }
@@ -71,7 +70,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 public interface ITestService { }
 
-[MapGet(""/api/test"", ServiceLifetime.Singleton, GroupPrefix = ""v1"", EntryPoint = ""Execute"", ServiceType = typeof(ITestService))]
+[MapGet(""/api/test"", ServiceLifetime.Singleton, EntryPoint = ""Execute"", ServiceType = typeof(ITestService))]
 public class TestClass : ITestService
 {
     public void Execute() { }
@@ -92,7 +91,6 @@ public class TestClass : ITestService
         Assert.Equal("MapGet", result.EndpointBuilderMethodName);
         Assert.Single(result.Methods);
         Assert.Contains("GET", result.Methods);
-        Assert.Equal("v1", result.GroupPrefix);
         Assert.Equal("Execute", result.EntryPoint);
         Assert.Equal("TestNamespace.ITestService", result.ServiceName);
     }
@@ -127,7 +125,6 @@ public class CreateUserEndpoint
         Assert.Equal("MapPost", result.EndpointBuilderMethodName);
         Assert.Single(result.Methods);
         Assert.Contains("POST", result.Methods);
-        Assert.Null(result.GroupPrefix);
         Assert.Null(result.EntryPoint);
         Assert.Null(result.ServiceName);
     }
@@ -143,7 +140,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 public interface ICreateUserEndpoint { }
 
-[MapPost(""/api/users"", ServiceLifetime.Transient, GroupPrefix = ""admin"", EntryPoint = ""HandleAsync"", ServiceType = typeof(ICreateUserEndpoint))]
+[MapPost(""/api/users"", ServiceLifetime.Transient, EntryPoint = ""HandleAsync"", ServiceType = typeof(ICreateUserEndpoint))]
 public class CreateUserEndpoint : ICreateUserEndpoint
 {
     public void HandleAsync() { }
@@ -164,7 +161,6 @@ public class CreateUserEndpoint : ICreateUserEndpoint
         Assert.Equal("MapPost", result.EndpointBuilderMethodName);
         Assert.Single(result.Methods);
         Assert.Contains("POST", result.Methods);
-        Assert.Equal("admin", result.GroupPrefix);
         Assert.Equal("HandleAsync", result.EntryPoint);
         Assert.Equal("TestNamespace.ICreateUserEndpoint", result.ServiceName);
     }
@@ -199,7 +195,6 @@ public class UpdateUserEndpoint
         Assert.Equal("MapPut", result.EndpointBuilderMethodName);
         Assert.Single(result.Methods);
         Assert.Contains("PUT", result.Methods);
-        Assert.Null(result.GroupPrefix);
         Assert.Null(result.EntryPoint);
         Assert.Null(result.ServiceName);
     }
@@ -215,7 +210,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 public interface IUpdateEndpoint { }
 
-[MapPut(""/api/users/{id}"", ServiceLifetime.Singleton, GroupPrefix = ""v2"", EntryPoint = ""ExecuteAsync"", ServiceType = typeof(IUpdateEndpoint))]
+[MapPut(""/api/users/{id}"", ServiceLifetime.Singleton, EntryPoint = ""ExecuteAsync"", ServiceType = typeof(IUpdateEndpoint))]
 public class UpdateUserEndpoint : IUpdateEndpoint
 {
     public void ExecuteAsync() { }
@@ -236,7 +231,6 @@ public class UpdateUserEndpoint : IUpdateEndpoint
         Assert.Equal("MapPut", result.EndpointBuilderMethodName);
         Assert.Single(result.Methods);
         Assert.Contains("PUT", result.Methods);
-        Assert.Equal("v2", result.GroupPrefix);
         Assert.Equal("ExecuteAsync", result.EntryPoint);
         Assert.Equal("TestNamespace.IUpdateEndpoint", result.ServiceName);
     }
@@ -271,7 +265,6 @@ public class DeleteUserEndpoint
         Assert.Equal("MapDelete", result.EndpointBuilderMethodName);
         Assert.Single(result.Methods);
         Assert.Contains("DELETE", result.Methods);
-        Assert.Null(result.GroupPrefix);
         Assert.Null(result.EntryPoint);
         Assert.Null(result.ServiceName);
     }
@@ -287,7 +280,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 public interface IDeleteEndpoint { }
 
-[MapDelete(""/api/users/{id}"", ServiceLifetime.Singleton, GroupPrefix = ""admin"", EntryPoint = ""RemoveAsync"", ServiceType = typeof(IDeleteEndpoint))]
+[MapDelete(""/api/users/{id}"", ServiceLifetime.Singleton, EntryPoint = ""RemoveAsync"", ServiceType = typeof(IDeleteEndpoint))]
 public class DeleteUserEndpoint : IDeleteEndpoint
 {
     public void RemoveAsync() { }
@@ -308,7 +301,6 @@ public class DeleteUserEndpoint : IDeleteEndpoint
         Assert.Equal("MapDelete", result.EndpointBuilderMethodName);
         Assert.Single(result.Methods);
         Assert.Contains("DELETE", result.Methods);
-        Assert.Equal("admin", result.GroupPrefix);
         Assert.Equal("RemoveAsync", result.EntryPoint);
         Assert.Equal("TestNamespace.IDeleteEndpoint", result.ServiceName);
     }
@@ -343,7 +335,6 @@ public class PatchUserEndpoint
         Assert.Equal("MapPatch", result.EndpointBuilderMethodName);
         Assert.Single(result.Methods);
         Assert.Contains("PATCH", result.Methods);
-        Assert.Null(result.GroupPrefix);
         Assert.Null(result.EntryPoint);
         Assert.Null(result.ServiceName);
     }
@@ -359,7 +350,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 public interface IPatchEndpoint { }
 
-[MapPatch(""/api/users/{id}/status"", ServiceLifetime.Singleton, GroupPrefix = ""internal"", EntryPoint = ""PatchAsync"", ServiceType = typeof(IPatchEndpoint))]
+[MapPatch(""/api/users/{id}/status"", ServiceLifetime.Singleton, EntryPoint = ""PatchAsync"", ServiceType = typeof(IPatchEndpoint))]
 public class PatchUserEndpoint : IPatchEndpoint
 {
     public void PatchAsync() { }
@@ -380,7 +371,6 @@ public class PatchUserEndpoint : IPatchEndpoint
         Assert.Equal("MapPatch", result.EndpointBuilderMethodName);
         Assert.Single(result.Methods);
         Assert.Contains("PATCH", result.Methods);
-        Assert.Equal("internal", result.GroupPrefix);
         Assert.Equal("PatchAsync", result.EntryPoint);
         Assert.Equal("TestNamespace.IPatchEndpoint", result.ServiceName);
     }
@@ -415,7 +405,6 @@ public class HealthCheckEndpoint
         Assert.Equal("MapHead", result.EndpointBuilderMethodName);
         Assert.Single(result.Methods);
         Assert.Contains("HEAD", result.Methods);
-        Assert.Null(result.GroupPrefix);
         Assert.Null(result.EntryPoint);
         Assert.Null(result.ServiceName);
     }
@@ -431,7 +420,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 public interface IHealthCheck { }
 
-[MapHead(""/api/health"", ServiceLifetime.Singleton, GroupPrefix = ""monitoring"", EntryPoint = ""CheckAsync"", ServiceType = typeof(IHealthCheck))]
+[MapHead(""/api/health"", ServiceLifetime.Singleton, EntryPoint = ""CheckAsync"", ServiceType = typeof(IHealthCheck))]
 public class HealthCheckEndpoint : IHealthCheck
 {
     public void CheckAsync() { }
@@ -452,7 +441,6 @@ public class HealthCheckEndpoint : IHealthCheck
         Assert.Equal("MapHead", result.EndpointBuilderMethodName);
         Assert.Single(result.Methods);
         Assert.Contains("HEAD", result.Methods);
-        Assert.Equal("monitoring", result.GroupPrefix);
         Assert.Equal("CheckAsync", result.EntryPoint);
         Assert.Equal("TestNamespace.IHealthCheck", result.ServiceName);
     }
@@ -489,7 +477,6 @@ public class CustomEndpoint
         Assert.Equal(2, result.Methods.Length);
         Assert.Contains("GET", result.Methods);
         Assert.Contains("POST", result.Methods);
-        Assert.Null(result.GroupPrefix);
         Assert.Null(result.EntryPoint);
         Assert.Null(result.ServiceName);
     }
@@ -505,7 +492,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 public interface ICustomEndpoint { }
 
-[MapMethods(""/api/custom"", new[] { ""PUT"", ""PATCH"", ""DELETE"" }, ServiceLifetime.Singleton, GroupPrefix = ""api/v3"", EntryPoint = ""ProcessAsync"", ServiceType = typeof(ICustomEndpoint))]
+[MapMethods(""/api/custom"", new[] { ""PUT"", ""PATCH"", ""DELETE"" }, ServiceLifetime.Singleton, EntryPoint = ""ProcessAsync"", ServiceType = typeof(ICustomEndpoint))]
 public class CustomEndpoint : ICustomEndpoint
 {
     public void ProcessAsync() { }
@@ -528,7 +515,6 @@ public class CustomEndpoint : ICustomEndpoint
         Assert.Contains("PUT", result.Methods);
         Assert.Contains("PATCH", result.Methods);
         Assert.Contains("DELETE", result.Methods);
-        Assert.Equal("api/v3", result.GroupPrefix);
         Assert.Equal("ProcessAsync", result.EntryPoint);
         Assert.Equal("TestNamespace.ICustomEndpoint", result.ServiceName);
     }
@@ -592,14 +578,21 @@ public class ComplexPatternEndpoint
     }
 
     [Fact]
-    public void GetMapMethodsAttributeDefinition_ShouldHandleOnlyGroupPrefix()
+    public void GetMapMethodsAttributeDefinition_ShouldHandleGroup()
     {
         // Arrange
         var code = @"
 namespace TestNamespace;
 using MinimalEndpoints.Annotations;
+using MinimalEndpoints;
 
-[MapGet(""/test"", GroupPrefix = ""v1"")]
+[MapGroup(""/api/v1"")]
+public class ApiV1Group : IEndpointGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group) { }
+}
+
+[MapGet(""/test"", Group = typeof(ApiV1Group))]
 public class TestEndpoint
 {
     public void Handle() { }
@@ -615,7 +608,8 @@ public class TestEndpoint
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal("v1", result.GroupPrefix);
+        Assert.NotNull(result.GroupType);
+        Assert.Equal("TestNamespace.ApiV1Group", result.GroupType.ToDisplayString());
         Assert.Null(result.EntryPoint);
         Assert.Null(result.ServiceName);
     }
@@ -645,7 +639,6 @@ public class TestEndpoint
         // Assert
         Assert.NotNull(result);
         Assert.Equal("CustomHandler", result.EntryPoint);
-        Assert.Null(result.GroupPrefix);
         Assert.Null(result.ServiceName);
     }
 
@@ -676,7 +669,6 @@ public class TestEndpoint : IMyService
         // Assert
         Assert.NotNull(result);
         Assert.Equal("TestNamespace.IMyService", result.ServiceName);
-        Assert.Null(result.GroupPrefix);
         Assert.Null(result.EntryPoint);
     }
 

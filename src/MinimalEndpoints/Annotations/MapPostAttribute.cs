@@ -25,10 +25,10 @@ namespace MinimalEndpoints.Annotations;
 ///
 ///     public async Task&lt;IResult&gt; HandleAsync(
 ///         [FromBody] CreateUserRequest request,
-///         CancellationToken cancellationToken)
+///         CancellationToken ct)
 ///     {
-///         var user = await _repository.CreateAsync(request, cancellationToken);
-///         return Results.Created($"/api/users/{user.Id}", user);
+///         var user = await _repository.CreateAsync(request, ct);
+///         return Results.Created($"/api/users/{userId}", user);
 ///     }
 /// }
 /// </code>

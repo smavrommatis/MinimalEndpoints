@@ -74,6 +74,6 @@ docker-compose up
 
 For questions or issues:
 - 📚 [Documentation](../docs/)
-- 💬 [Discussions](https://github.com/yourusername/MinimalEndpoints/discussions)
-- 🐛 [Issues](https://github.com/yourusername/MinimalEndpoints/issues)
+- 💬 [Discussions](https://github.com/blackeye/MinimalEndpoints/discussions)
+- 🐛 [Issues](https://github.com/blackeye/MinimalEndpoints/issues)
 

@@ -1,13 +1,13 @@
-using MinimalEndpoints.Annotations;
+using MinimalEndpoints.AdvancedSample.Groups;
 using MinimalEndpoints.AdvancedSample.Services;
-using Microsoft.AspNetCore.Http.HttpResults;
+using MinimalEndpoints.Annotations;
 
 namespace MinimalEndpoints.AdvancedSample.Endpoints;
 
 /// <summary>
 /// Gets a specific product by ID with route constraint
 /// </summary>
-[MapGet("/api/products/{id:int}")]
+[MapGet("/{id:int}", Group = typeof(ProductsGroup))]
 public class GetProductEndpoint : IConfigurableEndpoint
 {
     private readonly IProductRepository _repository;
@@ -51,4 +51,3 @@ public class GetProductEndpoint : IConfigurableEndpoint
             .Produces(StatusCodes.Status404NotFound);
     }
 }
-

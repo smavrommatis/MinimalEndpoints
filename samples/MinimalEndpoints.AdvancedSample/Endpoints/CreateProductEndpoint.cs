@@ -3,13 +3,14 @@ using Microsoft.AspNetCore.Mvc;
 using MinimalEndpoints.Annotations;
 using MinimalEndpoints.AdvancedSample.Models;
 using MinimalEndpoints.AdvancedSample.Services;
+using MinimalEndpoints.AdvancedSample.Groups;
 
 namespace MinimalEndpoints.AdvancedSample.Endpoints;
 
 /// <summary>
 /// Creates a new product with validation
 /// </summary>
-[MapPost("/api/products")]
+[MapPost("/", Group = typeof(ProductsGroup))]
 public class CreateProductEndpoint : IConfigurableEndpoint
 {
     private readonly IProductRepository _repository;
