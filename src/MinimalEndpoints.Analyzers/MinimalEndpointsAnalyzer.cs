@@ -76,7 +76,7 @@ public class MinimalEndpointsAnalyzer : DiagnosticAnalyzer
         // Validate ServiceType if specified
         if (!string.IsNullOrEmpty(mapMethodsAttributeDefinition.ServiceName))
         {
-            var serviceTypeSymbol = GetServiceTypeSymbol(attributes[0], context.Compilation);
+            var serviceTypeSymbol = GetServiceTypeSymbol(attributes[0]);
             if (serviceTypeSymbol != null)
             {
                 var interfaceHasMethod = serviceTypeSymbol.GetMembers()
@@ -101,7 +101,7 @@ public class MinimalEndpointsAnalyzer : DiagnosticAnalyzer
         }
     }
 
-    private static INamedTypeSymbol GetServiceTypeSymbol(AttributeData attributeData, Compilation compilation)
+    private static INamedTypeSymbol GetServiceTypeSymbol(AttributeData attributeData)
     {
         var serviceTypeArg = attributeData.NamedArguments
             .FirstOrDefault(arg => arg.Key == "ServiceType");

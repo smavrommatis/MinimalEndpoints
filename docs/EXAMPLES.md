@@ -738,3 +738,400 @@ app.Run();
 
 That's it! All endpoints are automatically discovered, registered, and mapped.
 
+---
+
+## ServiceType with IConfigurableEndpoint
+
+Combine interface-based DI with endpoint configuration:
+
+```csharp
+using MinimalEndpoints;
+using MinimalEndpoints.Annotations;
+
+// Define the service interface
+public interface IGetUsersEndpoint
+{
+    Task<IResult> HandleAsync(int page, int pageSize);
+}
+
+// Implement both the interface and IConfigurableEndpoint
+[MapGet("/api/users", ServiceType = typeof(IGetUsersEndpoint))]
+public class GetUsersEndpoint : IGetUsersEndpoint, IConfigurableEndpoint
+{
+    private readonly IUserRepository _repository;
+
+    public GetUsersEndpoint(IUserRepository repository)
+    {
+        _repository = repository;
+    }
+
+    public async Task<IResult> HandleAsync(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10)
+    {
+        var users = await _repository.GetPagedAsync(page, pageSize);
+        return Results.Ok(users);
+    }
+
+    public static void Configure(IApplicationBuilder app, IEndpointConventionBuilder endpoint)
+    {
+        endpoint
+            .WithName("GetUsers")
+            .WithTags("Users")
+            .WithOpenApi()
+            .CacheOutput(policy => policy.Expire(TimeSpan.FromMinutes(5)));
+    }
+}
+
+// Usage in your code
+public class SomeService
+{
+    private readonly IGetUsersEndpoint _getUsersEndpoint;
+
+    public SomeService(IGetUsersEndpoint getUsersEndpoint)
+    {
+        _getUsersEndpoint = getUsersEndpoint;
+    }
+}
+```
+
+---
+
+## Complex Generic Parameters
+
+Handle complex generic types seamlessly:
+
+```csharp
+using MinimalEndpoints.Annotations;
+
+public class Result<T>
+{
+    public bool Success { get; set; }
+    public T Data { get; set; }
+    public List<string> Errors { get; set; } = new();
+}
+
+[MapPost("/api/process")]
+public class ProcessDataEndpoint
+{
+    public async Task<Result<Dictionary<string, List<int>>>> HandleAsync(
+        [FromBody] Dictionary<string, object> request)
+    {
+        // Process the data
+        var processed = new Dictionary<string, List<int>>();
+
+        foreach (var kvp in request)
+        {
+            // Convert values to List<int>
+            var values = ConvertToIntList(kvp.Value);
+            processed[kvp.Key] = values;
+        }
+
+        return new Result<Dictionary<string, List<int>>>
+        {
+            Success = true,
+            Data = processed
+        };
+    }
+
+    private List<int> ConvertToIntList(object value)
+    {
+        // Conversion logic
+        return new List<int> { 1, 2, 3 };
+    }
+}
+```
+
+---
+
+## Middleware Integration
+
+Add middleware directly to your endpoint:
+
+```csharp
+using Microsoft.AspNetCore.RateLimiting;
+
+[MapPost("/api/submit")]
+public class SubmitDataEndpoint : IConfigurableEndpoint
+{
+    public async Task<IResult> HandleAsync([FromBody] SubmissionData data)
+    {
+        // Process submission
+        return Results.Ok(new { submitted = true });
+    }
+
+    public static void Configure(IApplicationBuilder app, IEndpointConventionBuilder endpoint)
+    {
+        endpoint
+            .RequireRateLimiting("fixed")
+            .RequireAuthorization()
+            .WithName("SubmitData")
+            .WithTags("Submissions");
+    }
+}
+```
+
+---
+
+## Authentication & Authorization
+
+Secure your endpoints with auth policies:
+
+```csharp
+using MinimalEndpoints;
+using MinimalEndpoints.Annotations;
+
+[MapGet("/api/admin/reports")]
+public class AdminReportsEndpoint : IConfigurableEndpoint
+{
+    private readonly IReportService _reportService;
+
+    public AdminReportsEndpoint(IReportService reportService)
+    {
+        _reportService = reportService;
+    }
+
+    public async Task<IResult> HandleAsync(
+        [FromQuery] DateTime? from,
+        [FromQuery] DateTime? to,
+        ClaimsPrincipal user)
+    {
+        var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var reports = await _reportService.GetReportsAsync(from, to, userId);
+        return Results.Ok(reports);
+    }
+
+    public static void Configure(IApplicationBuilder app, IEndpointConventionBuilder endpoint)
+    {
+        endpoint
+            .RequireAuthorization(policy => policy
+                .RequireRole("Admin")
+                .RequireClaim("permissions", "reports:read"))
+            .WithTags("Admin", "Reports")
+            .WithName("GetAdminReports");
+    }
+}
+
+// Setup in Program.cs
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("AdminReports", policy =>
+        policy.RequireRole("Admin"));
+});
+```
+
+---
+
+## OpenAPI / Swagger Integration
+
+Generate OpenAPI documentation for your endpoints:
+
+```csharp
+using MinimalEndpoints.Annotations;
+using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
+
+/// <summary>
+/// Creates a new user in the system
+/// </summary>
+[MapPost("/api/users")]
+public class CreateUserEndpoint : IConfigurableEndpoint
+{
+    private readonly IUserService _userService;
+
+    public CreateUserEndpoint(IUserService userService)
+    {
+        _userService = userService;
+    }
+
+    /// <summary>
+    /// Creates a new user
+    /// </summary>
+    /// <param name="request">User creation details</param>
+    /// <returns>Created user details</returns>
+    /// <response code="201">User created successfully</response>
+    /// <response code="400">Invalid request</response>
+    /// <response code="409">User already exists</response>
+    public async Task<Results<Created<UserResponse>, BadRequest<ValidationProblemDetails>, Conflict>> HandleAsync(
+        [FromBody] CreateUserRequest request)
+    {
+        if (await _userService.UserExistsAsync(request.Email))
+        {
+            return TypedResults.Conflict();
+        }
+
+        var user = await _userService.CreateAsync(request);
+        return TypedResults.Created($"/api/users/{user.Id}", user);
+    }
+
+    public static void Configure(IApplicationBuilder app, IEndpointConventionBuilder endpoint)
+    {
+        endpoint
+            .WithName("CreateUser")
+            .WithTags("Users")
+            .WithOpenApi(operation =>
+            {
+                operation.Summary = "Create a new user";
+                operation.Description = "Creates a new user account with the provided details";
+                return operation;
+            })
+            .Produces<UserResponse>(StatusCodes.Status201Created)
+            .Produces<ValidationProblemDetails>(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status409Conflict);
+    }
+}
+
+public record CreateUserRequest(
+    [Required] string Email,
+    [Required] string Name,
+    string? PhoneNumber);
+
+public record UserResponse(int Id, string Email, string Name);
+```
+
+---
+
+## File Upload Endpoint
+
+Handle file uploads with proper validation:
+
+```csharp
+using MinimalEndpoints.Annotations;
+
+[MapPost("/api/files/upload")]
+public class FileUploadEndpoint : IConfigurableEndpoint
+{
+    private readonly IFileStorage _storage;
+    private readonly ILogger<FileUploadEndpoint> _logger;
+
+    public FileUploadEndpoint(IFileStorage storage, ILogger<FileUploadEndpoint> logger)
+    {
+        _storage = storage;
+        _logger = logger;
+    }
+
+    public async Task<IResult> HandleAsync(
+        IFormFile file,
+        [FromForm] string? description,
+        CancellationToken cancellationToken)
+    {
+        // Validate file
+        if (file.Length == 0)
+            return Results.BadRequest("File is empty");
+
+        if (file.Length > 10 * 1024 * 1024) // 10 MB
+            return Results.BadRequest("File too large");
+
+        var allowedExtensions = new[] { ".jpg", ".png", ".pdf" };
+        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+
+        if (!allowedExtensions.Contains(extension))
+            return Results.BadRequest("Invalid file type");
+
+        // Save file
+        var fileId = await _storage.SaveAsync(file.OpenReadStream(), file.FileName, cancellationToken);
+
+        _logger.LogInformation("File uploaded: {FileName} ({FileId})", file.FileName, fileId);
+
+        return Results.Ok(new { fileId, fileName = file.FileName, description });
+    }
+
+    public static void Configure(IApplicationBuilder app, IEndpointConventionBuilder endpoint)
+    {
+        endpoint
+            .WithName("UploadFile")
+            .WithTags("Files")
+            .DisableAntiforgery() // If not using CSRF tokens
+            .Accepts<IFormFile>("multipart/form-data")
+            .Produces<object>(StatusCodes.Status200OK)
+            .Produces<string>(StatusCodes.Status400BadRequest);
+    }
+}
+```
+
+---
+
+## Background Job Trigger
+
+Trigger background jobs from endpoints:
+
+```csharp
+using MinimalEndpoints.Annotations;
+
+[MapPost("/api/jobs/process-orders")]
+public class TriggerOrderProcessingEndpoint : IConfigurableEndpoint
+{
+    private readonly IBackgroundJobClient _jobClient;
+
+    public TriggerOrderProcessingEndpoint(IBackgroundJobClient jobClient)
+    {
+        _jobClient = jobClient;
+    }
+
+    public Task<IResult> HandleAsync([FromQuery] DateTime? since)
+    {
+        var jobId = _jobClient.Enqueue<IOrderProcessingJob>(
+            job => job.ProcessOrdersAsync(since ?? DateTime.UtcNow.AddDays(-1), CancellationToken.None));
+
+        return Task.FromResult(Results.Ok(new { jobId, status = "queued" }));
+    }
+
+    public static void Configure(IApplicationBuilder app, IEndpointConventionBuilder endpoint)
+    {
+        endpoint
+            .RequireAuthorization("JobTrigger")
+            .WithName("TriggerOrderProcessing")
+            .WithTags("Jobs", "Orders");
+    }
+}
+```
+
+---
+
+## Health Check Endpoint
+
+Create custom health checks:
+
+```csharp
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using MinimalEndpoints.Annotations;
+
+[MapGet("/health")]
+public class HealthCheckEndpoint
+{
+    private readonly HealthCheckService _healthCheckService;
+
+    public HealthCheckEndpoint(HealthCheckService healthCheckService)
+    {
+        _healthCheckService = healthCheckService;
+    }
+
+    public async Task<IResult> HandleAsync()
+    {
+        var report = await _healthCheckService.CheckHealthAsync();
+
+        var result = new
+        {
+            status = report.Status.ToString(),
+            duration = report.TotalDuration,
+            checks = report.Entries.Select(e => new
+            {
+                name = e.Key,
+                status = e.Value.Status.ToString(),
+                description = e.Value.Description,
+                duration = e.Value.Duration,
+                data = e.Value.Data
+            })
+        };
+
+        return report.Status == HealthStatus.Healthy
+            ? Results.Ok(result)
+            : Results.StatusCode(503); // Service Unavailable
+    }
+}
+
+// Setup in Program.cs
+builder.Services.AddHealthChecks()
+    .AddCheck<DatabaseHealthCheck>("database")
+    .AddCheck<RedisHealthCheck>("redis");
+```

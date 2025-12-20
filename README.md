@@ -257,214 +257,225 @@ public class CreateUserEndpoint
 
 ---
 
-## 🔍 Analyzers & Code Fixes
+## 🔧 How It Works
 
-MinimalEndpoints includes Roslyn analyzers that catch common mistakes:
+MinimalEndpoints uses **Roslyn Source Generators** to automatically create registration and mapping code at compile-time:
 
-### ME0001: Missing Entry Point
+### 1. You Write
 
 ```csharp
-[MapGet("/test")]
-public class TestEndpoint  // ❌ Error: Missing entry point
+[MapGet("/api/users/{id}")]
+public class GetUserEndpoint
 {
-    // No Handle or HandleAsync method
-}
-```
+    private readonly IUserRepository _repo;
 
-**Code Fix:** Automatically adds a `HandleAsync` method
+    public GetUserEndpoint(IUserRepository repo) => _repo = repo;
 
-### ME0002: Multiple Mapping Attributes
-
-```csharp
-[MapGet("/test")]
-[MapPost("/test")]  // ❌ Error: Multiple attributes
-public class TestEndpoint { }
-```
-
----
-
-## 📖 Examples
-
-### Complete CRUD Example
-
-See [EXAMPLES.md](docs/EXAMPLES.md) for comprehensive examples including:
-- Basic endpoints
-- Parameter binding (route, query, body)
-- Dependency injection
-- Validation
-- Complex types and generics
-- Complete CRUD operations
-
-### Simple API
-
-```csharp
-// Endpoints/GetWeather.cs
-[MapGet("/weather")]
-public class GetWeatherEndpoint
-{
-    public IResult Handle()
+    public async Task<IResult> HandleAsync(int id)
     {
-        return Results.Ok(new
-        {
-            temperature = 72,
-            condition = "Sunny"
-        });
+        var user = await _repo.GetByIdAsync(id);
+        return user != null ? Results.Ok(user) : Results.NotFound();
     }
 }
-
-// Program.cs
-var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddMinimalEndpoints();
-
-var app = builder.Build();
-app.UseMinimalEndpoints();
-app.Run();
 ```
 
----
-
-## 🏗️ How It Works
-
-MinimalEndpoints uses **Source Generators** to analyze your code at compile time and generate registration and mapping code. This means:
-
-1. **Zero Runtime Overhead** - No reflection or runtime discovery
-2. **Compile-Time Safety** - Errors are caught before you run
-3. **Clean Generated Code** - You can inspect what's generated
-4. **IDE Support** - IntelliSense and navigation work perfectly
-
-### Generated Code
-
-For this endpoint:
+### 2. Generator Creates
 
 ```csharp
-[MapGet("/hello")]
-public class HelloEndpoint
-{
-    public IResult Handle() => Results.Ok("Hello!");
-}
-```
-
-MinimalEndpoints generates:
-
-```csharp
-// MinimalEndpointExtensions.g.cs
+// MinimalEndpointExtensions.g.cs (auto-generated)
 public static class MinimalEndpointExtensions
 {
-    public static IServiceCollection AddMinimalEndpoints(
-        this IServiceCollection services)
+    public static IServiceCollection AddMinimalEndpoints(this IServiceCollection services)
     {
-        services.AddScoped<HelloEndpoint>();
+        services.AddScoped<GetUserEndpoint>();
+        // ... other endpoints
         return services;
     }
 
-    public static IEndpointRouteBuilder Map__HelloEndpoint(
+    public static IEndpointRouteBuilder Map__Api_GetUserEndpoint(
         this IEndpointRouteBuilder builder,
         IApplicationBuilder app)
     {
-        static IResult Handler(
-            [FromServices]HelloEndpoint endpointInstance)
+        static Task<IResult> Handler(
+            [FromServices] GetUserEndpoint endpoint,
+            int id)
         {
-            return endpointInstance.Handle();
+            return endpoint.HandleAsync(id);
         }
 
-        var endpoint = builder.MapGet("/hello", Handler);
+        var endpoint = builder.MapGet("/api/users/{id}", Handler);
         return builder;
     }
 
-    public static IApplicationBuilder UseMinimalEndpoints(
-        this IApplicationBuilder app)
+    public static IApplicationBuilder UseMinimalEndpoints(this IApplicationBuilder app)
     {
-        var builder = app as IEndpointRouteBuilder ??
-            throw new ArgumentException(/* ... */);
-        builder.Map__HelloEndpoint(app);
+        var builder = app as IEndpointRouteBuilder ?? throw new InvalidOperationException();
+        builder.Map__Api_GetUserEndpoint(app);
+        // ... other endpoints
         return app;
     }
 }
 ```
 
+### 3. Analyzers Validate
+
+While you type, Roslyn analyzers check for common mistakes:
+
+- ✅ **MINEP001**: Ensures entry point method exists
+- ✅ **MINEP002**: Detects multiple mapping attributes
+- ✅ **MINEP003**: Validates ServiceType interface compatibility
+
+All validation happens at design-time with helpful error messages and quick fixes.
+
 ---
 
-## 🎯 Benefits Over Traditional Minimal APIs
+## 🎯 Migration Guide
 
-### Before (Traditional Minimal API)
+### From Controller-Based APIs
 
+**Before** (Controller):
 ```csharp
-var builder = WebApplication.CreateBuilder(args);
-
-var app = builder.Build();
-
-app.MapGet("/products", async (IProductRepository repo) =>
+[ApiController]
+[Route("api/[controller]")]
+public class UsersController : ControllerBase
 {
-    var products = await repo.GetAllAsync();
-    return Results.Ok(products);
-});
+    private readonly IUserRepository _repo;
 
-app.MapGet("/products/{id}", async (int id, IProductRepository repo) =>
-{
-    var product = await repo.GetByIdAsync(id);
-    return product != null ? Results.Ok(product) : Results.NotFound();
-});
+    public UsersController(IUserRepository repo) => _repo = repo;
 
-app.MapPost("/products", async (CreateProductRequest request, IProductRepository repo) =>
-{
-    var product = await repo.CreateAsync(request);
-    return Results.Created($"/products/{product.Id}", product);
-});
-
-// Hundreds more endpoints in Program.cs...
-```
-
-**Problems:**
-- ❌ All logic in one file
-- ❌ Hard to test
-- ❌ Difficult to reuse
-- ❌ No clear organization
-- ❌ Dependency injection is unclear
-
-### After (MinimalEndpoints)
-
-```csharp
-// Endpoints/Products/ListProducts.cs
-[MapGet("/products")]
-public class ListProductsEndpoint
-{
-    private readonly IProductRepository _repository;
-
-    public ListProductsEndpoint(IProductRepository repository)
+    [HttpGet("{id}")]
+    public async Task<ActionResult<User>> GetUser(int id)
     {
-        _repository = repository;
-    }
-
-    public async Task<IResult> HandleAsync()
-    {
-        var products = await _repository.GetAllAsync();
-        return Results.Ok(products);
+        var user = await _repo.GetByIdAsync(id);
+        return user != null ? Ok(user) : NotFound();
     }
 }
-
-// Endpoints/Products/GetProduct.cs
-[MapGet("/products/{id}")]
-public class GetProductEndpoint
-{
-    // ... similar structure
-}
-
-// Program.cs
-var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddMinimalEndpoints();
-
-var app = builder.Build();
-app.UseMinimalEndpoints();
-app.Run();
 ```
 
-**Benefits:**
-- ✅ One class per endpoint
-- ✅ Easy to test
-- ✅ Reusable components
-- ✅ Clear organization
-- ✅ Explicit dependencies
-- ✅ Still gets Minimal API performance!
+**After** (MinimalEndpoints):
+```csharp
+[MapGet("/api/users/{id}")]
+public class GetUserEndpoint
+{
+    private readonly IUserRepository _repo;
+
+    public GetUserEndpoint(IUserRepository repo) => _repo = repo;
+
+    public async Task<IResult> HandleAsync(int id)
+    {
+        var user = await _repo.GetByIdAsync(id);
+        return user != null ? Results.Ok(user) : Results.NotFound();
+    }
+}
+```
+
+**Key Differences**:
+- No controller base class
+- `IResult` instead of `ActionResult<T>`
+- `Results.Ok()` instead of `Ok()`
+- Endpoint = one class = one route
+- Dependency injection via constructor (same)
+
+### From Minimal APIs
+
+**Before** (Minimal API):
+```csharp
+app.MapGet("/api/users/{id}", async (int id, IUserRepository repo) =>
+{
+    var user = await repo.GetByIdAsync(id);
+    return user != null ? Results.Ok(user) : Results.NotFound();
+});
+```
+
+**After** (MinimalEndpoints):
+```csharp
+[MapGet("/api/users/{id}")]
+public class GetUserEndpoint
+{
+    private readonly IUserRepository _repo;
+
+    public GetUserEndpoint(IUserRepository repo) => _repo = repo;
+
+    public async Task<IResult> HandleAsync(int id)
+    {
+        var user = await _repo.GetByIdAsync(id);
+        return user != null ? Results.Ok(user) : Results.NotFound();
+    }
+}
+```
+
+**Benefits**:
+- Better organization for complex logic
+- Constructor injection for shared dependencies
+- Easier to test in isolation
+- Reusable across multiple routes (with ServiceType)
+- Same performance characteristics
+
+---
+
+## 🐛 Troubleshooting
+
+### Generator Not Running
+
+**Problem**: Generated code is not appearing
+
+**Solutions**:
+1. Clean and rebuild: `dotnet clean && dotnet build`
+2. Restart IDE (Visual Studio / Rider / VS Code)
+3. Check `.csproj` has `<OutputType>Exe</OutputType>` or `<OutputType>Library</OutputType>`
+4. Ensure you have the correct NuGet package version
+
+### Analyzer Errors
+
+**Problem**: False positive from MINEP001
+
+**Solution**: Ensure your entry point method is:
+- Public
+- Instance (not static)
+- Named `Handle`, `HandleAsync`, or specified in `EntryPoint` property
+- Returns `IResult`, `Task<IResult>`, or compatible type
+
+### ServiceType Issues
+
+**Problem**: MINEP003 error about missing method
+
+**Solution**: Ensure the interface specified in `ServiceType` contains the entry point method:
+```csharp
+public interface IMyEndpoint
+{
+    Task<IResult> HandleAsync(); // Must match endpoint method
+}
+
+[MapGet("/route", ServiceType = typeof(IMyEndpoint))]
+public class MyEndpoint : IMyEndpoint
+{
+    public Task<IResult> HandleAsync() => ...;
+}
+```
+
+### Missing Using Directives
+
+**Problem**: Cannot find `MapGetAttribute`
+
+**Solution**: Add using directive:
+```csharp
+using MinimalEndpoints.Annotations;
+```
+
+Or use global using in `GlobalUsings.cs`:
+```csharp
+global using MinimalEndpoints.Annotations;
+```
+
+### IntelliSense Not Working
+
+**Problem**: `AddMinimalEndpoints()` not showing in IntelliSense
+
+**Solution**:
+1. Ensure project has built successfully
+2. Check generated code is visible in IDE
+3. Add explicit using: `using MinimalEndpoints.Generated;`
+4. Try "Reload All Projects" in IDE
 
 ---
 

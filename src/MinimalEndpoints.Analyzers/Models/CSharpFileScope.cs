@@ -54,23 +54,64 @@ internal sealed class CSharpFileScope
         return method;
     }
 
+    /// <summary>
+    /// Builds the complete C# file content
+    /// </summary>
     public string Build()
     {
-        var sb = new StringBuilder(_header ?? string.Empty);
+        var sb = new StringBuilder();
 
+        BuildHeaderSection(sb);
+        BuildUsingsSection(sb);
+        BuildNamespaceAndClass(sb);
+
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Builds the header section (auto-generated comment, etc.)
+    /// </summary>
+    private void BuildHeaderSection(StringBuilder sb)
+    {
         if (_header != null)
         {
+            sb.Append(_header);
             sb.AppendLine();
         }
+    }
 
-        foreach (var @using in _usings)
+    /// <summary>
+    /// Builds the using directives section
+    /// </summary>
+    private void BuildUsingsSection(StringBuilder sb)
+    {
+        foreach (var @using in _usings.OrderBy(u => u))
         {
             sb.AppendLine($"using {@using};");
         }
 
-        sb.AppendLine();
+        if (_usings.Count > 0)
+        {
+            sb.AppendLine();
+        }
+    }
+
+    /// <summary>
+    /// Builds the namespace declaration and class with methods
+    /// </summary>
+    private void BuildNamespaceAndClass(StringBuilder sb)
+    {
         sb.AppendLine($"namespace {_namespaceName};");
         sb.AppendLine();
+
+        BuildClassDeclaration(sb);
+    }
+
+    /// <summary>
+    /// Builds the class declaration with attributes and methods
+    /// </summary>
+    private void BuildClassDeclaration(StringBuilder sb)
+    {
         foreach (var attribute in _classAttributes)
         {
             sb.AppendLine(attribute);
@@ -79,14 +120,26 @@ internal sealed class CSharpFileScope
         sb.AppendLine($"{_modifiers} partial class {_className}");
         sb.AppendLine("{");
 
-        foreach (var method in _methods.Values)
-        {
-            method.Build(sb);
-            sb.AppendLine();
-        }
+        BuildMethods(sb);
 
         sb.AppendLine("}");
+    }
 
-        return sb.ToString();
+    /// <summary>
+    /// Builds all method bodies
+    /// </summary>
+    private void BuildMethods(StringBuilder sb)
+    {
+        var methodList = _methods.Values.ToList();
+        for (var i = 0; i < methodList.Count; i++)
+        {
+            methodList[i].Build(sb);
+
+            // Add blank line between methods (but not after last method)
+            if (i < methodList.Count - 1)
+            {
+                sb.AppendLine();
+            }
+        }
     }
 }

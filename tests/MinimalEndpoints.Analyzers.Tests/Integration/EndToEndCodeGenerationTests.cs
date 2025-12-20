@@ -661,6 +661,157 @@ public class OverloadedEndpoint
         Assert.Contains("HandleAsync()", generatedCode);
     }
 
+    [Fact]
+    public void GeneratedCode_HandlesRouteConstraints_Correctly()
+    {
+        // Arrange
+        var code = @"
+namespace TestApp.Endpoints;
+
+[MapGet(""/users/{id:int}"")]
+public class GetUserByIdEndpoint
+{
+    public Task<IResult> HandleAsync(int id)
+    {
+        return Task.FromResult(Results.Ok(new { id }));
+    }
+}";
+
+        // Act
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
+
+        var (generatedCode, _) = GenerateCodeAndCompile(compilation);
+
+        // Assert
+        Assert.NotNull(generatedCode);
+        Assert.Contains("/users/{id:int}", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratedCode_HandlesOptionalParameters_InRoute()
+    {
+        // Arrange
+        var code = @"
+namespace TestApp.Endpoints;
+
+[MapGet(""/users/{id?}"")]
+public class GetUsersEndpoint
+{
+    public Task<IResult> HandleAsync(int? id)
+    {
+        return Task.FromResult(Results.Ok());
+    }
+}";
+
+        // Act
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
+
+        var (generatedCode, _) = GenerateCodeAndCompile(compilation);
+
+        // Assert
+        Assert.NotNull(generatedCode);
+        Assert.Contains("/users/{id?}", generatedCode);
+        Assert.Contains("int? id", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratedCode_HandlesCatchAllParameters_Correctly()
+    {
+        // Arrange
+        var code = @"
+namespace TestApp.Endpoints;
+
+[MapGet(""/{**path}"")]
+public class CatchAllEndpoint
+{
+    public Task<IResult> HandleAsync(string path)
+    {
+        return Task.FromResult(Results.Ok(path));
+    }
+}";
+
+        // Act
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
+
+        var (generatedCode, _) = GenerateCodeAndCompile(compilation);
+
+        // Assert
+        Assert.NotNull(generatedCode);
+        Assert.Contains("/{**path}", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratedCode_HandlesAllLifetimeCombinations_InSingleFile()
+    {
+        // Arrange
+        var code = @"
+namespace TestApp.Endpoints;
+
+[MapGet(""/singleton"", ServiceLifetime.Singleton)]
+public class SingletonEndpoint
+{
+    public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok());
+}
+
+[MapGet(""/scoped"", ServiceLifetime.Scoped)]
+public class ScopedEndpoint
+{
+    public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok());
+}
+
+[MapGet(""/transient"", ServiceLifetime.Transient)]
+public class TransientEndpoint
+{
+    public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok());
+}";
+
+        // Act
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
+
+        var (generatedCode, _) = GenerateCodeAndCompile(compilation);
+
+        // Assert
+        Assert.NotNull(generatedCode);
+        Assert.Contains("AddSingleton<TestApp.Endpoints.SingletonEndpoint>", generatedCode);
+        Assert.Contains("AddScoped<TestApp.Endpoints.ScopedEndpoint>", generatedCode);
+        Assert.Contains("AddTransient<TestApp.Endpoints.TransientEndpoint>", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratedCode_HandlesGlobalNamespace_Correctly()
+    {
+        // Arrange
+        var code = @"
+[MapGet(""/global"")]
+public class GlobalEndpoint
+{
+    public Task<IResult> HandleAsync()
+    {
+        return Task.FromResult(Results.Ok());
+    }
+}";
+
+        // Act
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
+
+        var (generatedCode, _) = GenerateCodeAndCompile(compilation);
+
+        // Assert
+        Assert.NotNull(generatedCode);
+        Assert.Contains("Map__GlobalEndpoint", generatedCode);
+        Assert.Contains("GlobalEndpoint", generatedCode);
+    }
+
     private (string generatedCode, IEnumerable<Diagnostic> diagnostics) GenerateCodeAndCompile(
         CSharpCompilation compilation,
         bool validateCompilation = true
