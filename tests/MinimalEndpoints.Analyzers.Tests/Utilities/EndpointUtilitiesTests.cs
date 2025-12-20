@@ -20,7 +20,9 @@ public class TestEndpoint : MinimalEndpoints.IConfigurableEndpoint
     }
 }";
 
-        var compilation = CodeCompilationHelpers.CreateCompilation(code);
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
         var symbol = compilation.GetTypeByMetadataName("TestNamespace.TestEndpoint");
 
         // Act
@@ -45,7 +47,9 @@ public class TestEndpoint
     }
 }";
 
-        var compilation = CodeCompilationHelpers.CreateCompilation(code);
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
         var symbol = compilation.GetTypeByMetadataName("TestNamespace.TestEndpoint");
 
         // Act
@@ -74,7 +78,9 @@ public class TestEndpoint : IConfigurableEndpoint
     }
 }";
 
-        var compilation = CodeCompilationHelpers.CreateCompilation(code);
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
         var symbol = compilation.GetTypeByMetadataName("TestNamespace.TestEndpoint");
 
         // Act
@@ -98,7 +104,9 @@ public class TestEndpoint
     }
 }";
 
-        var compilation = CodeCompilationHelpers.CreateCompilation(code);
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
         var symbol = compilation.GetTypeByMetadataName("TestNamespace.TestEndpoint");
 
         // Act
@@ -123,7 +131,9 @@ public class TestEndpoint
     }
 }";
 
-        var compilation = CodeCompilationHelpers.CreateCompilation(code);
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
         var symbol = compilation.GetTypeByMetadataName("TestNamespace.TestEndpoint");
 
         // Act
@@ -152,7 +162,9 @@ public class TestEndpoint
     }
 }";
 
-        var compilation = CodeCompilationHelpers.CreateCompilation(code);
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
         var symbol = compilation.GetTypeByMetadataName("TestNamespace.TestEndpoint");
 
         // Act
@@ -177,7 +189,9 @@ public class TestEndpoint
     }
 }";
 
-        var compilation = CodeCompilationHelpers.CreateCompilation(code);
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
         var symbol = compilation.GetTypeByMetadataName("TestNamespace.TestEndpoint");
 
         // Act
@@ -211,7 +225,9 @@ public class TestEndpoint
     }
 }";
 
-        var compilation = CodeCompilationHelpers.CreateCompilation(code);
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
         var symbol = compilation.GetTypeByMetadataName("TestNamespace.TestEndpoint");
 
         // Act
@@ -241,7 +257,9 @@ public class TestEndpoint
         return Task.CompletedTask;
     }
 }";
-        var compilation = CodeCompilationHelpers.CreateCompilation(code);
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
         var symbol = compilation.GetTypeByMetadataName("TestNamespace.TestEndpoint");
 
         // Act
@@ -265,7 +283,9 @@ public class TestEndpoint
     }
 }";
 
-        var compilation = CodeCompilationHelpers.CreateCompilation(code);
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
         var symbol = compilation.GetTypeByMetadataName("TestNamespace.TestEndpoint");
 
         // Act
@@ -289,7 +309,9 @@ public class TestEndpoint
     }
 }";
 
-        var compilation = CodeCompilationHelpers.CreateCompilation(code);
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
         var symbol = compilation.GetTypeByMetadataName("TestNamespace.TestEndpoint");
 
         // Act

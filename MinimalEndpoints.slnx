@@ -1,5 +1,7 @@
 <Solution>
-  <Folder Name="/benchmarks/">
+  <Folder Name="/docs/">
+    <File Path="docs/CONTRIBUTING.md" />
+    <File Path="docs/EXAMPLES.md" />
   </Folder>
   <Folder Name="/samples/">
     <Project Path="samples/MinimalEndpoints.Sample/MinimalEndpoints.Sample.csproj" />
@@ -15,5 +17,6 @@
   <Folder Name="/Soluction Items/">
     <File Path="Directory.Build.props" />
     <File Path="nuget.config" />
+    <File Path="README.md" />
   </Folder>
 </Solution>

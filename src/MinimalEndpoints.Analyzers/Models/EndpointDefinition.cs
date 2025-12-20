@@ -3,45 +3,43 @@ using MinimalEndpoints.Analyzers.Utilities;
 
 namespace MinimalEndpoints.Analyzers.Models;
 
-internal sealed class EndpointInfo
+internal sealed class EndpointDefinition
 {
-    public string ClassName { get; set; }
-
-    public string FullTypeName { get; set; }
-
-    public string Namespace { get; set; }
+    public TypeDefinition ClassType { get; set; }
 
     public bool IsConfigurable { get; set; }
 
-    public string MappingEndpointMethodName => $"Map__{FullTypeName.Replace(".", "_").Replace("+", "_")}";
+    public string MappingEndpointMethodName => $"Map__{ClassType.FullName.Replace(".", "_").Replace("+", "_")}";
 
-    public MapMethodsAttributeInfo MapMethodsAttribute { get; set; }
+    public MapMethodsAttributeDefinition MapMethodsAttribute { get; set; }
 
     public MethodInfo EntryPoint { get; set;  }
 
-    public static EndpointInfo Create(INamedTypeSymbol symbol, IMethodSymbol entryPoint,
-        MapMethodsAttributeInfo mapMethodsAttribute)
+
+    public static EndpointDefinition Create(INamedTypeSymbol symbol, IMethodSymbol entryPoint,
+        MapMethodsAttributeDefinition mapMethodsAttribute)
     {
         var isConfigurable = symbol.IsConfigurableEndpoint();
 
-        return new EndpointInfo
+        return new EndpointDefinition
         {
-            ClassName = symbol.Name,
-            FullTypeName = symbol.ToDisplayString(),
-            Namespace = symbol.ContainingNamespace.ToDisplayString(),
+            ClassType = new TypeDefinition(symbol),
             MapMethodsAttribute = mapMethodsAttribute,
             EntryPoint = new MethodInfo()
             {
                 Name = entryPoint.Name,
-                ReturnType = entryPoint.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+                ReturnType = new TypeDefinition(entryPoint.ReturnType),
                 Parameters = entryPoint.Parameters.Select(p => new ParameterInfo
                 {
                     Name = p.Name,
-                    Type = p.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+                    Type = new TypeDefinition(p.Type),
                     Nullable = p.NullableAnnotation == NullableAnnotation.Annotated,
                     DefaultValue = p.HasExplicitDefaultValue ? p.ExplicitDefaultValue?.ToString() : null,
                     Attributes = p.GetAttributes()
-                }).ToList(),
+                        .Select(AttributeDefinition.FromAttributeData)
+                        .Where(attr => attr != null)
+                        .ToList()
+                }).ToDictionary(x => x.Name),
                 IsAsync = entryPoint.IsAsync || entryPoint.ReturnType.Name.Contains("Task")
             },
             IsConfigurable = isConfigurable,

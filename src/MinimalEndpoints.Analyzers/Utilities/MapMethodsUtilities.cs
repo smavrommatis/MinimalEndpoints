@@ -16,7 +16,7 @@ internal static class MapMethodsUtilities
         { WellKnownTypes.Annotations.MapHeadAttributeName, ("HEAD", "MapHead") }
     }.ToFrozenDictionary();
 
-    public static AttributeData[] GetMapMethodsAttributes(this INamedTypeSymbol symbol)
+    public static AttributeData[] GetMapMethodAttributes(this INamedTypeSymbol symbol)
     {
         return symbol.GetAttributes()
             .Where(attribute =>
@@ -26,7 +26,14 @@ internal static class MapMethodsUtilities
             .ToArray();
     }
 
-    public static MapMethodsAttributeInfo GetMapMethodsAttributeInfo(this INamedTypeSymbol symbol)
+    public static MapMethodsAttributeDefinition GetMapMethodAttributeDefinition(this AttributeData attributeData)
+    {
+        return WellKnownTypes.Annotations.MapMethodsAttributeName.Equals(attributeData.AttributeClass!.Name)
+            ? GetAttributeDataForMultipleMethods(attributeData)
+            : GetAttributeDataForSingleMethod(attributeData);
+    }
+
+    public static MapMethodsAttributeDefinition GetMapMethodAttributeDefinition(this INamedTypeSymbol symbol)
     {
         var attributeData = symbol.GetAttributes()
             .SingleOrDefault(attribute =>
@@ -34,24 +41,17 @@ internal static class MapMethodsUtilities
                 && attribute.AttributeClass.IsMapMethodsAttribute()
             );
 
-        if (attributeData == null)
-        {
-            return null;
-        }
-
-        return WellKnownTypes.Annotations.MapMethodsAttributeName.Equals(attributeData.AttributeClass!.Name)
-            ? GetAttributeDataForMultipleMethods(attributeData)
-            : GetAttributeDataForSingleMethod(attributeData);
+        return attributeData?.GetMapMethodAttributeDefinition();
     }
 
-    private static MapMethodsAttributeInfo GetAttributeDataForSingleMethod(AttributeData attributeData)
+    private static MapMethodsAttributeDefinition GetAttributeDataForSingleMethod(AttributeData attributeData)
     {
         var pattern = attributeData.ConstructorArguments[0].Value as string;
         var lifetime = (ServiceLifetime)attributeData.ConstructorArguments[1].Value!;
 
         var attributeDefinition = MapMethodAttributes[attributeData.AttributeClass!.Name];
 
-        return GetMapMethodsAttributeInfoInternal(
+        return GetMapMethodsAttributeDefinitionInternal(
             attributeData: attributeData,
             pattern: pattern,
             lifetime: lifetime,
@@ -60,7 +60,7 @@ internal static class MapMethodsUtilities
         );
     }
 
-    private static MapMethodsAttributeInfo GetAttributeDataForMultipleMethods(AttributeData attributeData)
+    private static MapMethodsAttributeDefinition GetAttributeDataForMultipleMethods(AttributeData attributeData)
     {
         var pattern = attributeData.ConstructorArguments[0].Value as string;
         var methods = attributeData.ConstructorArguments[1].Values
@@ -69,7 +69,7 @@ internal static class MapMethodsUtilities
             .ToArray();
         var lifetime = (ServiceLifetime)attributeData.ConstructorArguments[2].Value!;
 
-        return GetMapMethodsAttributeInfoInternal(
+        return GetMapMethodsAttributeDefinitionInternal(
             attributeData: attributeData,
             pattern: pattern,
             lifetime: lifetime,
@@ -78,7 +78,7 @@ internal static class MapMethodsUtilities
         );
     }
 
-    private static MapMethodsAttributeInfo GetMapMethodsAttributeInfoInternal(
+    private static MapMethodsAttributeDefinition GetMapMethodsAttributeDefinitionInternal(
         AttributeData attributeData,
         string pattern,
         ServiceLifetime lifetime,
@@ -106,7 +106,7 @@ internal static class MapMethodsUtilities
             }
         }
 
-        return new MapMethodsAttributeInfo
+        return new MapMethodsAttributeDefinition
         {
             Pattern = pattern,
             EndpointBuilderMethodName = endpointBuilderMethodName,

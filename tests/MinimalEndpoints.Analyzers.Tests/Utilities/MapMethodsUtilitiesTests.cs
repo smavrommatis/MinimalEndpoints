@@ -6,20 +6,20 @@ namespace MinimalEndpoints.Analyzers.Tests.Utilities;
 public class MapMethodsUtilitiesTests
 {
     [Fact]
-    public void GetMapMethodsAttributeInfo_ShouldReturnNull_WhenNoMapMethodAttributeIsPresent()
+    public void GetMapMethodsAttributeDefinition_ShouldReturnNull_WhenNoMapMethodAttributeIsPresent()
     {
         // Arrange
         var code = @"
 namespace TestNamespace;
-public class TestClass
-{
-}";
+public class TestClass { }";
 
-        var compilation = CodeCompilationHelpers.CreateCompilation(code);
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
         var symbol = compilation.GetTypeByMetadataName("TestNamespace.TestClass");
 
         // Act
-        var result = symbol.GetMapMethodsAttributeInfo();
+        var result = symbol.GetMapMethodAttributeDefinition();
 
         // Assert
         Assert.Null(result);
@@ -27,7 +27,7 @@ public class TestClass
 
     // MapGet Tests
     [Fact]
-    public void GetMapMethodsAttributeInfo_ShouldReturnInfo_ForMapGet_Simple()
+    public void GetMapMethodsAttributeDefinition_ShouldReturnInfo_ForMapGet_Simple()
     {
         // Arrange
         var code = @"
@@ -40,11 +40,13 @@ public class TestClass
     public void Handle() { }
 }";
 
-        var compilation = CodeCompilationHelpers.CreateCompilation(code);
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
         var symbol = compilation.GetTypeByMetadataName("TestNamespace.TestClass");
 
         // Act
-        var result = symbol.GetMapMethodsAttributeInfo();
+        var result = symbol.GetMapMethodAttributeDefinition();
 
         // Assert
         Assert.NotNull(result);
@@ -59,7 +61,7 @@ public class TestClass
     }
 
     [Fact]
-    public void GetMapMethodsAttributeInfo_ShouldReturnInfo_ForMapGet_WithProperties()
+    public void GetMapMethodsAttributeDefinition_ShouldReturnInfo_ForMapGet_WithProperties()
     {
         // Arrange
         var code = @"
@@ -75,11 +77,13 @@ public class TestClass : ITestService
     public void Execute() { }
 }";
 
-        var compilation = CodeCompilationHelpers.CreateCompilation(code);
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
         var symbol = compilation.GetTypeByMetadataName("TestNamespace.TestClass");
 
         // Act
-        var result = symbol.GetMapMethodsAttributeInfo();
+        var result = symbol.GetMapMethodAttributeDefinition();
 
         // Assert
         Assert.NotNull(result);
@@ -95,7 +99,7 @@ public class TestClass : ITestService
 
     // MapPost Tests
     [Fact]
-    public void GetMapMethodsAttributeInfo_ShouldReturnInfo_ForMapPost_Simple()
+    public void GetMapMethodsAttributeDefinition_ShouldReturnInfo_ForMapPost_Simple()
     {
         // Arrange
         var code = @"
@@ -108,11 +112,13 @@ public class CreateUserEndpoint
     public void Handle() { }
 }";
 
-        var compilation = CodeCompilationHelpers.CreateCompilation(code);
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
         var symbol = compilation.GetTypeByMetadataName("TestNamespace.CreateUserEndpoint");
 
         // Act
-        var result = symbol.GetMapMethodsAttributeInfo();
+        var result = symbol.GetMapMethodAttributeDefinition();
 
         // Assert
         Assert.NotNull(result);
@@ -127,7 +133,7 @@ public class CreateUserEndpoint
     }
 
     [Fact]
-    public void GetMapMethodsAttributeInfo_ShouldReturnInfo_ForMapPost_WithProperties()
+    public void GetMapMethodsAttributeDefinition_ShouldReturnInfo_ForMapPost_WithProperties()
     {
         // Arrange
         var code = @"
@@ -143,11 +149,13 @@ public class CreateUserEndpoint : ICreateUserEndpoint
     public void HandleAsync() { }
 }";
 
-        var compilation = CodeCompilationHelpers.CreateCompilation(code);
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
         var symbol = compilation.GetTypeByMetadataName("TestNamespace.CreateUserEndpoint");
 
         // Act
-        var result = symbol.GetMapMethodsAttributeInfo();
+        var result = symbol.GetMapMethodAttributeDefinition();
 
         // Assert
         Assert.NotNull(result);
@@ -163,7 +171,7 @@ public class CreateUserEndpoint : ICreateUserEndpoint
 
     // MapPut Tests
     [Fact]
-    public void GetMapMethodsAttributeInfo_ShouldReturnInfo_ForMapPut_Simple()
+    public void GetMapMethodsAttributeDefinition_ShouldReturnInfo_ForMapPut_Simple()
     {
         // Arrange
         var code = @"
@@ -176,11 +184,13 @@ public class UpdateUserEndpoint
     public void Handle() { }
 }";
 
-        var compilation = CodeCompilationHelpers.CreateCompilation(code);
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
         var symbol = compilation.GetTypeByMetadataName("TestNamespace.UpdateUserEndpoint");
 
         // Act
-        var result = symbol.GetMapMethodsAttributeInfo();
+        var result = symbol.GetMapMethodAttributeDefinition();
 
         // Assert
         Assert.NotNull(result);
@@ -195,7 +205,7 @@ public class UpdateUserEndpoint
     }
 
     [Fact]
-    public void GetMapMethodsAttributeInfo_ShouldReturnInfo_ForMapPut_WithProperties()
+    public void GetMapMethodsAttributeDefinition_ShouldReturnInfo_ForMapPut_WithProperties()
     {
         // Arrange
         var code = @"
@@ -211,11 +221,13 @@ public class UpdateUserEndpoint : IUpdateEndpoint
     public void ExecuteAsync() { }
 }";
 
-        var compilation = CodeCompilationHelpers.CreateCompilation(code);
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
         var symbol = compilation.GetTypeByMetadataName("TestNamespace.UpdateUserEndpoint");
 
         // Act
-        var result = symbol.GetMapMethodsAttributeInfo();
+        var result = symbol.GetMapMethodAttributeDefinition();
 
         // Assert
         Assert.NotNull(result);
@@ -231,7 +243,7 @@ public class UpdateUserEndpoint : IUpdateEndpoint
 
     // MapDelete Tests
     [Fact]
-    public void GetMapMethodsAttributeInfo_ShouldReturnInfo_ForMapDelete_Simple()
+    public void GetMapMethodsAttributeDefinition_ShouldReturnInfo_ForMapDelete_Simple()
     {
         // Arrange
         var code = @"
@@ -244,11 +256,13 @@ public class DeleteUserEndpoint
     public void Handle() { }
 }";
 
-        var compilation = CodeCompilationHelpers.CreateCompilation(code);
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
         var symbol = compilation.GetTypeByMetadataName("TestNamespace.DeleteUserEndpoint");
 
         // Act
-        var result = symbol.GetMapMethodsAttributeInfo();
+        var result = symbol.GetMapMethodAttributeDefinition();
 
         // Assert
         Assert.NotNull(result);
@@ -263,7 +277,7 @@ public class DeleteUserEndpoint
     }
 
     [Fact]
-    public void GetMapMethodsAttributeInfo_ShouldReturnInfo_ForMapDelete_WithProperties()
+    public void GetMapMethodsAttributeDefinition_ShouldReturnInfo_ForMapDelete_WithProperties()
     {
         // Arrange
         var code = @"
@@ -279,11 +293,13 @@ public class DeleteUserEndpoint : IDeleteEndpoint
     public void RemoveAsync() { }
 }";
 
-        var compilation = CodeCompilationHelpers.CreateCompilation(code);
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
         var symbol = compilation.GetTypeByMetadataName("TestNamespace.DeleteUserEndpoint");
 
         // Act
-        var result = symbol.GetMapMethodsAttributeInfo();
+        var result = symbol.GetMapMethodAttributeDefinition();
 
         // Assert
         Assert.NotNull(result);
@@ -299,7 +315,7 @@ public class DeleteUserEndpoint : IDeleteEndpoint
 
     // MapPatch Tests
     [Fact]
-    public void GetMapMethodsAttributeInfo_ShouldReturnInfo_ForMapPatch_Simple()
+    public void GetMapMethodsAttributeDefinition_ShouldReturnInfo_ForMapPatch_Simple()
     {
         // Arrange
         var code = @"
@@ -312,11 +328,13 @@ public class PatchUserEndpoint
     public void Handle() { }
 }";
 
-        var compilation = CodeCompilationHelpers.CreateCompilation(code);
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
         var symbol = compilation.GetTypeByMetadataName("TestNamespace.PatchUserEndpoint");
 
         // Act
-        var result = symbol.GetMapMethodsAttributeInfo();
+        var result = symbol.GetMapMethodAttributeDefinition();
 
         // Assert
         Assert.NotNull(result);
@@ -331,7 +349,7 @@ public class PatchUserEndpoint
     }
 
     [Fact]
-    public void GetMapMethodsAttributeInfo_ShouldReturnInfo_ForMapPatch_WithProperties()
+    public void GetMapMethodsAttributeDefinition_ShouldReturnInfo_ForMapPatch_WithProperties()
     {
         // Arrange
         var code = @"
@@ -347,11 +365,13 @@ public class PatchUserEndpoint : IPatchEndpoint
     public void PatchAsync() { }
 }";
 
-        var compilation = CodeCompilationHelpers.CreateCompilation(code);
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
         var symbol = compilation.GetTypeByMetadataName("TestNamespace.PatchUserEndpoint");
 
         // Act
-        var result = symbol.GetMapMethodsAttributeInfo();
+        var result = symbol.GetMapMethodAttributeDefinition();
 
         // Assert
         Assert.NotNull(result);
@@ -367,7 +387,7 @@ public class PatchUserEndpoint : IPatchEndpoint
 
     // MapHead Tests
     [Fact]
-    public void GetMapMethodsAttributeInfo_ShouldReturnInfo_ForMapHead_Simple()
+    public void GetMapMethodsAttributeDefinition_ShouldReturnInfo_ForMapHead_Simple()
     {
         // Arrange
         var code = @"
@@ -380,11 +400,13 @@ public class HealthCheckEndpoint
     public void Handle() { }
 }";
 
-        var compilation = CodeCompilationHelpers.CreateCompilation(code);
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
         var symbol = compilation.GetTypeByMetadataName("TestNamespace.HealthCheckEndpoint");
 
         // Act
-        var result = symbol.GetMapMethodsAttributeInfo();
+        var result = symbol.GetMapMethodAttributeDefinition();
 
         // Assert
         Assert.NotNull(result);
@@ -399,7 +421,7 @@ public class HealthCheckEndpoint
     }
 
     [Fact]
-    public void GetMapMethodsAttributeInfo_ShouldReturnInfo_ForMapHead_WithProperties()
+    public void GetMapMethodsAttributeDefinition_ShouldReturnInfo_ForMapHead_WithProperties()
     {
         // Arrange
         var code = @"
@@ -415,11 +437,13 @@ public class HealthCheckEndpoint : IHealthCheck
     public void CheckAsync() { }
 }";
 
-        var compilation = CodeCompilationHelpers.CreateCompilation(code);
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
         var symbol = compilation.GetTypeByMetadataName("TestNamespace.HealthCheckEndpoint");
 
         // Act
-        var result = symbol.GetMapMethodsAttributeInfo();
+        var result = symbol.GetMapMethodAttributeDefinition();
 
         // Assert
         Assert.NotNull(result);
@@ -435,7 +459,7 @@ public class HealthCheckEndpoint : IHealthCheck
 
     // MapMethods Tests
     [Fact]
-    public void GetMapMethodsAttributeInfo_ShouldReturnInfo_ForMapMethods_Simple()
+    public void GetMapMethodsAttributeDefinition_ShouldReturnInfo_ForMapMethods_Simple()
     {
         // Arrange
         var code = @"
@@ -449,11 +473,13 @@ public class CustomEndpoint
     public void Handle() { }
 }";
 
-        var compilation = CodeCompilationHelpers.CreateCompilation(code);
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
         var symbol = compilation.GetTypeByMetadataName("TestNamespace.CustomEndpoint");
 
         // Act
-        var result = symbol.GetMapMethodsAttributeInfo();
+        var result = symbol.GetMapMethodAttributeDefinition();
 
         // Assert
         Assert.NotNull(result);
@@ -469,7 +495,7 @@ public class CustomEndpoint
     }
 
     [Fact]
-    public void GetMapMethodsAttributeInfo_ShouldReturnInfo_ForMapMethods_WithProperties()
+    public void GetMapMethodsAttributeDefinition_ShouldReturnInfo_ForMapMethods_WithProperties()
     {
         // Arrange
         var code = @"
@@ -485,11 +511,13 @@ public class CustomEndpoint : ICustomEndpoint
     public void ProcessAsync() { }
 }";
 
-        var compilation = CodeCompilationHelpers.CreateCompilation(code);
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
         var symbol = compilation.GetTypeByMetadataName("TestNamespace.CustomEndpoint");
 
         // Act
-        var result = symbol.GetMapMethodsAttributeInfo();
+        var result = symbol.GetMapMethodAttributeDefinition();
 
         // Assert
         Assert.NotNull(result);
@@ -507,7 +535,7 @@ public class CustomEndpoint : ICustomEndpoint
 
     // Edge Cases
     [Fact]
-    public void GetMapMethodsAttributeInfo_ShouldHandleEmptyPattern()
+    public void GetMapMethodsAttributeDefinition_ShouldHandleEmptyPattern()
     {
         // Arrange
         var code = @"
@@ -520,11 +548,13 @@ public class RootEndpoint
     public void Handle() { }
 }";
 
-        var compilation = CodeCompilationHelpers.CreateCompilation(code);
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
         var symbol = compilation.GetTypeByMetadataName("TestNamespace.RootEndpoint");
 
         // Act
-        var result = symbol.GetMapMethodsAttributeInfo();
+        var result = symbol.GetMapMethodAttributeDefinition();
 
         // Assert
         Assert.NotNull(result);
@@ -533,7 +563,7 @@ public class RootEndpoint
     }
 
     [Fact]
-    public void GetMapMethodsAttributeInfo_ShouldHandleComplexPattern()
+    public void GetMapMethodsAttributeDefinition_ShouldHandleComplexPattern()
     {
         // Arrange
         var code = @"
@@ -547,11 +577,13 @@ public class ComplexPatternEndpoint
     public void Handle() { }
 }";
 
-        var compilation = CodeCompilationHelpers.CreateCompilation(code);
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
         var symbol = compilation.GetTypeByMetadataName("TestNamespace.ComplexPatternEndpoint");
 
         // Act
-        var result = symbol.GetMapMethodsAttributeInfo();
+        var result = symbol.GetMapMethodAttributeDefinition();
 
         // Assert
         Assert.NotNull(result);
@@ -560,7 +592,7 @@ public class ComplexPatternEndpoint
     }
 
     [Fact]
-    public void GetMapMethodsAttributeInfo_ShouldHandleOnlyGroupPrefix()
+    public void GetMapMethodsAttributeDefinition_ShouldHandleOnlyGroupPrefix()
     {
         // Arrange
         var code = @"
@@ -573,11 +605,13 @@ public class TestEndpoint
     public void Handle() { }
 }";
 
-        var compilation = CodeCompilationHelpers.CreateCompilation(code);
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
         var symbol = compilation.GetTypeByMetadataName("TestNamespace.TestEndpoint");
 
         // Act
-        var result = symbol.GetMapMethodsAttributeInfo();
+        var result = symbol.GetMapMethodAttributeDefinition();
 
         // Assert
         Assert.NotNull(result);
@@ -587,7 +621,7 @@ public class TestEndpoint
     }
 
     [Fact]
-    public void GetMapMethodsAttributeInfo_ShouldHandleOnlyEntryPoint()
+    public void GetMapMethodsAttributeDefinition_ShouldHandleOnlyEntryPoint()
     {
         // Arrange
         var code = @"
@@ -600,11 +634,13 @@ public class TestEndpoint
     public void CustomHandler() { }
 }";
 
-        var compilation = CodeCompilationHelpers.CreateCompilation(code);
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
         var symbol = compilation.GetTypeByMetadataName("TestNamespace.TestEndpoint");
 
         // Act
-        var result = symbol.GetMapMethodsAttributeInfo();
+        var result = symbol.GetMapMethodAttributeDefinition();
 
         // Assert
         Assert.NotNull(result);
@@ -614,7 +650,7 @@ public class TestEndpoint
     }
 
     [Fact]
-    public void GetMapMethodsAttributeInfo_ShouldHandleOnlyServiceType()
+    public void GetMapMethodsAttributeDefinition_ShouldHandleOnlyServiceType()
     {
         // Arrange
         var code = @"
@@ -629,11 +665,13 @@ public class TestEndpoint : IMyService
     public void Handle() { }
 }";
 
-        var compilation = CodeCompilationHelpers.CreateCompilation(code);
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
         var symbol = compilation.GetTypeByMetadataName("TestNamespace.TestEndpoint");
 
         // Act
-        var result = symbol.GetMapMethodsAttributeInfo();
+        var result = symbol.GetMapMethodAttributeDefinition();
 
         // Assert
         Assert.NotNull(result);
@@ -643,7 +681,7 @@ public class TestEndpoint : IMyService
     }
 
     [Fact]
-    public void GetMapMethodsAttributeInfo_ShouldHandleNestedNamespaces()
+    public void GetMapMethodsAttributeDefinition_ShouldHandleNestedNamespaces()
     {
         // Arrange
         var code = @"
@@ -658,11 +696,13 @@ public class TestEndpoint : IEndpoint
     public void Handle() { }
 }";
 
-        var compilation = CodeCompilationHelpers.CreateCompilation(code);
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
         var symbol = compilation.GetTypeByMetadataName("TestNamespace.Api.V1.Endpoints.TestEndpoint");
 
         // Act
-        var result = symbol.GetMapMethodsAttributeInfo();
+        var result = symbol.GetMapMethodAttributeDefinition();
 
         // Assert
         Assert.NotNull(result);
@@ -670,7 +710,7 @@ public class TestEndpoint : IEndpoint
     }
 
     [Fact]
-    public void GetMapMethodsAttributeInfo_ShouldHandleAllLifetimes()
+    public void GetMapMethodsAttributeDefinition_ShouldHandleAllLifetimes()
     {
         // Arrange - Singleton
         var codeSingleton = @"
@@ -684,7 +724,9 @@ public class SingletonEndpoint
     public void Handle() { }
 }";
 
-        var compilationSingleton = CodeCompilationHelpers.CreateCompilation(codeSingleton);
+        var compilationSingleton = new CompilationBuilder(codeSingleton)
+            .WithMvcReferences()
+            .Build();
         var symbolSingleton = compilationSingleton.GetTypeByMetadataName("TestNamespace.SingletonEndpoint");
 
         // Arrange - Scoped
@@ -699,7 +741,9 @@ public class ScopedEndpoint
     public void Handle() { }
 }";
 
-        var compilationScoped = CodeCompilationHelpers.CreateCompilation(codeScoped);
+        var compilationScoped = new CompilationBuilder(codeScoped)
+            .WithMvcReferences()
+            .Build();
         var symbolScoped = compilationScoped.GetTypeByMetadataName("TestNamespace.ScopedEndpoint");
 
         // Arrange - Transient
@@ -714,13 +758,15 @@ public class TransientEndpoint
     public void Handle() { }
 }";
 
-        var compilationTransient = CodeCompilationHelpers.CreateCompilation(codeTransient);
+        var compilationTransient = new CompilationBuilder(codeTransient)
+            .WithMvcReferences()
+            .Build();
         var symbolTransient = compilationTransient.GetTypeByMetadataName("TestNamespace.TransientEndpoint");
 
         // Act
-        var resultSingleton = symbolSingleton.GetMapMethodsAttributeInfo();
-        var resultScoped = symbolScoped.GetMapMethodsAttributeInfo();
-        var resultTransient = symbolTransient.GetMapMethodsAttributeInfo();
+        var resultSingleton = symbolSingleton.GetMapMethodAttributeDefinition();
+        var resultScoped = symbolScoped.GetMapMethodAttributeDefinition();
+        var resultTransient = symbolTransient.GetMapMethodAttributeDefinition();
 
         // Assert
         Assert.Equal(ServiceLifetime.Singleton, resultSingleton.Lifetime);
@@ -729,7 +775,7 @@ public class TransientEndpoint
     }
 
     [Fact]
-    public void GetMapMethodsAttributeInfo_ShouldReturnNull_ForMultipleAttributes()
+    public void GetMapMethodsAttributeDefinition_ShouldReturnNull_ForMultipleAttributes()
     {
         // Arrange
         var code = @"
@@ -744,11 +790,13 @@ public class TestEndpoint
     public void Handle() { }
 }";
 
-        var compilation = CodeCompilationHelpers.CreateCompilation(code);
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
         var symbol = compilation.GetTypeByMetadataName("TestNamespace.TestEndpoint");
 
         // Act
-        var result = symbol.GetMapMethodsAttributeInfo();
+        var result = symbol.GetMapMethodAttributeDefinition();
 
         // Assert
         Assert.NotNull(result); // Should still find the MapGet attribute
@@ -756,7 +804,7 @@ public class TestEndpoint
     }
 
     [Fact]
-    public void GetMapMethodsAttributeInfo_ShouldThrowException_WhenMultipleAttributesPresent()
+    public void GetMapMethodsAttributeDefinition_ShouldThrowException_WhenMultipleAttributesPresent()
     {
         // Arrange
         var code = @"
@@ -770,9 +818,11 @@ public class TestClass
     public void Handle() { }
 }";
 
-        var compilation = CodeCompilationHelpers.CreateCompilation(code);
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
         var symbol = compilation.GetTypeByMetadataName("TestNamespace.TestClass");
 
-        Assert.Throws<InvalidOperationException>(() => symbol.GetMapMethodsAttributeInfo());
+        Assert.Throws<InvalidOperationException>(() => symbol.GetMapMethodAttributeDefinition());
     }
 }

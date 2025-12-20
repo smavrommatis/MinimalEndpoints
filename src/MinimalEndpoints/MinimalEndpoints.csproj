@@ -2,8 +2,8 @@
 
   <PropertyGroup>
     <!-- Package metadata -->
-    <PackageId>MinimalEndpoints</PackageId>
-    <Version>0.1.0</Version>
+    <PackageId>Blackeye.MinimalEndpoints</PackageId>
+    <Version>0.1.10</Version>
     <Authors>S. Mavrommatis</Authors>
     <Description>Minimal endpoints library with source generators</Description>
 

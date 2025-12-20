@@ -1,6 +1,6 @@
 namespace MinimalEndpoints.Analyzers.Models;
 
-internal class MapMethodsAttributeInfo
+internal class MapMethodsAttributeDefinition
 {
     public string Pattern { get; set; }
 
