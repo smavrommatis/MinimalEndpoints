@@ -4,9 +4,8 @@ using BenchmarkDotNet.Engines;
 using Microsoft.AspNetCore.Http;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using MinimalEndpoints.Analyzers;
 
-namespace MinimalEndpoints.Benchmarks;
+namespace MinimalEndpoints.Analyzers.Benchmarks;
 
 /// <summary>
 /// Benchmarks for source generator performance with varying endpoint counts.
@@ -93,7 +92,7 @@ public class Endpoint{i}
             MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
             MetadataReference.CreateFromFile(typeof(Console).Assembly.Location),
             MetadataReference.CreateFromFile(typeof(IResult).Assembly.Location),
-            MetadataReference.CreateFromFile(typeof(Annotations.MapGetAttribute).Assembly.Location),
+            MetadataReference.CreateFromFile(typeof(MinimalEndpoints.Annotations.MapGetAttribute).Assembly.Location),
             MetadataReference.CreateFromFile(AppDomain.CurrentDomain.GetAssemblies()
                 .Single(a => a.GetName().Name == "System.Runtime").Location),
             MetadataReference.CreateFromFile(AppDomain.CurrentDomain.GetAssemblies()

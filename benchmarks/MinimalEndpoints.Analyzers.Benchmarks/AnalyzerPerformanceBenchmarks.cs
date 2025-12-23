@@ -5,9 +5,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
-using MinimalEndpoints.Analyzers;
 
-namespace MinimalEndpoints.Benchmarks;
+namespace MinimalEndpoints.Analyzers.Benchmarks;
 
 /// <summary>
 /// Benchmarks for analyzer execution performance.

@@ -1,6 +1,6 @@
 <Solution>
   <Folder Name="/bechmarks/">
-    <Project Path="benchmarks/MinimalEndpoints.Benchmarks.csproj" />
+    <Project Path="benchmarks/MinimalEndpoints.Analyzers.Benchmarks/MinimalEndpoints.Analyzers.Benchmarks.csproj" />
   </Folder>
   <Folder Name="/docs/">
     <File Path="docs/ARCHITECTURE.md" />

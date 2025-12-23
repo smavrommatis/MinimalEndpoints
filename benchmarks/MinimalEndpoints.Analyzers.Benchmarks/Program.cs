@@ -1,6 +1,6 @@
 using BenchmarkDotNet.Running;
 
-namespace MinimalEndpoints.Benchmarks;
+namespace MinimalEndpoints.Analyzers.Benchmarks;
 
 /// <summary>
 /// Entry point for running benchmarks.
