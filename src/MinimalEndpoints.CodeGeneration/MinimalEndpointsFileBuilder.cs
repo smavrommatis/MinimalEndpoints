@@ -128,7 +128,7 @@ internal static class MinimalEndpointsFileBuilder
             : "this IEndpointRouteBuilder builder, IApplicationBuilder app";
 
         var method = fileScope.AddMethod(
-            modifiers: "public static",
+            modifiers: "private static",
             returnType: groupDefinition.IsConditionallyMapped ? "RouteGroupBuilder?" : "RouteGroupBuilder",
             methodName: groupDefinition.MappingGroupMethodName,
             parameters: parameters
@@ -176,7 +176,7 @@ internal static class MinimalEndpointsFileBuilder
             : "this IEndpointRouteBuilder builder, IApplicationBuilder app";
 
         var method = fileScope.AddMethod(
-            modifiers: "public static",
+            modifiers: "private static",
             returnType: endpoint.IsConditionallyMapped ? "IEndpointRouteBuilder?" : "IEndpointRouteBuilder",
             methodName: endpoint.MappingEndpointMethodName,
             parameters: methodParameters

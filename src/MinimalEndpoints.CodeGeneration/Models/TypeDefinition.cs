@@ -186,6 +186,7 @@ internal class TypeDefinition
         SpecialType.System_Single => "float",
         SpecialType.System_Double => "double",
         SpecialType.System_String => "string",
+        SpecialType.System_DateTime => "System.DateTime",
         _ => "object"
     };
 

@@ -395,6 +395,202 @@ public class TestEndpoint
 
     #endregion
 
+    #region MINEP004 - Additional Edge Cases
+
+    [Fact]
+    public void AmbiguousRoutes_WithTrailingSlash_DetectsConflict()
+    {
+        // Arrange
+        var code = @"
+namespace TestApp;
+
+[MapGet(""/api/users"")]
+public class GetUsersEndpoint
+{
+    public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok());
+}
+
+[MapGet(""/api/users/"")]
+public class GetUsersWithSlashEndpoint
+{
+    public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok());
+}";
+
+        // Act
+        var diagnostics = GetDiagnostics(code);
+
+        // Assert
+        var warning = Assert.Single(diagnostics, d => d.Id == "MINEP004");
+        Assert.Equal(DiagnosticSeverity.Warning, warning.Severity);
+    }
+
+    [Fact]
+    public void AmbiguousRoutes_WithOptionalParameters_DetectsConflict()
+    {
+        // Arrange
+        var code = @"
+namespace TestApp;
+
+[MapGet(""/users/{id?}"")]
+public class GetUsersEndpoint
+{
+    public Task<IResult> HandleAsync(int? id) => Task.FromResult(Results.Ok());
+}
+
+[MapGet(""/users/{userId?}"")]
+public class GetUsersByIdEndpoint
+{
+    public Task<IResult> HandleAsync(int? userId) => Task.FromResult(Results.Ok());
+}";
+
+        // Act
+        var diagnostics = GetDiagnostics(code);
+
+        // Assert
+        var warning = Assert.Single(diagnostics, d => d.Id == "MINEP004");
+        Assert.Equal(DiagnosticSeverity.Warning, warning.Severity);
+    }
+
+    [Fact]
+    public void AmbiguousRoutes_WithCatchAll_DetectsConflict()
+    {
+        // Arrange
+        var code = @"
+namespace TestApp;
+
+[MapGet(""/{**path}"")]
+public class CatchAllEndpoint1
+{
+    public Task<IResult> HandleAsync(string path) => Task.FromResult(Results.Ok());
+}
+
+[MapGet(""/{**route}"")]
+public class CatchAllEndpoint2
+{
+    public Task<IResult> HandleAsync(string route) => Task.FromResult(Results.Ok());
+}";
+
+        // Act
+        var diagnostics = GetDiagnostics(code);
+
+        // Assert
+        var warning = Assert.Single(diagnostics, d => d.Id == "MINEP004");
+        Assert.Equal(DiagnosticSeverity.Warning, warning.Severity);
+    }
+
+    [Fact]
+    public void AmbiguousRoutes_DifferentConstraintsSamePattern_StillReports()
+    {
+        // Arrange
+        var code = @"
+namespace TestApp;
+
+[MapGet(""/items/{id:int:min(1)}"")]
+public class GetItemEndpoint
+{
+    public Task<IResult> HandleAsync(int id) => Task.FromResult(Results.Ok());
+}
+
+[MapGet(""/items/{id:int:max(1000)}"")]
+public class GetItemWithMaxEndpoint
+{
+    public Task<IResult> HandleAsync(int id) => Task.FromResult(Results.Ok());
+}";
+
+        // Act
+        var diagnostics = GetDiagnostics(code);
+
+        // Assert
+        var warning = Assert.Single(diagnostics, d => d.Id == "MINEP004");
+        Assert.Equal(DiagnosticSeverity.Warning, warning.Severity);
+    }
+
+    #endregion
+
+    #region MINEP006 - Additional Edge Cases
+
+    [Fact]
+    public void CyclicGroupHierarchy_FourLevelCycle_DetectsError()
+    {
+        // Arrange
+        var code = @"
+namespace TestApp;
+
+[MapGroup(""/api"", ParentGroup = typeof(V3Group))]
+public class ApiGroup { }
+
+[MapGroup(""/v1"", ParentGroup = typeof(ApiGroup))]
+public class V1Group { }
+
+[MapGroup(""/v2"", ParentGroup = typeof(V1Group))]
+public class V2Group { }
+
+[MapGroup(""/v3"", ParentGroup = typeof(V2Group))]
+public class V3Group { }";
+
+        // Act
+        var diagnostics = GetDiagnostics(code);
+
+        // Assert
+        var errors = diagnostics.Where(d => d.Id == "MINEP006").ToList();
+        Assert.NotEmpty(errors);
+    }
+
+    [Fact]
+    public void CyclicGroupHierarchy_MultipleSeparateCycles_DetectsAll()
+    {
+        // Arrange
+        var code = @"
+namespace TestApp;
+
+[MapGroup(""/api1"", ParentGroup = typeof(V1Group))]
+public class Api1Group { }
+
+[MapGroup(""/v1"", ParentGroup = typeof(Api1Group))]
+public class V1Group { }
+
+[MapGroup(""/api2"", ParentGroup = typeof(V2Group))]
+public class Api2Group { }
+
+[MapGroup(""/v2"", ParentGroup = typeof(Api2Group))]
+public class V2Group { }";
+
+        // Act
+        var diagnostics = GetDiagnostics(code);
+
+        // Assert
+        var errors = diagnostics.Where(d => d.Id == "MINEP006").ToList();
+        Assert.True(errors.Count >= 2, "Should detect multiple cycles");
+    }
+
+    [Fact]
+    public void CyclicGroupHierarchy_DiamondShape_NoErrorIfNoCycle()
+    {
+        // Arrange - Diamond pattern without cycle
+        var code = @"
+namespace TestApp;
+
+[MapGroup(""/api"")]
+public class ApiGroup { }
+
+[MapGroup(""/v1"", ParentGroup = typeof(ApiGroup))]
+public class V1GroupA { }
+
+[MapGroup(""/v2"", ParentGroup = typeof(ApiGroup))]
+public class V1GroupB { }
+
+[MapGroup(""/admin"", ParentGroup = typeof(V1GroupA))]
+public class AdminGroup { }";
+
+        // Act
+        var diagnostics = GetDiagnostics(code);
+
+        // Assert
+        Assert.DoesNotContain(diagnostics, d => d.Id == "MINEP006");
+    }
+
+    #endregion
+
     private List<Diagnostic> GetDiagnostics(string code)
     {
         var compilation = new CompilationBuilder(code)

@@ -45,8 +45,8 @@ public class GetProductsEndpoint
         Assert.Contains("services.AddSingleton<TestApp.V1Group>();", generatedCode);
 
         // Should include MapGroup__ApiGroup method
-        Assert.Contains("public static RouteGroupBuilder MapGroup__TestApp_ApiGroup(", generatedCode);
-        Assert.Contains("public static RouteGroupBuilder MapGroup__TestApp_V1Group(", generatedCode);
+        Assert.Contains("private static RouteGroupBuilder MapGroup__TestApp_ApiGroup(", generatedCode);
+        Assert.Contains("private static RouteGroupBuilder MapGroup__TestApp_V1Group(", generatedCode);
 
         // Should create ApiGroup in UseMinimalEndpoints
         Assert.Contains("var group_TestApp_ApiGroup = builder.MapGroup__TestApp_ApiGroup(app);", generatedCode);
@@ -102,9 +102,9 @@ public class GetUsersEndpoint
         Assert.Contains("services.AddSingleton<TestApp.AdminGroup>();", generatedCode);
 
         // All three MapGroup methods should exist
-        Assert.Contains("public static RouteGroupBuilder MapGroup__TestApp_ApiGroup(", generatedCode);
-        Assert.Contains("public static RouteGroupBuilder MapGroup__TestApp_V1Group(", generatedCode);
-        Assert.Contains("public static RouteGroupBuilder MapGroup__TestApp_AdminGroup(", generatedCode);
+        Assert.Contains("private static RouteGroupBuilder MapGroup__TestApp_ApiGroup(", generatedCode);
+        Assert.Contains("private static RouteGroupBuilder MapGroup__TestApp_V1Group(", generatedCode);
+        Assert.Contains("private static RouteGroupBuilder MapGroup__TestApp_AdminGroup(", generatedCode);
 
         // Should create groups in hierarchy order
         Assert.Contains("var group_TestApp_ApiGroup = builder.MapGroup__TestApp_ApiGroup(app);", generatedCode);
@@ -169,7 +169,7 @@ public class GetProductsV2Endpoint
 
         // Shared parent ApiGroup should be included
         Assert.Contains("services.AddSingleton<TestApp.ApiGroup>();", generatedCode);
-        Assert.Contains("public static RouteGroupBuilder MapGroup__TestApp_ApiGroup(", generatedCode);
+        Assert.Contains("private static RouteGroupBuilder MapGroup__TestApp_ApiGroup(", generatedCode);
         Assert.Contains("var group_TestApp_ApiGroup = builder.MapGroup__TestApp_ApiGroup(app);", generatedCode);
 
         // Both child groups should reference the shared parent
@@ -212,7 +212,7 @@ public class GetProductsEndpoint
         // Assert
         Assert.NotNull(generatedCode);
         Assert.Contains("services.AddSingleton<TestApp.ApiGroup>();", generatedCode);
-        Assert.Contains("public static RouteGroupBuilder MapGroup__TestApp_ApiGroup(", generatedCode);
+        Assert.Contains("private static RouteGroupBuilder MapGroup__TestApp_ApiGroup(", generatedCode);
 
         // Should NOT have parent parameter (root group)
         Assert.Contains("MapGroup__TestApp_ApiGroup(this IEndpointRouteBuilder builder, IApplicationBuilder app)", generatedCode);

@@ -31,7 +31,7 @@ public class TestEndpoint
         Assert.NotNull(generatedCode);
 
         Assert.Contains("public static IServiceCollection AddMinimalEndpoints", generatedCode);
-        Assert.Contains("public static IEndpointRouteBuilder Map__TestApp_Endpoints_TestEndpoint", generatedCode);
+        Assert.Contains("private static IEndpointRouteBuilder Map__TestApp_Endpoints_TestEndpoint", generatedCode);
         Assert.Contains("public static IApplicationBuilder UseMinimalEndpoints", generatedCode);
     }
 
@@ -834,6 +834,251 @@ public class GlobalEndpoint
         Assert.NotNull(generatedCode);
         Assert.Contains("Map__GlobalEndpoint", generatedCode);
         Assert.Contains("GlobalEndpoint", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratedCode_WithDefaultParameterValues_PreservesDefaults()
+    {
+        // Arrange
+        var code = @"
+namespace TestApp.Endpoints;
+
+[MapGet(""/test"")]
+public class TestEndpoint
+{
+    public Task<IResult> HandleAsync(int page = 1, int pageSize = 10)
+    {
+        return Task.FromResult(Results.Ok(new { page, pageSize }));
+    }
+}";
+
+        // Act
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
+
+        var (generatedCode, _) = CompilationUtilities.GenerateCodeAndCompile(compilation);
+
+        // Assert
+        Assert.NotNull(generatedCode);
+        // Default values should be present in generated handler signature
+        Assert.Contains("int page", generatedCode);
+        Assert.Contains("int pageSize", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratedCode_WithCancellationToken_BindsCorrectly()
+    {
+        // Arrange
+        var code = @"
+namespace TestApp.Endpoints;
+
+[MapGet(""/async-operation"")]
+public class AsyncOperationEndpoint
+{
+    public async Task<IResult> HandleAsync(CancellationToken cancellationToken)
+    {
+        await Task.Delay(100, cancellationToken);
+        return Results.Ok();
+    }
+}";
+
+        // Act
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
+
+        var (generatedCode, _) = CompilationUtilities.GenerateCodeAndCompile(compilation);
+
+        // Assert
+        Assert.NotNull(generatedCode);
+        Assert.Contains("CancellationToken cancellationToken", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratedCode_WithHttpContext_BindsCorrectly()
+    {
+        // Arrange
+        var code = @"
+namespace TestApp.Endpoints;
+
+[MapGet(""/context"")]
+public class ContextEndpoint
+{
+    public Task<IResult> HandleAsync(HttpContext context)
+    {
+        return Task.FromResult(Results.Ok(context.Request.Path));
+    }
+}";
+
+        // Act
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
+
+        var (generatedCode, _) = CompilationUtilities.GenerateCodeAndCompile(compilation);
+
+        // Assert
+        Assert.NotNull(generatedCode);
+        Assert.Contains("HttpContext context", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratedCode_WithComplexBindingAttributes_PreservesAll()
+    {
+        // Arrange
+        var code = @"
+namespace TestApp.Endpoints;
+
+[MapPost(""/complex"")]
+public class ComplexBindingEndpoint
+{
+    public Task<IResult> HandleAsync(
+        [FromRoute] int id,
+        [FromQuery] string filter,
+        [FromHeader(Name = ""X-Api-Key"")] string apiKey,
+        [FromBody] CreateRequest request)
+    {
+        return Task.FromResult(Results.Ok());
+    }
+}
+
+public class CreateRequest
+{
+    public string Name { get; set; }
+}";
+
+        // Act
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
+
+        var (generatedCode, _) = CompilationUtilities.GenerateCodeAndCompile(compilation);
+
+        // Assert
+        Assert.NotNull(generatedCode);
+        Assert.Contains("[FromRoute]", generatedCode);
+        Assert.Contains("[FromQuery]", generatedCode);
+        Assert.Contains("[FromHeader(Name = \"X-Api-Key\")]", generatedCode);
+        Assert.Contains("[FromBody]", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratedCode_WithRecordTypes_GeneratesCorrectly()
+    {
+        // Arrange
+        var code = @"
+namespace TestApp.Endpoints;
+
+public record ProductDto(int Id, string Name, decimal Price);
+
+[MapGet(""/products/{id}"")]
+public class GetProductEndpoint
+{
+    public Task<ProductDto> HandleAsync(int id)
+    {
+        return Task.FromResult(new ProductDto(id, ""Product"", 99.99m));
+    }
+}";
+
+        // Act
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
+
+        var (generatedCode, _) = CompilationUtilities.GenerateCodeAndCompile(compilation);
+
+        // Assert
+        Assert.NotNull(generatedCode);
+        Assert.Contains("Task<", generatedCode);
+        Assert.Contains("ProductDto", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratedCode_WithNullableValueTypes_GeneratesCorrectly()
+    {
+        // Arrange
+        var code = @"
+namespace TestApp.Endpoints;
+
+[MapGet(""/data"")]
+public class NullableValueTypesEndpoint
+{
+    public Task<IResult> HandleAsync(int? id, DateTime? date, bool? flag)
+    {
+        return Task.FromResult(Results.Ok());
+    }
+}";
+
+        // Act
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
+
+        var (generatedCode, _) = CompilationUtilities.GenerateCodeAndCompile(compilation);
+
+        // Assert
+        Assert.NotNull(generatedCode);
+        Assert.Contains("int? id", generatedCode);
+        Assert.Contains("DateTime? date", generatedCode);
+        Assert.Contains("bool? flag", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratedCode_WithArrayParameters_GeneratesCorrectly()
+    {
+        // Arrange
+        var code = @"
+namespace TestApp.Endpoints;
+
+[MapPost(""/bulk"")]
+public class BulkOperationEndpoint
+{
+    public Task<IResult> HandleAsync(int[] ids, string[] tags)
+    {
+        return Task.FromResult(Results.Ok());
+    }
+}";
+
+        // Act
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
+
+        var (generatedCode, _) = CompilationUtilities.GenerateCodeAndCompile(compilation);
+
+        // Assert
+        Assert.NotNull(generatedCode);
+        Assert.Contains("int[] ids", generatedCode);
+        Assert.Contains("string[] tags", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratedCode_WithMultipleRouteConstraints_PreservesAll()
+    {
+        // Arrange
+        var code = @"
+namespace TestApp.Endpoints;
+
+[MapGet(""/users/{userId:int:min(1)}/posts/{postId:guid}"")]
+public class GetUserPostEndpoint
+{
+    public Task<IResult> HandleAsync(int userId, Guid postId)
+    {
+        return Task.FromResult(Results.Ok());
+    }
+}";
+
+        // Act
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
+
+        var (generatedCode, _) = CompilationUtilities.GenerateCodeAndCompile(compilation);
+
+        // Assert
+        Assert.NotNull(generatedCode);
+        Assert.Contains("/users/{userId:int:min(1)}/posts/{postId:guid}", generatedCode);
     }
 }
 

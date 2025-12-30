@@ -104,6 +104,7 @@ public class CompilationBuilder
         var usings = new List<string>
         {
             "System",
+            "System.Threading",
             "System.Threading.Tasks",
             "System.Collections.Generic",
             "System.Linq",
