@@ -74,7 +74,7 @@ public class GetUsersEndpoint
 
 ### 2. Analyzer Layer
 
-**Location**: `src/MinimalEndpoints.Analyzers/`
+**Location**: `src/MinimalEndpoints.CodeGeneration/`
 
 The analyzer layer provides compile-time diagnostics and validation:
 
@@ -119,7 +119,7 @@ Report diagnostics to IDE
 
 ### 3. Source Generator Layer
 
-**Location**: `src/MinimalEndpoints.Analyzers/`
+**Location**: `src/MinimalEndpoints.CodeGeneration/`
 
 The source generator creates extension methods at compile-time:
 
@@ -296,7 +296,7 @@ internal class ParameterInfo
 
 ```
 tests/
-  MinimalEndpoints.Analyzers.Tests/
+  MinimalEndpoints.CodeGeneration.Tests/
     ├── CompilationBuilder.cs          # Test helper
     ├── MinimalEndpointsAnalyzerTests.cs  # Analyzer tests
     ├── Integration/
@@ -394,7 +394,7 @@ services.AddScoped<IGetUsers, GetUsersEndpoint>();
              │ references
              ▼
 ┌─────────────────────────────────────┐
-│  MinimalEndpoints.Analyzers         │
+│  MinimalEndpoints.CodeGeneration         │
 │  - EndpointGenerator                │
 │  - MinimalEndpointsAnalyzer         │
 │  - Models & Utilities               │
@@ -427,7 +427,7 @@ Blackeye.MinimalEndpoints.nupkg
 ├── analyzers/
 │   └── dotnet/
 │       └── cs/
-│           ├── MinimalEndpoints.Analyzers.dll
+│           ├── MinimalEndpoints.CodeGeneration.dll
 │           └── MinimalEndpoints.CodeFixes.dll
 └── [package metadata]
 ```
@@ -468,7 +468,7 @@ Blackeye.MinimalEndpoints.nupkg
 
 ### View Generated Code
 In Visual Studio:
-- Solution Explorer → Project → Dependencies → Analyzers → MinimalEndpoints.Analyzers → MinimalEndpointExtensions.g.cs
+- Solution Explorer → Project → Dependencies → Analyzers → MinimalEndpoints.CodeGeneration → MinimalEndpointExtensions.g.cs
 
 ### Debug Generator
 Add to generator project:

@@ -201,7 +201,7 @@ MyApi/
 Want to see what's generated? In Visual Studio or Rider:
 
 1. Right-click the project → **Analyze** → **View Source Generators**
-2. Find `MinimalEndpoints.Analyzers` → `MinimalEndpointExtensions.g.cs`
+2. Find `MinimalEndpoints.CodeGeneration` → `MinimalEndpointExtensions.g.cs`
 
 You'll see:
 ```csharp

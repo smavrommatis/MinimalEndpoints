@@ -6,7 +6,7 @@ namespace MinimalEndpoints.Annotations;
 /// Defines an endpoint group with a common route prefix and optional shared configuration.
 /// </summary>
 /// <remarks>
-/// Apply this attribute to a class implementing <see cref="IEndpointGroup"/> to define
+/// Apply this attribute to a class implementing <see cref="IConfigurableGroup"/> to define
 /// a reusable group that multiple endpoints can reference. The group provides a route
 /// prefix and allows centralized configuration of authorization, rate limiting, and other
 /// middleware for all endpoints in the group.
@@ -14,7 +14,7 @@ namespace MinimalEndpoints.Annotations;
 /// <example>
 /// <code>
 /// [MapGroup("/api/v1", GroupName = "V1 API")]
-/// public class ApiV1Group : IEndpointGroup
+/// public class ApiV1Group : IConfigurableGroup
 /// {
 ///     public void ConfigureGroup(RouteGroupBuilder group)
 ///     {
@@ -40,29 +40,20 @@ public sealed class MapGroupAttribute : Attribute
     public string Prefix { get; }
 
     /// <summary>
-    /// Gets or sets the logical name of the group.
-    /// </summary>
-    /// <remarks>
-    /// Used for OpenAPI grouping and documentation purposes.
-    /// If not specified, the group class name is used.
-    /// </remarks>
-    public string? GroupName { get; set; }
-
-    /// <summary>
     /// Gets or sets the parent group type for hierarchical grouping.
     /// </summary>
     /// <remarks>
     /// When specified, this group's prefix will be appended to the parent group's full path.
-    /// The parent group must also be decorated with <see cref="MapGroupAttribute"/> and implement <see cref="IEndpointGroup"/>.
+    /// The parent group must also be decorated with <see cref="MapGroupAttribute"/>/>.
     /// Cyclic group hierarchies are not allowed and will result in a compile-time error.
     /// </remarks>
     /// <example>
     /// <code>
     /// [MapGroup("/api")]
-    /// public class ApiGroup : IEndpointGroup { }
+    /// public class ApiGroup { }
     ///
     /// [MapGroup("/v1", ParentGroup = typeof(ApiGroup))]
-    /// public class ApiV1Group : IEndpointGroup { }
+    /// public class ApiV1Group { }
     /// // Results in prefix: /api/v1
     /// </code>
     /// </example>

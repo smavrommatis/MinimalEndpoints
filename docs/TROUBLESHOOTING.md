@@ -69,7 +69,7 @@ Common issues and their solutions when using MinimalEndpoints.
 
 **Visual Studio:**
 1. Solution Explorer → Dependencies → Analyzers
-2. Expand `MinimalEndpoints.Analyzers`
+2. Expand `MinimalEndpoints.CodeGeneration`
 3. View `MinimalEndpointExtensions.g.cs`
 
 **Rider:**
@@ -79,7 +79,7 @@ Common issues and their solutions when using MinimalEndpoints.
 **VS Code:**
 ```bash
 # Generated files are in:
-obj/Debug/net8.0/generated/MinimalEndpoints.Analyzers/MinimalEndpoints.Analyzers.EndpointGenerator/
+obj/Debug/net8.0/generated/MinimalEndpoints.CodeGeneration/MinimalEndpoints.CodeGeneration.EndpointGenerator/
 ```
 
 ### Generator Not Running
@@ -92,7 +92,7 @@ dotnet build -v:detailed | Select-String "MinimalEndpoints"
 
 Look for lines like:
 ```
-Executing generator 'MinimalEndpoints.Analyzers.EndpointGenerator'...
+Executing generator 'MinimalEndpoints.CodeGeneration.EndpointGenerator'...
 ```
 
 If not present, the generator isn't loading. Try:
@@ -580,7 +580,7 @@ builder.Services.AddMinimalEndpoints();  // Then add endpoints
 
    Visual Studio:
    - Solution Explorer → Dependencies → Analyzers
-   - Should see `MinimalEndpoints.Analyzers`
+   - Should see `MinimalEndpoints.CodeGeneration`
 
    Rider:
    - Settings → Tools → Roslyn Analyzers
@@ -704,7 +704,7 @@ builder.Logging.AddConsole();
 
 ```bash
 # After build, find generated files:
-ls obj/Debug/net8.0/generated/MinimalEndpoints.Analyzers/**/*.cs
+ls obj/Debug/net8.0/generated/MinimalEndpoints.CodeGeneration/**/*.cs
 ```
 
 ### Test Endpoints Individually

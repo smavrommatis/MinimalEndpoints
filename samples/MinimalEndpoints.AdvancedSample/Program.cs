@@ -25,7 +25,6 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-// Map all MinimalEndpoints
 app.UseMinimalEndpoints();
 
 app.Run();

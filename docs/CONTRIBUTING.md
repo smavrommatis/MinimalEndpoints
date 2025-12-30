@@ -92,10 +92,10 @@ dotnet test
 MinimalEndpoints/
 ├── src/
 │   ├── MinimalEndpoints/              # Core library with attributes
-│   ├── MinimalEndpoints.Analyzers/    # Roslyn analyzers and generators
+│   ├── MinimalEndpoints.CodeGeneration/    # Roslyn analyzers and generators
 │   └── MinimalEndpoints.CodeFixes/    # Code fix providers
 ├── tests/
-│   └── MinimalEndpoints.Analyzers.Tests/  # Unit and integration tests
+│   └── MinimalEndpoints.CodeGeneration.Tests/  # Unit and integration tests
 ├── samples/
 │   └── MinimalEndpoints.Sample/       # Sample application
 ├── docs/                              # Documentation
@@ -228,7 +228,7 @@ using System.Collections.Generic;
 using Microsoft.CodeAnalysis;
 
 // 2. Namespace
-namespace MinimalEndpoints.Analyzers.Models;
+namespace MinimalEndpoints.CodeGeneration.Models;
 
 // 3. XML documentation
 /// <summary>

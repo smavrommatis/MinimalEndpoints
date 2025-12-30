@@ -83,18 +83,18 @@ public abstract class MapMethodsBaseAttribute : Attribute
     /// Gets or sets the endpoint group type that defines shared configuration and route prefix.
     /// </summary>
     /// <value>
-    /// The type of a class decorated with <see cref="MapGroupAttribute"/> implementing <see cref="IEndpointGroup"/>,
+    /// The type of a class decorated with <see cref="MapGroupAttribute"/> implementing <see cref="IConfigurableGroup"/>,
     /// or null if this endpoint is not part of a group.
     /// </value>
     /// <remarks>
     /// When specified, this endpoint will be mapped within the route group, inheriting the group's
-    /// route prefix and any shared configuration defined in the group's <see cref="IEndpointGroup.ConfigureGroup"/> method.
-    /// The group type must be decorated with <see cref="MapGroupAttribute"/> and implement <see cref="IEndpointGroup"/>.
+    /// route prefix and any shared configuration defined in the group's <see cref="IConfigurableGroup.ConfigureGroup"/> method.
+    /// The group type must be decorated with <see cref="MapGroupAttribute"/> and implement <see cref="IConfigurableGroup"/>.
     /// </remarks>
     /// <example>
     /// <code>
     /// [MapGroup("/api/v1")]
-    /// public class ApiV1Group : IEndpointGroup
+    /// public class ApiV1Group : IConfigurableGroup
     /// {
     ///     public void ConfigureGroup(RouteGroupBuilder group)
     ///     {
