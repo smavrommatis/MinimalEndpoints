@@ -158,22 +158,20 @@ public class GetUsersV2Endpoint : IConfigurableEndpoint
 
 ```csharp
 [MapGroup("/api/v1")]
-public class V1Group : IEndpointGroup
+public class V1Group : IConfigurableGroup
 {
     public void ConfigureGroup(RouteGroupBuilder group)
     {
-        group.HasApiVersion(new ApiVersion(1, 0))
-             .WithOpenApi();
+        group.WithOpenApi();
     }
 }
 
 [MapGroup("/api/v2")]
-public class V2Group : IEndpointGroup
+public class V2Group : IConfigurableGroup
 {
     public void ConfigureGroup(RouteGroupBuilder group)
     {
-        group.HasApiVersion(new ApiVersion(2, 0))
-             .WithOpenApi();
+        group.WithOpenApi();
     }
 }
 
@@ -462,7 +460,7 @@ public class GenerateReportEndpoint : IConfigurableEndpoint
 
 ```csharp
 [MapGroup("/api/public")]
-public class PublicApiGroup : IEndpointGroup
+public class PublicApiGroup : IConfigurableGroup
 {
     public void ConfigureGroup(RouteGroupBuilder group)
     {
@@ -738,7 +736,7 @@ public class UpdateUserEndpoint : IConfigurableEndpoint
 
 ```csharp
 [MapGroup("/api/admin")]
-public class AdminGroup : IEndpointGroup
+public class AdminGroup : IConfigurableGroup
 {
     public void ConfigureGroup(RouteGroupBuilder group)
     {
@@ -860,7 +858,7 @@ public class GetReportsEndpoint : IConfigurableEndpoint
 
 ```csharp
 [MapGroup("/api/v{version:apiVersion}")]
-public class ApiGroup : IEndpointGroup
+public class ApiGroup : IConfigurableGroup
 {
     public void ConfigureGroup(RouteGroupBuilder group)
     {
@@ -914,11 +912,10 @@ public class GetProductsEndpoint : IConfigurableEndpoint
 ## See Also
 
 - [Basic Endpoints](02-basic-endpoints.md) - HTTP method examples
-- [Endpoint Groups](06-endpoint-groups.md) - Organizing endpoints
-- [Configurable Endpoints](08-configurable-endpoints.md) - Advanced configuration
+- [Getting Started](01-getting-started.md) - Quick start guide
 - [ASP.NET Core Documentation](https://learn.microsoft.com/aspnet/core/)
 
 ---
 
-**Last Updated:** December 21, 2025
+**Last Updated:** January 31, 2025
 

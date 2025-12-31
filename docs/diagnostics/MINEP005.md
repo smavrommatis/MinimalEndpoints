@@ -10,26 +10,23 @@ Error
 
 ## Description
 
-The `Group` property on a mapping attribute references a type that either doesn't implement `IEndpointGroup` or isn't decorated with `[MapGroup]` attribute.
+The `Group` property on a mapping attribute references a type that isn't decorated with `[MapGroup]` attribute.
 
 ## Message
 
-> The Group type '{0}' specified for endpoint '{1}' does not implement IEndpointGroup or is not decorated with MapGroupAttribute. Ensure the group class implements IEndpointGroup and has the [MapGroup] attribute.
+> The Group type '{0}' specified for endpoint '{1}' is not decorated with MapGroupAttribute. Ensure the group has the [MapGroup] attribute.
 
 ## Cause
 
-This error occurs when:
-1. The `Group` property references a class without `[MapGroup]` attribute
-2. The group class doesn't implement `IEndpointGroup` interface
-3. Both the attribute and interface are missing
+This error occurs when the `Group` property references a class without the `[MapGroup]` attribute.
 
 ## How to Fix
 
-### Option 1: Add Both Attribute and Interface
+### Option 1: Add [MapGroup] Attribute
 
 **❌ Incorrect:**
 ```csharp
-// Missing [MapGroup] and IEndpointGroup
+// Missing [MapGroup]
 public class ApiV1Group
 {
 }
@@ -41,19 +38,37 @@ public class GetProductsEndpoint { }
 **✅ Correct:**
 ```csharp
 [MapGroup("/api/v1")]  // ✅ Add attribute
-public class ApiV1Group : IEndpointGroup  // ✅ Implement interface
+public class ApiV1Group
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
-    {
-        group.RequireAuthorization();
-    }
 }
 
 [MapGet("/products", Group = typeof(ApiV1Group))]
 public class GetProductsEndpoint { }
 ```
 
-### Option 2: Remove Group Property
+### Option 2: Add Configuration (Optional)
+
+For advanced configuration, implement `IConfigurableGroup`:
+
+```csharp
+[MapGroup("/api/v1")]
+public class ApiV1Group : IConfigurableGroup  // Optional interface
+{
+    public void ConfigureGroup(RouteGroupBuilder group)
+    {
+        group.RequireAuthorization()
+             .WithOpenApi();
+    }
+}
+
+[MapGet("/products", Group = typeof(ApiV1Group))]
+public class GetProductsEndpoint
+{
+    public IResult Handle() => Results.Ok();
+}
+```
+
+### Option 3: Remove Group Property
 
 If you don't need grouping:
 
@@ -66,8 +81,7 @@ public class GetProductsEndpoint { }
 
 A valid endpoint group must:
 1. ✅ Be decorated with `[MapGroup("prefix")]` attribute
-2. ✅ Implement `IEndpointGroup` interface
-3. ✅ Implement `ConfigureGroup(RouteGroupBuilder)` method
+2. ⚪ Optionally implement `IConfigurableGroup` interface for configuration
 
 ## Examples
 
@@ -75,47 +89,50 @@ A valid endpoint group must:
 
 ```csharp
 // ❌ No [MapGroup] attribute
-public class ApiV1Group : IEndpointGroup
+public class ApiV1Group
 {
-    public void ConfigureGroup(RouteGroupBuilder group) { }
 }
 
 [MapGet("/products", Group = typeof(ApiV1Group))]
 public class GetProductsEndpoint { }
 ```
 
-### ❌ Incorrect - Missing Interface
+### ✅ Correct - Simple Group
 
 ```csharp
 [MapGroup("/api/v1")]
-public class ApiV1Group  // ❌ Doesn't implement IEndpointGroup
+public class ApiV1Group
 {
 }
 
 [MapGet("/products", Group = typeof(ApiV1Group))]
-public class GetProductsEndpoint { }
+public class GetProductsEndpoint
+{
+    public IResult Handle() => Results.Ok();
+}
+// Results in: /api/v1/products
 ```
 
-### ✅ Correct - Complete Group
+### ✅ Correct - Group with Configuration
 
 ```csharp
-[MapGroup("/api/v1", GroupName = "V1 API")]
-public class ApiV1Group : IEndpointGroup
+[MapGroup("/api/v1")]
+public class ApiV1Group : IConfigurableGroup
 {
     public void ConfigureGroup(RouteGroupBuilder group)
     {
         group.RequireAuthorization()
              .WithOpenApi()
-             .WithRateLimiter("fixed");
+             .RequireRateLimiting("fixed");
     }
 }
 
 [MapGet("/products", Group = typeof(ApiV1Group))]
 public class GetProductsEndpoint
 {
-    public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok());
+    public IResult Handle() => Results.Ok();
 }
-// Results in: /api/v1/products with authorization
+// Results in: /api/v1/products with authorization and rate limiting
 ```
 
 ## What Groups Enable
@@ -125,9 +142,8 @@ Using groups provides several benefits:
 ### 1. Route Prefix
 ```csharp
 [MapGroup("/api/v1")]
-public class ApiV1Group : IEndpointGroup
+public class ApiV1Group
 {
-    public void ConfigureGroup(RouteGroupBuilder group) { }
 }
 
 [MapGet("/products", Group = typeof(ApiV1Group))]  // → /api/v1/products
@@ -137,7 +153,7 @@ public class ApiV1Group : IEndpointGroup
 ### 2. Shared Authorization
 ```csharp
 [MapGroup("/admin")]
-public class AdminGroup : IEndpointGroup
+public class AdminGroup : IConfigurableGroup
 {
     public void ConfigureGroup(RouteGroupBuilder group)
     {
@@ -153,19 +169,19 @@ public class AdminGroup : IEndpointGroup
 ### 3. Rate Limiting
 ```csharp
 [MapGroup("/api")]
-public class ApiGroup : IEndpointGroup
+public class ApiGroup : IConfigurableGroup
 {
     public void ConfigureGroup(RouteGroupBuilder group)
     {
-        group.WithRateLimiter("fixed");
+        group.RequireRateLimiting("fixed");
     }
 }
 ```
 
 ### 4. OpenAPI Grouping
 ```csharp
-[MapGroup("/api/v1", GroupName = "V1 API")]
-public class ApiV1Group : IEndpointGroup
+[MapGroup("/api/v1")]
+public class ApiV1Group : IConfigurableGroup
 {
     public void ConfigureGroup(RouteGroupBuilder group)
     {
@@ -178,7 +194,7 @@ public class ApiV1Group : IEndpointGroup
 ### 5. CORS Policies
 ```csharp
 [MapGroup("/public")]
-public class PublicGroup : IEndpointGroup
+public class PublicGroup : IConfigurableGroup
 {
     public void ConfigureGroup(RouteGroupBuilder group)
     {
@@ -191,8 +207,8 @@ public class PublicGroup : IEndpointGroup
 
 ```csharp
 // API V1 - Requires authorization
-[MapGroup("/api/v1", GroupName = "V1 API")]
-public class ApiV1Group : IEndpointGroup
+[MapGroup("/api/v1")]
+public class ApiV1Group : IConfigurableGroup
 {
     public void ConfigureGroup(RouteGroupBuilder group)
     {
@@ -201,20 +217,20 @@ public class ApiV1Group : IEndpointGroup
 }
 
 // API V2 - Different configuration
-[MapGroup("/api/v2", GroupName = "V2 API")]
-public class ApiV2Group : IEndpointGroup
+[MapGroup("/api/v2")]
+public class ApiV2Group : IConfigurableGroup
 {
     public void ConfigureGroup(RouteGroupBuilder group)
     {
         group.RequireAuthorization()
-             .WithRateLimiter("sliding")
+             .RequireRateLimiting("sliding")
              .WithOpenApi();
     }
 }
 
 // Public - No auth
 [MapGroup("/public")]
-public class PublicGroup : IEndpointGroup
+public class PublicGroup : IConfigurableGroup
 {
     public void ConfigureGroup(RouteGroupBuilder group)
     {

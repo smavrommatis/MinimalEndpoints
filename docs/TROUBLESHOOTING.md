@@ -306,14 +306,14 @@ public class ListUsersEndpoint { }
 
 **Error:**
 ```
-The Group type 'MyGroup' specified for endpoint 'MyEndpoint' does not implement IEndpointGroup or is not decorated with MapGroupAttribute.
+The Group type 'MyGroup' specified for endpoint 'MyEndpoint' is not decorated with MapGroupAttribute.
 ```
 
-**Cause:** Group class doesn't implement `IEndpointGroup` or missing `[MapGroup]` attribute.
+**Cause:** Group class is missing `[MapGroup]` attribute.
 
 **Bad:**
 ```csharp
-public class MyGroup  // ❌ Missing IEndpointGroup and [MapGroup]
+public class MyGroup  // ❌ Missing [MapGroup]
 {
 }
 
@@ -325,7 +325,13 @@ public class MyEndpoint { }
 
 ```csharp
 [MapGroup("/api")]  // ✅ Add attribute
-public class MyGroup : IEndpointGroup  // ✅ Implement interface
+public class MyGroup  // IConfigurableGroup is optional
+{
+}
+
+// Or with configuration
+[MapGroup("/api")]
+public class MyGroup : IConfigurableGroup  // ✅ Optional interface
 {
     public void ConfigureGroup(RouteGroupBuilder group)
     {
@@ -354,10 +360,10 @@ Group 'GroupA' has a cyclic hierarchy: GroupA -> GroupB -> GroupA.
 **Bad:**
 ```csharp
 [MapGroup("/a", ParentGroup = typeof(GroupB))]
-public class GroupA : IEndpointGroup { }
+public class GroupA : IConfigurableGroup { }
 
 [MapGroup("/b", ParentGroup = typeof(GroupA))]  // ❌ Circular reference
-public class GroupB : IEndpointGroup { }
+public class GroupB : IConfigurableGroup { }
 ```
 
 **Solution:**
@@ -365,10 +371,10 @@ public class GroupB : IEndpointGroup { }
 Remove circular reference:
 ```csharp
 [MapGroup("/a")]  // ✅ No parent
-public class GroupA : IEndpointGroup { }
+public class GroupA : IConfigurableGroup { }
 
 [MapGroup("/b", ParentGroup = typeof(GroupA))]  // ✅ Valid hierarchy
-public class GroupB : IEndpointGroup { }
+public class GroupB : IConfigurableGroup { }
 ```
 
 ---
@@ -528,10 +534,10 @@ builder.Services.AddMinimalEndpoints();  // Then add endpoints
 
 **Solution:**
 
-1. **Ensure Group Implements IEndpointGroup:**
+1. **Ensure Group Has [MapGroup] and IConfigurableGroup (if needed):**
    ```csharp
    [MapGroup("/api")]
-   public class ApiGroup : IEndpointGroup  // Must implement
+   public class ApiGroup : IConfigurableGroup  // For configuration
    {
        public void ConfigureGroup(RouteGroupBuilder group)
        {

@@ -488,7 +488,7 @@ public class UsersModule : CarterModule
 ```csharp
 // Groups/UsersGroup.cs
 [MapGroup("/api/users")]
-public class UsersGroup : IEndpointGroup
+public class UsersGroup : IConfigurableGroup  // Optional: for configuration
 {
     public void ConfigureGroup(RouteGroupBuilder group)
     {
@@ -553,7 +553,8 @@ public class GetUserEndpoint
    ```
 
 3. **Convert Modules to Groups**
-   - Create `IEndpointGroup` for each `CarterModule`
+   - Create groups with `[MapGroup]` attribute for each `CarterModule`
+   - Optionally implement `IConfigurableGroup` for configuration
    - Move each `MapGet/Post` to separate endpoint class
    - Reference group in endpoint: `Group = typeof(UsersGroup)`
 

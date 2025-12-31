@@ -4,7 +4,6 @@
   </Folder>
   <Folder Name="/docs/">
     <File Path="docs/ARCHITECTURE.md" />
-    <File Path="docs/COMPARISONS.md" />
     <File Path="docs/CONTRIBUTING.md" />
     <File Path="docs/EXAMPLES.md" />
     <File Path="docs/MIGRATION.md" />
@@ -18,6 +17,7 @@
     <File Path="docs/diagnostics/MINEP004.md" />
     <File Path="docs/diagnostics/MINEP005.md" />
     <File Path="docs/diagnostics/MINEP006.md" />
+    <File Path="docs/diagnostics/MINEP007.md" />
   </Folder>
   <Folder Name="/docs/examples/">
     <File Path="docs/examples/01-getting-started.md" />

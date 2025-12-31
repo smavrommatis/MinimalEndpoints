@@ -8,10 +8,6 @@
 
 Error
 
-## Version History
-
-- **v1.0.0 (2025-12-20)**: Initial implementation. Detects cyclic dependencies in group hierarchies using the `ParentGroup` property.
-
 ## Description
 
 The group '{0}' has a cyclic hierarchy. Group hierarchies must form a proper tree structure without cycles.
@@ -36,7 +32,7 @@ Reorganize your group hierarchy to form a proper tree structure.
 **❌ Incorrect - Direct Cycle:**
 ```csharp
 [MapGroup("/api", ParentGroup = typeof(ApiGroup))]  // ❌ References itself!
-public class ApiGroup : IEndpointGroup
+public class ApiGroup : IConfigurableGroup
 {
     public void ConfigureGroup(RouteGroupBuilder group) { }
 }
@@ -45,7 +41,7 @@ public class ApiGroup : IEndpointGroup
 **✅ Correct:**
 ```csharp
 [MapGroup("/api")]  // ✅ No parent - root of hierarchy
-public class ApiGroup : IEndpointGroup
+public class ApiGroup : IConfigurableGroup
 {
     public void ConfigureGroup(RouteGroupBuilder group) { }
 }
@@ -56,19 +52,19 @@ public class ApiGroup : IEndpointGroup
 **❌ Incorrect - Two-Level Cycle:**
 ```csharp
 [MapGroup("/api", ParentGroup = typeof(V1Group))]
-public class ApiGroup : IEndpointGroup { }
+public class ApiGroup : IConfigurableGroup { }
 
 [MapGroup("/v1", ParentGroup = typeof(ApiGroup))]  // ❌ Cycle: Api -> V1 -> Api
-public class V1Group : IEndpointGroup { }
+public class V1Group : IConfigurableGroup { }
 ```
 
 **✅ Correct:**
 ```csharp
 [MapGroup("/api")]  // Root
-public class ApiGroup : IEndpointGroup { }
+public class ApiGroup : IConfigurableGroup { }
 
 [MapGroup("/v1", ParentGroup = typeof(ApiGroup))]  // ✅ Child of Api
-public class V1Group : IEndpointGroup { }
+public class V1Group : IConfigurableGroup { }
 ```
 
 ---
@@ -76,29 +72,31 @@ public class V1Group : IEndpointGroup { }
 **❌ Incorrect - Three-Level Cycle:**
 ```csharp
 [MapGroup("/api", ParentGroup = typeof(V2Group))]  // ❌ Cycle!
-public class ApiGroup : IEndpointGroup { }
+public class ApiGroup : IConfigurableGroup { }
 
 [MapGroup("/v1", ParentGroup = typeof(ApiGroup))]
-public class V1Group : IEndpointGroup { }
+public class V1Group : IConfigurableGroup { }
 
 [MapGroup("/v2", ParentGroup = typeof(V1Group))]  // Api -> V2 -> V1 -> Api
-public class V2Group : IEndpointGroup { }
+public class V2Group : IConfigurableGroup { }
 ```
 
 **✅ Correct - Proper Hierarchy:**
 ```csharp
 [MapGroup("/api")]  // Root
-public class ApiGroup : IEndpointGroup { }
+public class ApiGroup : IConfigurableGroup { }
 
 [MapGroup("/v1", ParentGroup = typeof(ApiGroup))]  // Level 1
-public class V1Group : IEndpointGroup { }
+public class V1Group : IConfigurableGroup { }
 
 [MapGroup("/products", ParentGroup = typeof(V1Group))]  // Level 2
-public class ProductsGroup : IEndpointGroup { }
+public class ProductsGroup : IConfigurableGroup { }
 
 // Results in hierarchy:
 // ApiGroup (/)
 //   └─ V1Group (/api/v1)
+//      └─ ProductsGroup (/api/v1/products)
+```
 //       └─ ProductsGroup (/api/v1/products)
 ```
 
@@ -109,7 +107,7 @@ public class ProductsGroup : IEndpointGroup { }
 **Example 1: Simple Two-Level Hierarchy**
 ```csharp
 [MapGroup("/api")]
-public class ApiGroup : IEndpointGroup
+public class ApiGroup : IConfigurableGroup
 {
     public void ConfigureGroup(RouteGroupBuilder group)
     {
@@ -118,7 +116,7 @@ public class ApiGroup : IEndpointGroup
 }
 
 [MapGroup("/v1", ParentGroup = typeof(ApiGroup))]
-public class V1Group : IEndpointGroup
+public class V1Group : IConfigurableGroup
 {
     public void ConfigureGroup(RouteGroupBuilder group)
     {
@@ -134,13 +132,13 @@ public class ListProductsEndpoint { }
 **Example 2: Multi-Level Hierarchy**
 ```csharp
 [MapGroup("/api")]
-public class ApiGroup : IEndpointGroup { }
+public class ApiGroup : IConfigurableGroup { }
 
 [MapGroup("/v1", ParentGroup = typeof(ApiGroup))]
-public class V1Group : IEndpointGroup { }
+public class V1Group : IConfigurableGroup { }
 
 [MapGroup("/admin", ParentGroup = typeof(V1Group))]
-public class AdminGroup : IEndpointGroup
+public class AdminGroup : IConfigurableGroup
 {
     public void ConfigureGroup(RouteGroupBuilder group)
     {
@@ -156,21 +154,21 @@ public class ListUsersEndpoint { }
 **Example 3: Multiple Branches**
 ```csharp
 [MapGroup("/api")]
-public class ApiGroup : IEndpointGroup { }
+public class ApiGroup : IConfigurableGroup { }
 
 // Branch 1: V1
 [MapGroup("/v1", ParentGroup = typeof(ApiGroup))]
-public class V1Group : IEndpointGroup { }
+public class V1Group : IConfigurableGroup { }
 
 [MapGroup("/products", ParentGroup = typeof(V1Group))]
-public class V1ProductsGroup : IEndpointGroup { }
+public class V1ProductsGroup : IConfigurableGroup { }
 
 // Branch 2: V2
 [MapGroup("/v2", ParentGroup = typeof(ApiGroup))]
-public class V2Group : IEndpointGroup { }
+public class V2Group : IConfigurableGroup { }
 
 [MapGroup("/products", ParentGroup = typeof(V2Group))]
-public class V2ProductsGroup : IEndpointGroup { }
+public class V2ProductsGroup : IConfigurableGroup { }
 
 // Results in tree:
 // ApiGroup (/api)
@@ -185,7 +183,7 @@ public class V2ProductsGroup : IEndpointGroup { }
 ### 1. Nested Configuration
 ```csharp
 [MapGroup("/api")]
-public class ApiGroup : IEndpointGroup
+public class ApiGroup : IConfigurableGroup
 {
     public void ConfigureGroup(RouteGroupBuilder group)
     {
@@ -194,7 +192,7 @@ public class ApiGroup : IEndpointGroup
 }
 
 [MapGroup("/v1", ParentGroup = typeof(ApiGroup))]
-public class V1Group : IEndpointGroup
+public class V1Group : IConfigurableGroup
 {
     public void ConfigureGroup(RouteGroupBuilder group)
     {
@@ -203,7 +201,7 @@ public class V1Group : IEndpointGroup
 }
 
 [MapGroup("/admin", ParentGroup = typeof(V1Group))]
-public class AdminGroup : IEndpointGroup
+public class AdminGroup : IConfigurableGroup
 {
     public void ConfigureGroup(RouteGroupBuilder group)
     {
@@ -215,10 +213,10 @@ public class AdminGroup : IEndpointGroup
 ### 2. API Versioning
 ```csharp
 [MapGroup("/api")]
-public class ApiGroup : IEndpointGroup { }
+public class ApiGroup : IConfigurableGroup { }
 
 [MapGroup("/v1", ParentGroup = typeof(ApiGroup))]
-public class V1Group : IEndpointGroup
+public class V1Group : IConfigurableGroup
 {
     public void ConfigureGroup(RouteGroupBuilder group)
     {
@@ -227,12 +225,12 @@ public class V1Group : IEndpointGroup
 }
 
 [MapGroup("/v2", ParentGroup = typeof(ApiGroup))]
-public class V2Group : IEndpointGroup
+public class V2Group : IConfigurableGroup
 {
     public void ConfigureGroup(RouteGroupBuilder group)
     {
         group.WithTags("V2")
-             .WithRateLimiter("strict");
+             .RequireRateLimiting("strict");
     }
 }
 ```
@@ -240,16 +238,16 @@ public class V2Group : IEndpointGroup
 ### 3. Feature Grouping
 ```csharp
 [MapGroup("/api")]
-public class ApiGroup : IEndpointGroup { }
+public class ApiGroup : IConfigurableGroup { }
 
 [MapGroup("/products", ParentGroup = typeof(ApiGroup))]
-public class ProductsGroup : IEndpointGroup { }
+public class ProductsGroup : IConfigurableGroup { }
 
 [MapGroup("/orders", ParentGroup = typeof(ApiGroup))]
-public class OrdersGroup : IEndpointGroup { }
+public class OrdersGroup : IConfigurableGroup { }
 
 [MapGroup("/users", ParentGroup = typeof(ApiGroup))]
-public class UsersGroup : IEndpointGroup
+public class UsersGroup : IConfigurableGroup
 {
     public void ConfigureGroup(RouteGroupBuilder group)
     {
@@ -263,10 +261,10 @@ public class UsersGroup : IEndpointGroup
 ### Works With MINEP004 (Ambiguous Routes)
 ```csharp
 [MapGroup("/api")]
-public class ApiGroup : IEndpointGroup { }
+public class ApiGroup : IConfigurableGroup { }
 
 [MapGroup("/v1", ParentGroup = typeof(ApiGroup))]
-public class V1Group : IEndpointGroup { }
+public class V1Group : IConfigurableGroup { }
 
 [MapGet("/products", Group = typeof(V1Group))]  // /api/v1/products
 public class GetProductsV1 { }
@@ -279,7 +277,7 @@ public class GetProductsDirect { }
 ### Works With MINEP005 (Invalid Group Type)
 ```csharp
 [MapGroup("/api", ParentGroup = typeof(InvalidGroup))]  // ❌ MINEP005 if InvalidGroup is invalid
-public class ApiGroup : IEndpointGroup { }
+public class ApiGroup : IConfigurableGroup { }
 ```
 
 ## Debugging Tips

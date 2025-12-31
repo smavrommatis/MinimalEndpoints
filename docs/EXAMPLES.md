@@ -1151,8 +1151,8 @@ using MinimalEndpoints;
 using MinimalEndpoints.Annotations;
 
 // Define the group
-[MapGroup("/api/v1", GroupName = "V1 API")]
-public class ApiV1Group : IEndpointGroup
+[MapGroup("/api/v1")]
+public class ApiV1Group : IConfigurableGroup  // Optional: for configuration
 {
     public void ConfigureGroup(RouteGroupBuilder group)
     {
@@ -1203,8 +1203,8 @@ builder.Services.AddRateLimiter(options =>
 });
 
 // Define group with rate limiting
-[MapGroup("/api", GroupName = "Public API")]
-public class PublicApiGroup : IEndpointGroup
+[MapGroup("/api")]
+public class PublicApiGroup : IConfigurableGroup  // Optional interface
 {
     public void ConfigureGroup(RouteGroupBuilder group)
     {
@@ -1268,8 +1268,8 @@ using MinimalEndpoints;
 using MinimalEndpoints.Annotations;
 
 // V1 API Group
-[MapGroup("/api/v1", GroupName = "V1")]
-public class ApiV1Group : IEndpointGroup
+[MapGroup("/api/v1")]
+public class ApiV1Group : IConfigurableGroup  // Optional interface
 {
     public void ConfigureGroup(RouteGroupBuilder group)
     {
@@ -1279,8 +1279,8 @@ public class ApiV1Group : IEndpointGroup
 }
 
 // V2 API Group
-[MapGroup("/api/v2", GroupName = "V2")]
-public class ApiV2Group : IEndpointGroup
+[MapGroup("/api/v2")]
+public class ApiV2Group : IConfigurableGroup  // Optional interface
 {
     public void ConfigureGroup(RouteGroupBuilder group)
     {

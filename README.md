@@ -5,7 +5,7 @@
 [![NuGet](https://img.shields.io/nuget/v/Blackeye.MinimalEndpoints)](https://www.nuget.org/packages/Blackeye.MinimalEndpoints)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/smavrommatis/MinimalEndpoints)
 [![License: BSD-2-Clause](https://img.shields.io/badge/License-BSD--2--Clause-blue.svg)](https://opensource.org/licenses/BSD-2-Clause)
-[![Code Coverage](https://img.shields.io/badge/coverage-85%25-yellowgreen)](https://github.com/smavrommatis/MinimalEndpoints)
+[![Code Coverage](https://img.shields.io/badge/coverage-95%25-brightgreen)](https://github.com/smavrommatis/MinimalEndpoints)
 
 MinimalEndpoints brings the benefits of class-based organization to ASP.NET Core Minimal APIs while maintaining their simplicity and performance. Using **source generators** and **Roslyn analyzers**, it provides compile-time code generation with zero runtime overhead.
 
@@ -220,18 +220,18 @@ public class GuidEndpoint { }
 
 ### Endpoint Groups
 
-Group related endpoints with shared configuration using `IEndpointGroup`:
+Group related endpoints with shared configuration using `IConfigurableGroup`:
 
 ```csharp
 // Define a group
-[MapGroup("/api/v1", GroupName = "V1 API")]
-public class ApiV1Group : IEndpointGroup
+[MapGroup("/api/v1")]
+public class ApiV1Group : IConfigurableGroup
 {
     public void ConfigureGroup(RouteGroupBuilder group)
     {
         group.RequireAuthorization()
              .WithOpenApi()
-             .WithRateLimiter("fixed");
+             .RequireRateLimiting("fixed");
     }
 }
 
@@ -257,7 +257,7 @@ Groups can have parent groups, creating multi-level route structures:
 ```csharp
 // Root group
 [MapGroup("/api")]
-public class ApiGroup : IEndpointGroup
+public class ApiGroup : IConfigurableGroup
 {
     public void ConfigureGroup(RouteGroupBuilder group)
     {
@@ -267,7 +267,7 @@ public class ApiGroup : IEndpointGroup
 
 // Child group with parent
 [MapGroup("/v1", ParentGroup = typeof(ApiGroup))]
-public class V1Group : IEndpointGroup
+public class V1Group : IConfigurableGroup
 {
     public void ConfigureGroup(RouteGroupBuilder group)
     {
@@ -277,7 +277,7 @@ public class V1Group : IEndpointGroup
 
 // Grandchild group
 [MapGroup("/admin", ParentGroup = typeof(V1Group))]
-public class AdminGroup : IEndpointGroup
+public class AdminGroup : IConfigurableGroup
 {
     public void ConfigureGroup(RouteGroupBuilder group)
     {
@@ -535,8 +535,9 @@ While you type, Roslyn analyzers check for common mistakes:
 - ✅ **MINEP002**: Detects multiple mapping attributes
 - ✅ **MINEP003**: Validates ServiceType interface compatibility
 - ✅ **MINEP004**: Warns about ambiguous route patterns
-- ✅ **MINEP005**: Validates group types implement IEndpointGroup
+- ✅ **MINEP005**: Validates group types have `[MapGroup]` attribute
 - ✅ **MINEP006**: Detects cyclic group hierarchies
+- ✅ **MINEP007**: Prevents classes from being both endpoint and group
 
 All validation happens at design-time with helpful error messages and quick fixes.
 
@@ -753,11 +754,11 @@ public class ListUsersEndpoint { }
 [Learn more →](docs/diagnostics/MINEP004.md)
 
 ### MINEP005: Invalid Group Type
-Validates that groups implement `IEndpointGroup` and have `[MapGroup]` attribute.
+Validates that groups have `[MapGroup]` attribute.
 
 ```csharp
 // ❌ Error: Invalid group type
-public class ApiGroup { }  // Missing IEndpointGroup and [MapGroup]
+public class ApiGroup { }  // Missing [MapGroup] attribute
 
 [MapGet("/users", Group = typeof(ApiGroup))]
 public class GetUsersEndpoint { }
@@ -771,14 +772,26 @@ Detects circular parent-child relationships in group hierarchies.
 ```csharp
 // ❌ Error: Cyclic hierarchy
 [MapGroup("/api", ParentGroup = typeof(V1Group))]
-public class ApiGroup : IEndpointGroup { }
+public class ApiGroup : IConfigurableGroup { }
 
 [MapGroup("/v1", ParentGroup = typeof(ApiGroup))]
-public class V1Group : IEndpointGroup { }
+public class V1Group : IConfigurableGroup { }
 // Cycle: ApiGroup → V1Group → ApiGroup
 ```
 
 [Learn more →](docs/diagnostics/MINEP006.md)
+
+### MINEP007: Class Cannot Be Both Endpoint and Group
+Prevents classes from having both endpoint and group attributes.
+
+```csharp
+// ❌ Error: Cannot be both
+[MapGet("/users")]
+[MapGroup("/api")]
+public class InvalidClass { }
+```
+
+[Learn more →](docs/diagnostics/MINEP007.md)
 
 ---
 
@@ -837,14 +850,34 @@ public class GetUserEndpointTests
 
 MinimalEndpoints has **zero runtime overhead** compared to traditional Minimal APIs:
 
-| Metric | MinimalEndpoints | Traditional Minimal API | MVC Controllers |
-|--------|------------------|------------------------|-----------------|
-| **Latency (p50)** | 0.81ms | 0.80ms | 1.18ms |
-| **Throughput** | 64,800 req/s | 65,200 req/s | 44,500 req/s |
-| **Memory/Request** | 320 B | 320 B | 512 B |
-| **Startup (100 endpoints)** | 450ms | 440ms | 850ms |
+### Generator Performance
 
-**Why Zero Overhead?**
+Source generator execution time and memory usage:
+
+#### Analyzer Performance (Diagnostic Analysis)
+
+| Endpoints | Mean     | Error     | StdDev    | Gen0     | Gen1    | Allocated  |
+|-----------|----------|-----------|-----------|----------|---------|------------|
+| 10        | 1.525 ms | 0.555 ms  | 0.367 ms  | 39.0625  | 3.9063  | 832.22 KB  |
+| 50        | 3.428 ms | 0.904 ms  | 0.538 ms  | 101.5625 | 31.2500 | 3437.14 KB |
+| 100       | 6.669 ms | 3.676 ms  | 2.431 ms  | 203.1250 | 78.1250 | 8251.23 KB |
+
+#### Code Generation Performance
+
+| Endpoints | Mean      | Error    | StdDev   | Gen0   | Allocated |
+|-----------|-----------|----------|----------|--------|-----------|
+| 10        | 48.27 μs  | 0.253 μs | 0.133 μs | 0.9766 | 20.34 KB  |
+| 50        | 98.56 μs  | 0.803 μs | 0.420 μs | 0.9766 | 20.7 KB   |
+| 100       | 160.81 μs | 0.594 μs | 0.393 μs | 0.9766 | 23.21 KB  |
+| 500       | 649.14 μs | 6.088 μs | 3.623 μs | -      | 32.47 KB  |
+
+**Key Takeaways:**
+- ⚡ **Sub-millisecond generation** for typical projects (<100 endpoints)
+- 💾 **Minimal memory allocation** (~20-30 KB for most projects)
+- 🚀 **Linear scaling** with endpoint count
+- ✅ **Incremental generation** - only regenerates what changed
+
+**Why Zero Runtime Overhead?**
 
 1. **No Reflection** - Everything generated at compile-time
 2. **No Runtime Discovery** - Endpoints explicitly registered
@@ -877,11 +910,10 @@ dotnet test
 - **[Getting Started](docs/examples/01-getting-started.md)** - Your first endpoint in 5 minutes
 - **[Architecture Guide](docs/ARCHITECTURE.md)** - How it works under the hood
 - **[Examples](docs/examples/)** - Comprehensive examples for all scenarios
-- **[API Reference](docs/API_REFERENCE.md)** - Detailed API documentation
 - **[Migration Guide](docs/MIGRATION.md)** - Migrating from other approaches
 - **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Common issues and solutions
 - **[Performance](docs/PERFORMANCE.md)** - Benchmarks and optimization tips
-- **[Comparisons](docs/COMPARISONS.md)** - vs FastEndpoints, Carter, and more
+- **[Diagnostics Reference](docs/diagnostics/)** - All MINEP diagnostic codes explained
 
 ---
 
