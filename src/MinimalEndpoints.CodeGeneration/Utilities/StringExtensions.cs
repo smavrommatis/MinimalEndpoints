@@ -6,7 +6,9 @@ internal static class StringExtensions
 {
     public static string Indent(int level = 1)
     {
-        return new string(' ', level * 4);
+        return level <= 0
+            ? string.Empty
+            : new string(' ', level * 4);
     }
 
     public static StringBuilder AppendLineWithIndentation(this StringBuilder sb, string value, int level = 1)

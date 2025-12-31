@@ -50,7 +50,6 @@
     <File Path="LICENSE" />
     <File Path="nuget.config" />
     <File Path="README.md" />
-    <File Path="run-coverage.ps1" />
     <File Path="SECURITY.md" />
   </Folder>
 </Solution>
