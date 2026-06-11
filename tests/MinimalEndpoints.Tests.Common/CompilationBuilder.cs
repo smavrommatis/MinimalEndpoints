@@ -16,7 +16,7 @@ namespace MinimalEndpoints.Tests.Common;
 /// </summary>
 public class CompilationBuilder
 {
-    private readonly string _source;
+    private readonly List<string> _sources = new();
     private readonly List<MetadataReference> _references = new();
     private readonly HashSet<string> _addedAssemblies = new(StringComparer.OrdinalIgnoreCase);
     private bool _hasMvcReferences;
@@ -24,7 +24,7 @@ public class CompilationBuilder
 
     public CompilationBuilder(string source)
     {
-        _source = source;
+        _sources.Add(source);
 
         // Add minimal required references
         AddReferenceIfNotExists(typeof(object).Assembly); // System.Private.CoreLib
@@ -33,6 +33,16 @@ public class CompilationBuilder
         AddReferenceIfNotExists(typeof(IConfigurableEndpoint).Assembly);
         WithComponentModelReferences();
         WithSystemAssemblies();
+    }
+
+    /// <summary>
+    /// Adds an additional source file, producing a second syntax tree in the compilation.
+    /// Use this to exercise scenarios that span multiple files.
+    /// </summary>
+    public CompilationBuilder WithAdditionalSource(string source)
+    {
+        _sources.Add(source);
+        return this;
     }
 
     /// <summary>
@@ -99,7 +109,7 @@ public class CompilationBuilder
     /// </summary>
     public CSharpCompilation Build(bool validateCompilation = true)
     {
-        var syntaxTree = CSharpSyntaxTree.ParseText(_source);
+        var syntaxTrees = _sources.Select(s => CSharpSyntaxTree.ParseText(s)).ToList();
 
         var usings = new List<string>
         {
@@ -128,10 +138,11 @@ public class CompilationBuilder
         }
 
         var globalUsingsSyntaxTree = CSharpSyntaxTree.ParseText(string.Join(Environment.NewLine, usings.Select(u => $"global using {u};")));
+        syntaxTrees.Add(globalUsingsSyntaxTree);
 
         var compilation = CSharpCompilation.Create(
             "TestAssembly",
-            new[] { syntaxTree, globalUsingsSyntaxTree },
+            syntaxTrees,
             _references,
             new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,

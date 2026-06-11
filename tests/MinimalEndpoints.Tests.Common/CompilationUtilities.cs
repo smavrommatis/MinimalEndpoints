@@ -1,15 +1,9 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
-using MinimalEndpoints.CodeGeneration;
 using MinimalEndpoints.CodeGeneration.Endpoints.Analyzers;
-using MinimalEndpoints.CodeGeneration.Endpoints.Models;
-using MinimalEndpoints.CodeGeneration.Groups;
 using MinimalEndpoints.CodeGeneration.Groups.Analyzers;
-using MinimalEndpoints.CodeGeneration.Groups.Models;
-using MinimalEndpoints.CodeGeneration.Models;
 
 namespace MinimalEndpoints.Tests.Common;
 
@@ -37,78 +31,35 @@ public static class CompilationUtilities
         bool validateCompilation = true
     )
     {
-        // Get all endpoint classes
-        var syntaxTree = compilation.SyntaxTrees.First();
-        var semanticModel = compilation.GetSemanticModel(syntaxTree);
+        // Run the real incremental generator (predicate, transform, Collect,
+        // RegisterSourceOutput, AddSource) rather than re-implementing its pipeline.
+        var (result, outputCompilation) = GeneratorDriverUtilities.RunGenerator(compilation);
 
-        var definitions = syntaxTree.GetRoot()
-            .DescendantNodes()
-            .OfType<ClassDeclarationSyntax>()
-            .Select(classDecl => semanticModel.GetDeclaredSymbol(classDecl))
-            .Where(symbol => symbol != null)
-            .Select(SymbolDefinitionFactory.TryCreateSymbol)
-            .Where(ed => ed != null)
-            .ToImmutableArray();
+        var generatedCode = result.GeneratedTrees.FirstOrDefault()?.ToString();
 
-        if (definitions.IsEmpty)
+        // No endpoints discovered -> the generator emits no source.
+        if (generatedCode == null)
         {
             return (null!, Enumerable.Empty<Diagnostic>());
         }
 
-        var endpoints = new List<EndpointDefinition>(definitions.Length);
-        var groupDefinitions = new List<EndpointGroupDefinition>(definitions.Length);
-        Dictionary<INamedTypeSymbol, EndpointGroupDefinition> groups;
+        // The output compilation already includes the original trees plus the generated
+        // source, so its diagnostics verify that the generated code compiles cleanly.
+        var diagnostics = outputCompilation.GetDiagnostics();
 
-        foreach (var def in definitions)
+        if (validateCompilation)
         {
-            switch (def)
+            var errors = diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).ToArray();
+
+            if (errors.Length > 0)
             {
-                case EndpointDefinition endpoint:
-                    endpoints.Add(endpoint);
-                    break;
-                case EndpointGroupDefinition group:
-                    groupDefinitions.Add(group);
-                    break;
+                var errorMessages = string.Join(Environment.NewLine,
+                    errors.Select(e => $"{e.Id}: {e.GetMessage()}"));
+                throw new InvalidOperationException(
+                    $"Compilation failed with {errors.Length} error(s):{Environment.NewLine}{errorMessages}");
             }
         }
 
-        groups = groupDefinitions.Count > 0
-            ? groupDefinitions.FillHierarchyAndDetectCycles()
-            : new Dictionary<INamedTypeSymbol, EndpointGroupDefinition>(SymbolEqualityComparer.Default);
-
-        // Generate code
-        var fileScope = MinimalEndpointsFileBuilder.GenerateFile(
-            "MinimalEndpoints.Generated",
-            "MinimalEndpointExtensions",
-            endpoints,
-            groups
-        );
-
-        var generatedCode = fileScope?.Build();
-
-        // Compile generated code with original to verify it compiles
-        if (generatedCode != null)
-        {
-            var generatedTree = CSharpSyntaxTree.ParseText(generatedCode);
-            var newCompilation = compilation.AddSyntaxTrees(generatedTree);
-            var diagnostics = newCompilation.GetDiagnostics();
-
-            if (validateCompilation)
-            {
-                var errors = diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).ToArray();
-
-                if (errors.Length > 0)
-                {
-                    var errorMessages = string.Join(Environment.NewLine,
-                        errors.Select(e => $"{e.Id}: {e.GetMessage()}"));
-                    throw new InvalidOperationException(
-                        $"Compilation failed with {errors.Length} error(s):{Environment.NewLine}{errorMessages}");
-                }
-            }
-
-            return (generatedCode, diagnostics);
-        }
-
-        return (null!, compilation.GetDiagnostics());
+        return (generatedCode, diagnostics);
     }
 }
