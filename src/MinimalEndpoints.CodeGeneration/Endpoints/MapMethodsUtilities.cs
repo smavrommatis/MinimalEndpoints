@@ -23,6 +23,16 @@ internal static class MapMethodsUtilities
 
     public static MapMethodsAttributeDefinition GetMapMethodAttributeDefinition(this AttributeData attributeData)
     {
+        // A mid-typing / malformed attribute (e.g. '[MapGet]' before its pattern is typed) still
+        // resolves its AttributeClass, so the factory predicate passes — but it has no valid
+        // constructor to bind to. Reading its constructor arguments would throw and crash the
+        // generator (CS8785) / analyzer (AD0001). Decline it here instead; the compiler already
+        // reports the incomplete attribute, and callers tolerate a null result.
+        if (attributeData.AttributeConstructor is null)
+        {
+            return null;
+        }
+
         return WellKnownTypes.Annotations.MapMethodsAttributeName.Equals(attributeData.AttributeClass!.Name)
             ? GetAttributeDataForMultipleMethods(attributeData)
             : GetAttributeDataForSingleMethod(attributeData);
@@ -37,8 +47,20 @@ internal static class MapMethodsUtilities
 
     private static MapMethodsAttributeDefinition GetAttributeDataForSingleMethod(AttributeData attributeData)
     {
-        var pattern = attributeData.ConstructorArguments[0].Value as string;
-        var lifetime = (ServiceLifetime)attributeData.ConstructorArguments[1].Value!;
+        // Single-method ctor is (string pattern, ServiceLifetime lifetime). Guard against an
+        // error-state attribute whose arguments are short or in error (the lifetime defaults to
+        // a constant when omitted, so a well-formed attribute always has both arguments).
+        var args = attributeData.ConstructorArguments;
+        if (args.Length < 2 ||
+            args[0].Kind == TypedConstantKind.Error ||
+            args[1].Kind == TypedConstantKind.Error ||
+            args[1].Value is not int lifetimeValue)
+        {
+            return null;
+        }
+
+        var pattern = args[0].Value as string;
+        var lifetime = (ServiceLifetime)lifetimeValue;
 
         var attributeDefinition = s_mapMethodAttributes[attributeData.AttributeClass!.Name];
 
@@ -53,12 +75,27 @@ internal static class MapMethodsUtilities
 
     private static MapMethodsAttributeDefinition GetAttributeDataForMultipleMethods(AttributeData attributeData)
     {
-        var pattern = attributeData.ConstructorArguments[0].Value as string;
-        var methods = attributeData.ConstructorArguments[1].Values
+        // MapMethods ctor is (string pattern, string[] methods, ServiceLifetime lifetime). Guard
+        // against a short/error-state attribute: a missing or null methods array (e.g.
+        // '[MapMethods("/x")]' or '[MapMethods("/x", null)]') leaves a default ImmutableArray
+        // whose enumeration throws, and a missing lifetime would index out of bounds.
+        var args = attributeData.ConstructorArguments;
+        if (args.Length < 3 ||
+            args[0].Kind == TypedConstantKind.Error ||
+            args[1].Kind != TypedConstantKind.Array ||
+            args[1].Values.IsDefault ||
+            args[2].Kind == TypedConstantKind.Error ||
+            args[2].Value is not int lifetimeValue)
+        {
+            return null;
+        }
+
+        var pattern = args[0].Value as string;
+        var methods = args[1].Values
             .Select(v => v.Value as string)
             .Where(s => s != null)
             .ToArray();
-        var lifetime = (ServiceLifetime)attributeData.ConstructorArguments[2].Value!;
+        var lifetime = (ServiceLifetime)lifetimeValue;
 
         return GetMapMethodsAttributeDefinitionInternal(
             attributeData: attributeData,

@@ -103,6 +103,13 @@ internal sealed class AttributeDefinition
                 return typeSymbol != null ? $"typeof({new TypeDefinition(typeSymbol).FullName})" : "null";
 
             case TypedConstantKind.Array:
+                // A malformed/error-state array argument can leave Values as a default
+                // ImmutableArray, whose enumeration throws. Guard before projecting.
+                if (constant.Values.IsDefault)
+                {
+                    return "new[] { }";
+                }
+
                 var elements = constant.Values.Select(FormatArgumentValue);
                 return $"new[] {{ {string.Join(", ", elements)} }}";
 

@@ -31,6 +31,80 @@ public class TestEndpoint
     }
 
     [Fact]
+    public void TryCreateSymbol_WithMultipleEndpointAttributes_DoesNotThrow()
+    {
+        // Two endpoint attributes on one class is ambiguous. Discovery must return null (no throw);
+        // the generator skips the class and MINEP002 reports the error.
+        var code = @"
+namespace TestApp;
+
+[MapGet(""/test"")]
+[MapPost(""/test"")]
+public class TestEndpoint
+{
+    public IResult Handle() => Results.Ok();
+}";
+
+        var compilation = new CompilationBuilder(code).WithMvcReferences().Build();
+        var classSymbol = GetClassSymbol(compilation, "TestEndpoint");
+
+        // Act — must not throw.
+        var result = SymbolDefinitionFactory.TryCreateSymbol(classSymbol);
+
+        // Assert
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void TryCreateSymbol_WithEndpointAndGroupAttributes_DoesNotThrow()
+    {
+        // An endpoint attribute AND a group attribute on one class — the MINEP007 case. Discovery
+        // returns null (no throw); the analyzer reports MINEP007 via an explicit classification.
+        var code = @"
+namespace TestApp;
+
+[MapGet(""/users"")]
+[MapGroup(""/api"")]
+public class TestEndpoint
+{
+    public IResult Handle() => Results.Ok();
+}";
+
+        var compilation = new CompilationBuilder(code).WithMvcReferences().Build();
+        var classSymbol = GetClassSymbol(compilation, "TestEndpoint");
+
+        // Act — must not throw.
+        var result = SymbolDefinitionFactory.TryCreateSymbol(classSymbol);
+
+        // Assert
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void TryCreateSymbol_WithIncompleteMapAttribute_ReturnsNull()
+    {
+        // Arrange — '[MapGet]' mid-typing (no pattern). Discovery must degrade gracefully
+        // (return null) rather than throw and crash the generator transform.
+        var code = @"
+namespace TestApp;
+
+[MapGet]
+public class TestEndpoint
+{
+    public IResult Handle() => Results.Ok();
+}";
+
+        var compilation = new CompilationBuilder(code).WithMvcReferences().Build(validateCompilation: false);
+        var classSymbol = GetClassSymbol(compilation, "TestEndpoint");
+
+        // Act — must not throw.
+        var result = SymbolDefinitionFactory.TryCreateSymbol(classSymbol);
+
+        // Assert
+        Assert.Null(result);
+    }
+
+    [Fact]
     public void TryCreateSymbol_WithMapPostAttribute_ReturnsEndpointDefinition()
     {
         // Arrange

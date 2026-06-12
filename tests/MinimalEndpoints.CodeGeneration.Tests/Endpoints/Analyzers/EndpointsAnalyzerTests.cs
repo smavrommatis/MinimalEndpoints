@@ -34,6 +34,34 @@ public class TestEndpoint
     }
 
     [Fact]
+    public void AnalyzeClassDeclaration_WithIncompleteAttribute_DoesNotCrash()
+    {
+        // '[MapGet]' with no pattern (mid-typing). The analyzer must not crash (AD0001) — the
+        // compiler already reports the incomplete attribute. Before the fix, the unguarded
+        // ConstructorArguments read throws and surfaces as AD0001 (which the MINEP filter would
+        // hide), so this asserts on the full, unfiltered diagnostic set.
+        var code = @"
+namespace TestApp;
+
+[MapGet]
+public class TestEndpoint
+{
+    public Task<IResult> HandleAsync()
+    {
+        return Task.FromResult(Results.Ok());
+    }
+}";
+
+        var compilation = new CompilationBuilder(code).WithMvcReferences().Build(validateCompilation: false);
+
+        // Act — must complete without throwing.
+        var diagnostics = GenerateAllDiagnostics(compilation);
+
+        // Assert — no analyzer crash.
+        Assert.DoesNotContain(diagnostics, d => d.Id == "AD0001");
+    }
+
+    [Fact]
     public void MissingEntryPoint_WithCustomEntryPointNotFound_ReportsError()
     {
         // Arrange
@@ -177,6 +205,9 @@ public class TestEndpoint
         var error = Assert.Single(diagnostics, d => d.Id == "MINEP002");
         Assert.Equal(DiagnosticSeverity.Error, error.Severity);
         Assert.Contains("TestEndpoint", error.GetMessage());
+
+        // Two endpoint attributes is NOT the endpoint+group combination — no MINEP007.
+        Assert.DoesNotContain(diagnostics, d => d.Id == "MINEP007");
     }
 
     [Fact]
@@ -425,6 +456,44 @@ public class GetProductsEndpoint
         Assert.Equal(DiagnosticSeverity.Error, error.Severity);
     }
 
+    [Fact]
+    public void InvalidGroupType_WithDuplicateMapGroupOnGroupType_DoesNotThrow()
+    {
+        // A group type with [MapGroup] duplicated across partial parts is a compiler error (CS0579),
+        // but GetAttributes() still returns both. SingleOrDefault(predicate) throws on >1 match and
+        // crashes the analyzer (AD0001). The group IS decorated (just erroneously twice), so MINEP005
+        // must not fire either.
+        var code = @"
+namespace TestApp;
+
+[MapGroup(""/a"")]
+public partial class DupGroup : IConfigurableGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group) { }
+}
+
+[MapGroup(""/b"")]
+public partial class DupGroup { }
+
+[MapGet(""/products"", Group = typeof(DupGroup))]
+public class GetProductsEndpoint
+{
+    public Task<IResult> HandleAsync()
+    {
+        return Task.FromResult(Results.Ok());
+    }
+}";
+
+        var compilation = new CompilationBuilder(code).WithMvcReferences().Build(validateCompilation: false);
+
+        // Act — must complete without throwing.
+        var diagnostics = GenerateAllDiagnostics(compilation);
+
+        // Assert — no analyzer crash, and no MINEP005 (the group IS decorated).
+        Assert.DoesNotContain(diagnostics, d => d.Id == "AD0001");
+        Assert.DoesNotContain(diagnostics, d => d.Id == "MINEP005");
+    }
+
     #endregion
 
     #region MINEP001 - Additional Edge Cases
@@ -604,6 +673,9 @@ public class TestEndpoint
         // Assert
         var error = Assert.Single(diagnostics, d => d.Id == "MINEP002");
         Assert.Equal(DiagnosticSeverity.Error, error.Severity);
+
+        // Three endpoint attributes, still no group — no MINEP007.
+        Assert.DoesNotContain(diagnostics, d => d.Id == "MINEP007");
     }
 
     [Fact]
@@ -629,6 +701,9 @@ public class TestEndpoint
         // Assert
         var error = Assert.Single(diagnostics, d => d.Id == "MINEP002");
         Assert.Equal(DiagnosticSeverity.Error, error.Severity);
+
+        // A MapGet + MapMethods pairing is two endpoint attributes, not endpoint+group — no MINEP007.
+        Assert.DoesNotContain(diagnostics, d => d.Id == "MINEP007");
     }
 
     #endregion

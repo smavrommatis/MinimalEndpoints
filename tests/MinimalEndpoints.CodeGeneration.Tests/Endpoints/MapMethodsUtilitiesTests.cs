@@ -28,6 +28,62 @@ public class TestClass { }";
         Assert.Null(result);
     }
 
+    [Fact]
+    public void GetMapMethodAttributeDefinition_WithMissingArguments_ReturnsNull()
+    {
+        // Arrange — '[MapGet]' with no pattern argument (mid-typing). The attribute class still
+        // resolves (so discovery is reached), but its constructor arguments are absent. Reading
+        // ConstructorArguments[0] unguarded throws IndexOutOfRange and crashes the generator/analyzer.
+        var code = @"
+namespace TestNamespace;
+using MinimalEndpoints.Annotations;
+
+[MapGet]
+public class TestClass
+{
+    public void Handle() { }
+}";
+
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build(validateCompilation: false);
+        var symbol = compilation.GetTypeByMetadataName("TestNamespace.TestClass");
+        var attribute = symbol!.GetAttributes().Single();
+
+        // Act — must not throw.
+        var result = attribute.GetMapMethodAttributeDefinition();
+
+        // Assert — discovery declines the malformed attribute.
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void GetMapMethodAttributeDefinition_WithIncompleteMapMethods_ReturnsNull()
+    {
+        // Arrange — '[MapMethods("/x")]' missing its required methods array argument.
+        var code = @"
+namespace TestNamespace;
+using MinimalEndpoints.Annotations;
+
+[MapMethods(""/x"")]
+public class TestClass
+{
+    public void Handle() { }
+}";
+
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build(validateCompilation: false);
+        var symbol = compilation.GetTypeByMetadataName("TestNamespace.TestClass");
+        var attribute = symbol!.GetAttributes().Single();
+
+        // Act — must not throw.
+        var result = attribute.GetMapMethodAttributeDefinition();
+
+        // Assert
+        Assert.Null(result);
+    }
+
     // MapGet Tests
     [Fact]
     public void GetMapMethodsAttributeDefinition_ShouldReturnInfo_ForMapGet_Simple()
@@ -801,9 +857,10 @@ public class TestEndpoint
     }
 
     [Fact]
-    public void GetMapMethodsAttributeDefinition_ShouldThrowException_WhenMultipleAttributesPresent()
+    public void GetMapMethodsAttributeDefinition_ShouldReturnNull_WhenMultipleAttributesPresent()
     {
-        // Arrange
+        // Arrange — two endpoint attributes on one class is ambiguous. Discovery must degrade
+        // gracefully (return null) rather than throw and crash the generator; MINEP002 reports it.
         var code = @"
 namespace TestNamespace;
 using MinimalEndpoints.Annotations;
@@ -820,7 +877,11 @@ public class TestClass
             .Build();
         var symbol = compilation.GetTypeByMetadataName("TestNamespace.TestClass");
 
-        Assert.Throws<InvalidOperationException>(() => GetMapMethodsAttributeDefinition(symbol!));
+        // Act — must not throw.
+        var result = GetMapMethodsAttributeDefinition(symbol!);
+
+        // Assert
+        Assert.Null(result);
     }
 
     private static MapMethodsAttributeDefinition? GetMapMethodsAttributeDefinition(INamedTypeSymbol symbol) =>

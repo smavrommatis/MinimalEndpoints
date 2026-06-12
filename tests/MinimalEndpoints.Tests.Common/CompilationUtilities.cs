@@ -11,18 +11,27 @@ public static class CompilationUtilities
 {
     public static List<Diagnostic> GenerateDiagnostics(CSharpCompilation compilation)
     {
-        var minimalEndpointsAnalyzer = new EndpointsAnalyzer();
-        var ambiguousRouteAnalyzer = new GroupsAnalyzer();
-        var analyzers = ImmutableArray.Create<DiagnosticAnalyzer>(
-            minimalEndpointsAnalyzer,
-            ambiguousRouteAnalyzer);
-
-        var compilationWithAnalyzer = compilation.WithAnalyzers(analyzers);
-
-        var diagnostics = compilationWithAnalyzer.GetAllDiagnosticsAsync().GetAwaiter().GetResult();
-
-        return diagnostics
+        return GenerateAllDiagnostics(compilation)
             .Where(d => d.Id.StartsWith("MINEP"))
+            .ToList();
+    }
+
+    /// <summary>
+    /// Runs the MinimalEndpoints analyzers and returns ALL resulting diagnostics. Unlike
+    /// <see cref="GenerateDiagnostics"/>, this does NOT filter to the MINEP prefix, so callers
+    /// can assert on analyzer-infrastructure diagnostics such as AD0001 (an analyzer crash),
+    /// which the MINEP filter would otherwise hide.
+    /// </summary>
+    public static List<Diagnostic> GenerateAllDiagnostics(CSharpCompilation compilation)
+    {
+        var analyzers = ImmutableArray.Create<DiagnosticAnalyzer>(
+            new EndpointsAnalyzer(),
+            new GroupsAnalyzer());
+
+        return compilation.WithAnalyzers(analyzers)
+            .GetAllDiagnosticsAsync()
+            .GetAwaiter()
+            .GetResult()
             .ToList();
     }
 

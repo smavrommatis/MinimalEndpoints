@@ -64,6 +64,14 @@ public class EndpointsAnalyzer : DiagnosticAnalyzer
         }
 
         var mapMethodsAttributeDefinition = attributes[0].GetMapMethodAttributeDefinition();
+        if (mapMethodsAttributeDefinition == null)
+        {
+            // The attribute is mid-typing / malformed (e.g. '[MapGet]' with no pattern). The
+            // compiler already reports the incomplete attribute; skip analysis so we don't
+            // dereference a null definition and crash the analyzer (AD0001) on every keystroke.
+            return;
+        }
+
         var entryPoint = namedTypeSymbol.FindEntryPointMethod(mapMethodsAttributeDefinition.EntryPoint);
 
         if (entryPoint == null)
@@ -126,11 +134,14 @@ public class EndpointsAnalyzer : DiagnosticAnalyzer
         INamedTypeSymbol endpointSymbol,
         INamedTypeSymbol groupTypeSymbol)
     {
-        // Check if group type has MapGroupAttribute
-        var mapGroupAttribute = groupTypeSymbol.GetAttributes()
-            .SingleOrDefault(EndpointGroupDefinition.Factory.Predicate);
+        // Check if group type has MapGroupAttribute. Use Any (only existence matters): a group
+        // type may carry a duplicated [MapGroup] across partial parts — a compiler error (CS0579),
+        // but GetAttributes() returns both, and SingleOrDefault(predicate) would throw on >1 match
+        // and crash the analyzer (AD0001).
+        var hasMapGroupAttribute = groupTypeSymbol.GetAttributes()
+            .Any(EndpointGroupDefinition.Factory.Predicate);
 
-        if (mapGroupAttribute == null)
+        if (!hasMapGroupAttribute)
         {
             var diagnostic = Diagnostic.Create(
                 Diagnostics.InvalidGroupType,

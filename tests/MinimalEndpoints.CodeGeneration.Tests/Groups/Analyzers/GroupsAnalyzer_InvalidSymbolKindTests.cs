@@ -50,5 +50,46 @@ public class InvalidClass
         Assert.Contains(diagnostics, d => d.Id == "MINEP007");
     }
 
+    [Fact]
+    public void EndpointOnlyClass_NoMinep007()
+    {
+        // A class with a single endpoint attribute and no group attribute is a valid endpoint —
+        // MINEP007 (marked as both an Endpoint and a Group) must not fire.
+        var code = @"
+namespace TestApp;
+
+[MapGet(""/users"")]
+public class GetUsersEndpoint
+{
+    public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok());
+}";
+
+        // Act
+        var diagnostics = GetDiagnostics(code);
+
+        // Assert
+        Assert.DoesNotContain(diagnostics, d => d.Id == "MINEP007");
+    }
+
+    [Fact]
+    public void GroupOnlyClass_NoMinep007()
+    {
+        // A class with a single group attribute and no endpoint attribute is a valid group —
+        // MINEP007 must not fire.
+        var code = @"
+namespace TestApp;
+
+[MapGroup(""/api"")]
+public class ApiGroup : IConfigurableGroup
+{
+    public void ConfigureGroup(RouteGroupBuilder group) { }
+}";
+
+        // Act
+        var diagnostics = GetDiagnostics(code);
+
+        // Assert
+        Assert.DoesNotContain(diagnostics, d => d.Id == "MINEP007");
+    }
 }
 

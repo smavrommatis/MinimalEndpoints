@@ -127,6 +127,76 @@ public class ConcreteEndpoint
     }
 
     [Fact]
+    public void Generator_IncompleteAttributeAlongsideValidEndpoint_DoesNotCrashAndStillGenerates()
+    {
+        // Arrange: a malformed '[MapGet]' (no pattern — mid-typing) next to a valid endpoint.
+        // The malformed attribute must not crash the generator (CS8785) and drop ALL output.
+        var code = @"
+namespace TestApp.Endpoints;
+
+[MapGet]
+public class HalfTypedEndpoint
+{
+    public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok());
+}
+
+[MapGet(""/valid"")]
+public class ValidEndpoint
+{
+    public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok());
+}";
+
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build(validateCompilation: false);
+
+        // Act
+        var (result, _) = GeneratorDriverUtilities.RunGenerator(compilation);
+
+        // Assert: the generator did not throw, and the valid endpoint still generated.
+        Assert.Null(result.Results[0].Exception);
+        var generated = Assert.Single(result.GeneratedTrees).ToString();
+        Assert.Contains("Map__TestApp_Endpoints_ValidEndpoint", generated);
+        Assert.DoesNotContain("Map__TestApp_Endpoints_HalfTypedEndpoint", generated);
+    }
+
+    [Fact]
+    public void Generator_WithMultipleMapAttributesOnOneClass_DoesNotCrashGenerator()
+    {
+        // Arrange: an ambiguous class with two endpoint attributes next to a valid endpoint.
+        // SingleOrDefault throws on >1 match; without the fix this crashes the whole generator
+        // (CS8785) and drops ALL output, breaking every AddMinimalEndpoints() call site.
+        var code = @"
+namespace TestApp.Endpoints;
+
+[MapGet(""/ambiguous"")]
+[MapPost(""/ambiguous"")]
+public class AmbiguousEndpoint
+{
+    public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok());
+}
+
+[MapGet(""/valid"")]
+public class ValidEndpoint
+{
+    public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok());
+}";
+
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
+
+        // Act
+        var (result, _) = GeneratorDriverUtilities.RunGenerator(compilation);
+
+        // Assert: the generator did not throw, and the valid endpoint still generated.
+        Assert.Null(result.Results[0].Exception);
+        var generated = Assert.Single(result.GeneratedTrees).ToString();
+        Assert.Contains("Map__TestApp_Endpoints_ValidEndpoint", generated);
+        Assert.DoesNotContain("Map__TestApp_Endpoints_AmbiguousEndpoint", generated);
+    }
+
+    [Fact]
     public void Generator_NoEndpoints_GeneratesNoSource()
     {
         // Arrange: a class with no Map attribute

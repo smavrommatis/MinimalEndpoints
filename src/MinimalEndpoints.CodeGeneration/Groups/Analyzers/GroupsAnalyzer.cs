@@ -42,23 +42,27 @@ public class GroupsAnalyzer : DiagnosticAnalyzer
                 return;
             }
 
-            try
-            {
-                var definition = SymbolDefinitionFactory.TryCreateSymbol(namedTypeSymbol);
+            var classification = SymbolDefinitionFactory.Classify(namedTypeSymbol);
 
-                if (definition != null)
-                {
-                    definitions.TryAdd(namedTypeSymbol, definition);
-                }
-            }
-            catch (InvalidOperationException ex)
+            if (classification.IsEndpointAndGroup)
             {
+                // A class decorated with both an endpoint attribute and [MapGroup] is invalid.
+                // Report MINEP007 explicitly instead of relying on a thrown exception, and do not
+                // build a definition for it.
                 var invalidSymbolDiagnostic = Diagnostic.Create(
                     Diagnostics.InvalidSymbolKind,
                     namedTypeSymbol.Locations.FirstOrDefault(),
                     namedTypeSymbol.Name
                 );
                 symbolContext.ReportDiagnostic(invalidSymbolDiagnostic);
+                return;
+            }
+
+            var definition = SymbolDefinitionFactory.TryCreateSymbol(namedTypeSymbol);
+
+            if (definition != null)
+            {
+                definitions.TryAdd(namedTypeSymbol, definition);
             }
 
         }, SymbolKind.NamedType);
