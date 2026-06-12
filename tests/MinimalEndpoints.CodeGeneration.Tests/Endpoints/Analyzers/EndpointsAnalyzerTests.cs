@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using static MinimalEndpoints.Tests.Common.CompilationUtilities;
 
 namespace MinimalEndpoints.CodeGeneration.Tests.Endpoints.Analyzers;
 
@@ -697,15 +698,6 @@ public class TestEndpoint : ITestEndpoint<string>
     }
 
     #endregion
-
-    private List<Diagnostic> GetDiagnostics(string code)
-    {
-        var compilation = new CompilationBuilder(code)
-            .WithMvcReferences()
-            .Build(validateCompilation: false);
-
-        return CompilationUtilities.GenerateDiagnostics(compilation);
-    }
 
 }
 

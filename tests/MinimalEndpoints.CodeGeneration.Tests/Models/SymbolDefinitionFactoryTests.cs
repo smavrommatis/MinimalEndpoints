@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using MinimalEndpoints.CodeGeneration.Models;
+using static MinimalEndpoints.Tests.Common.SymbolTestHelpers;
 
 namespace MinimalEndpoints.CodeGeneration.Tests.Models;
 
@@ -269,19 +270,6 @@ public class TestEndpoint
 
         // Assert
         Assert.Same(create, factory.Create);
-    }
-
-    private static INamedTypeSymbol GetClassSymbol(Compilation compilation, string className)
-    {
-        var syntaxTree = compilation.SyntaxTrees.First();
-        var semanticModel = compilation.GetSemanticModel(syntaxTree);
-        var root = syntaxTree.GetRoot();
-
-        var classDeclaration = root.DescendantNodes()
-            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.ClassDeclarationSyntax>()
-            .First(c => c.Identifier.Text == className);
-
-        return (semanticModel.GetDeclaredSymbol(classDeclaration) as INamedTypeSymbol)!;
     }
 }
 

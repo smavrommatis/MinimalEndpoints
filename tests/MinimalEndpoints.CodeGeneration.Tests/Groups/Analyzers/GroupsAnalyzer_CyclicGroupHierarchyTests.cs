@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using static MinimalEndpoints.Tests.Common.CompilationUtilities;
 
 namespace MinimalEndpoints.CodeGeneration.Tests.Groups.Analyzers;
 
@@ -258,15 +259,5 @@ public class Leaf2Group { }";
         // Assert - No cycles, just complex branching
         Assert.DoesNotContain(diagnostics, d => d.Id == "MINEP006");
     }
-
-    private List<Diagnostic> GetDiagnostics(string code)
-    {
-        var compilation = new CompilationBuilder(code)
-            .WithMvcReferences()
-            .Build(validateCompilation: false);
-
-        return CompilationUtilities.GenerateDiagnostics(compilation);
-    }
-
 }
 

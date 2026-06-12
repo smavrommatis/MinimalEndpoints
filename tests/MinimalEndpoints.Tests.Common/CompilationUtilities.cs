@@ -19,11 +19,25 @@ public static class CompilationUtilities
 
         var compilationWithAnalyzer = compilation.WithAnalyzers(analyzers);
 
-        var diagnostics = compilationWithAnalyzer.GetAllDiagnosticsAsync().Result;
+        var diagnostics = compilationWithAnalyzer.GetAllDiagnosticsAsync().GetAwaiter().GetResult();
 
         return diagnostics
             .Where(d => d.Id.StartsWith("MINEP"))
             .ToList();
+    }
+
+    /// <summary>
+    /// Builds a compilation from <paramref name="code"/> (with MVC references, validation off)
+    /// and returns the MINEP analyzer diagnostics. Shared by the analyzer test classes, which
+    /// previously each carried an identical private copy of this helper.
+    /// </summary>
+    public static List<Diagnostic> GetDiagnostics(string code)
+    {
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build(validateCompilation: false);
+
+        return GenerateDiagnostics(compilation);
     }
 
     public static (string generatedCode, IEnumerable<Diagnostic> diagnostics) GenerateCodeAndCompile(

@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using MinimalEndpoints.CodeGeneration.Endpoints.Models;
+using static MinimalEndpoints.Tests.Common.SymbolTestHelpers;
 
 namespace MinimalEndpoints.CodeGeneration.Tests.Endpoints.Models;
 
@@ -507,36 +508,6 @@ public class TestEndpoint
         Assert.NotNull(result);
         Assert.NotNull(result.MapMethodsAttribute);
         Assert.Contains("GET", result.MapMethodsAttribute.Methods);
-    }
-
-    private static INamedTypeSymbol GetClassSymbol(Compilation compilation, string className)
-    {
-        var syntaxTree = compilation.SyntaxTrees.First();
-        var semanticModel = compilation.GetSemanticModel(syntaxTree);
-        var root = syntaxTree.GetRoot();
-
-        var classDeclaration = root.DescendantNodes()
-            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.ClassDeclarationSyntax>()
-            .First(c => c.Identifier.Text == className);
-
-        return (semanticModel.GetDeclaredSymbol(classDeclaration) as INamedTypeSymbol)!;
-    }
-
-    private static INamedTypeSymbol GetNestedClassSymbol(Compilation compilation, string outerClassName, string innerClassName)
-    {
-        var syntaxTree = compilation.SyntaxTrees.First();
-        var semanticModel = compilation.GetSemanticModel(syntaxTree);
-        var root = syntaxTree.GetRoot();
-
-        var outerClass = root.DescendantNodes()
-            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.ClassDeclarationSyntax>()
-            .First(c => c.Identifier.Text == outerClassName);
-
-        var innerClass = outerClass.DescendantNodes()
-            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.ClassDeclarationSyntax>()
-            .First(c => c.Identifier.Text == innerClassName);
-
-        return (semanticModel.GetDeclaredSymbol(innerClass) as INamedTypeSymbol)!;
     }
 }
 

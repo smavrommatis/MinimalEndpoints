@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using static MinimalEndpoints.Tests.Common.CompilationUtilities;
 
 namespace MinimalEndpoints.CodeGeneration.Tests.Groups.Analyzers;
 
@@ -47,15 +48,6 @@ public class InvalidClass
 
         // Assert
         Assert.Contains(diagnostics, d => d.Id == "MINEP007");
-    }
-
-    private List<Diagnostic> GetDiagnostics(string code)
-    {
-        var compilation = new CompilationBuilder(code)
-            .WithMvcReferences()
-            .Build(validateCompilation: false);
-
-        return CompilationUtilities.GenerateDiagnostics(compilation);
     }
 
 }
