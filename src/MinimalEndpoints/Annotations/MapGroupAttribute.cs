@@ -6,14 +6,14 @@ namespace MinimalEndpoints.Annotations;
 /// Defines an endpoint group with a common route prefix and optional shared configuration.
 /// </summary>
 /// <remarks>
-/// Apply this attribute to a class implementing <see cref="IConfigurableGroup"/> to define
+/// Apply this attribute to a class (optionally implementing <see cref="IConfigurableGroup"/>) to define
 /// a reusable group that multiple endpoints can reference. The group provides a route
 /// prefix and allows centralized configuration of authorization, rate limiting, and other
 /// middleware for all endpoints in the group.
 /// </remarks>
 /// <example>
 /// <code>
-/// [MapGroup("/api/v1", GroupName = "V1 API")]
+/// [MapGroup("/api/v1")]
 /// public class ApiV1Group : IConfigurableGroup
 /// {
 ///     public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
@@ -44,7 +44,7 @@ public sealed class MapGroupAttribute : Attribute
     /// </summary>
     /// <remarks>
     /// When specified, this group's prefix will be appended to the parent group's full path.
-    /// The parent group must also be decorated with <see cref="MapGroupAttribute"/>/>.
+    /// The parent group must also be decorated with <see cref="MapGroupAttribute"/>.
     /// Cyclic group hierarchies are not allowed and will result in a compile-time error.
     /// </remarks>
     /// <example>

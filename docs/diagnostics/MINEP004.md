@@ -12,7 +12,7 @@ Warning
 
 - **v1.0.0 (2025-12-20)**: Initial implementation. Route parameters are normalized to `{param}` regardless of name or constraints. This means `/users/{id:int}` and `/users/{userId:int}` are both treated as `/users/{param}` and flagged as ambiguous.
 
-> **Note**: If this behavior causes issues in your scenario, please [report it](https://github.com/blackeye/MinimalEndpoints/issues/new?labels=analyzer,MINEP004) so we can improve the analyzer. See the [When to Suppress](#when-to-suppress) section for workarounds.
+> **Note**: If this behavior causes issues in your scenario, please [report it](https://github.com/smavrommatis/MinimalEndpoints/issues/new?labels=analyzer,MINEP004) so we can improve the analyzer. See the [When to Suppress](#when-to-suppress) section for workarounds.
 
 ## Description
 
@@ -322,28 +322,38 @@ public class GetUserEndpoint { }
 #pragma warning restore MINEP004
 ```
 
-### 2. Routes Are Conditionally Registered
-If you use feature flags or environment-based registration:
-```csharp
-// In Startup/Program.cs
-if (featureFlags.UseV2Endpoints)
-{
-    builder.Services.AddEndpoint<GetUsersV2Endpoint>();
-}
-else
-{
-    builder.Services.AddEndpoint<GetUsersV1Endpoint>();
-}
+### 2. Routes Are Conditionally Mapped
+If two endpoints share a route but each is gated by `IConditionallyMapped.ShouldMap`,
+only one maps its route at startup, so the shared pattern is safe at runtime. Suppress
+MINEP004 for the shared pattern:
 
-// Both endpoints can have same route since only one registers
+```csharp
+// Both classes share "/users" but are gated by IConditionallyMapped.ShouldMap —
+// only one maps its route at startup based on the feature flag.
 #pragma warning disable MINEP004
 [MapGet("/users")]
-public class GetUsersV1Endpoint { }
+public class GetUsersV1Endpoint : IConditionallyMapped
+{
+    public static bool ShouldMap(IApplicationBuilder app) =>
+        !app.ApplicationServices.GetRequiredService<IFeatureFlags>().UseV2Endpoints;
+
+    public IResult Handle() => Results.Ok();
+}
 
 [MapGet("/users")]
-public class GetUsersV2Endpoint { }
+public class GetUsersV2Endpoint : IConditionallyMapped
+{
+    public static bool ShouldMap(IApplicationBuilder app) =>
+        app.ApplicationServices.GetRequiredService<IFeatureFlags>().UseV2Endpoints;
+
+    public IResult Handle() => Results.Ok();
+}
 #pragma warning restore MINEP004
 ```
+
+> **Note**: `AddMinimalEndpoints()` still registers *both* classes in DI — only the
+> route mapping is conditional. `ShouldMap` is consulted at mapping time, and the
+> endpoint whose `ShouldMap` returns `false` is simply not mapped.
 
 ### 3. Using Route Constraints for Disambiguation
 If you're intentionally using constraints to differentiate routes:
@@ -421,7 +431,7 @@ If you encounter a scenario where MINEP004 produces a **false positive** (warns 
 
 ### How to Report
 
-**GitHub Issue**: [Create an issue](https://github.com/blackeye/MinimalEndpoints/issues/new?labels=analyzer,MINEP004&template=analyzer-issue.md)
+**GitHub Issue**: [Create an issue](https://github.com/smavrommatis/MinimalEndpoints/issues/new?labels=analyzer,MINEP004&template=analyzer-issue.md)
 
 **Include:**
 1. The route patterns that triggered the warning
@@ -456,7 +466,7 @@ Your feedback helps make MinimalEndpoints better for everyone!
 ---
 
 - [MINEP001: Endpoint Missing Entry Point Method](MINEP001.md)
-- [MINEP002: Multiple MapMethods Attributes](MINEP002.md)
+- [MINEP002: Multiple Map Attributes](MINEP002.md)
 - [MINEP003: ServiceType Interface Missing Entry Point](MINEP003.md)
 - [ASP.NET Core Routing Documentation](https://learn.microsoft.com/aspnet/core/fundamentals/routing)
 - [Route Constraints](https://learn.microsoft.com/aspnet/core/fundamentals/routing#route-constraints)

@@ -1,4 +1,4 @@
-# MINEP002: Multiple MapMethods Attributes Detected
+# MINEP002: Multiple Map Attributes Detected
 
 ## Diagnostic ID
 
@@ -10,11 +10,11 @@ Error
 
 ## Description
 
-An endpoint class has multiple MapMethods attributes (e.g., multiple `[MapGet]`, `[MapPost]`, etc.). Only one MapMethods attribute is allowed per endpoint class.
+An endpoint class has multiple Map attributes (e.g., multiple `[MapGet]`, `[MapPost]`, etc.). Only one Map attribute is allowed per endpoint class.
 
 ## Message
 
-> Class '{0}' is marked with multiple MapMethods attributes. Only one MapMethods attribute is allowed per endpoint class. Remove duplicate attributes or use MapMethodsAttribute with an array of HTTP methods.
+> Class '{0}' is marked with multiple Map attributes. Only one Map attribute is allowed per endpoint class. Remove duplicate attributes or use MapMethodsAttribute with an array of HTTP methods.
 
 ## Cause
 
@@ -128,7 +128,7 @@ public class HealthCheckEndpoint
 
         // HEAD returns same status but no body
         return Task.FromResult(
-            isHealthy ? Results.Ok() : Results.ServiceUnavailable()
+            isHealthy ? Results.Ok() : Results.StatusCode(StatusCodes.Status503ServiceUnavailable)
         );
     }
 }
@@ -198,5 +198,5 @@ public class DataEndpoint
 
 - [MINEP001: Endpoint Missing Entry Point Method](MINEP001.md)
 - [MINEP003: ServiceType Interface Missing Entry Point](MINEP003.md)
-- [Documentation: MapMethods Attribute](../README.md#supported-attributes)
+- [Documentation: MapMethods Attribute](../../README.md#supported-attributes)
 

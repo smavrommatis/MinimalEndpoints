@@ -1,13 +1,12 @@
-using System.ComponentModel.DataAnnotations;
 using MinimalEndpoints.Annotations;
 
 namespace MinimalEndpoints.Sample.Endpoints;
 
-[MapGet("/test/{id}")]
+[MapGet("/test/{id:int}")]
 public class GetTest
 {
-    public async Task<IResult> HandleAsync([RegularExpression(@"\d")]int id)
+    public Task<IResult> HandleAsync(int id)
     {
-        return Results.Ok();
+        return Task.FromResult(Results.Ok());
     }
 }

@@ -34,7 +34,7 @@ Reorganize your group hierarchy to form a proper tree structure.
 [MapGroup("/api", ParentGroup = typeof(ApiGroup))]  // ❌ References itself!
 public class ApiGroup : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group) { }
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group) { }
 }
 ```
 
@@ -43,7 +43,7 @@ public class ApiGroup : IConfigurableGroup
 [MapGroup("/api")]  // ✅ No parent - root of hierarchy
 public class ApiGroup : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group) { }
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group) { }
 }
 ```
 
@@ -93,11 +93,9 @@ public class V1Group : IConfigurableGroup { }
 public class ProductsGroup : IConfigurableGroup { }
 
 // Results in hierarchy:
-// ApiGroup (/)
+// ApiGroup (/api)
 //   └─ V1Group (/api/v1)
 //      └─ ProductsGroup (/api/v1/products)
-```
-//       └─ ProductsGroup (/api/v1/products)
 ```
 
 ## Examples
@@ -109,7 +107,7 @@ public class ProductsGroup : IConfigurableGroup { }
 [MapGroup("/api")]
 public class ApiGroup : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.WithOpenApi();
     }
@@ -118,7 +116,7 @@ public class ApiGroup : IConfigurableGroup
 [MapGroup("/v1", ParentGroup = typeof(ApiGroup))]
 public class V1Group : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.RequireAuthorization();
     }
@@ -140,7 +138,7 @@ public class V1Group : IConfigurableGroup { }
 [MapGroup("/admin", ParentGroup = typeof(V1Group))]
 public class AdminGroup : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.RequireAuthorization("Admin");
     }
@@ -185,7 +183,7 @@ public class V2ProductsGroup : IConfigurableGroup { }
 [MapGroup("/api")]
 public class ApiGroup : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.WithOpenApi();  // All descendants get OpenAPI
     }
@@ -194,7 +192,7 @@ public class ApiGroup : IConfigurableGroup
 [MapGroup("/v1", ParentGroup = typeof(ApiGroup))]
 public class V1Group : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.RequireAuthorization();  // All V1 endpoints require auth
     }
@@ -203,7 +201,7 @@ public class V1Group : IConfigurableGroup
 [MapGroup("/admin", ParentGroup = typeof(V1Group))]
 public class AdminGroup : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.RequireAuthorization("Admin");  // Admin-specific auth
     }
@@ -218,7 +216,7 @@ public class ApiGroup : IConfigurableGroup { }
 [MapGroup("/v1", ParentGroup = typeof(ApiGroup))]
 public class V1Group : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.WithTags("V1");
     }
@@ -227,7 +225,7 @@ public class V1Group : IConfigurableGroup
 [MapGroup("/v2", ParentGroup = typeof(ApiGroup))]
 public class V2Group : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.WithTags("V2")
              .RequireRateLimiting("strict");
@@ -249,7 +247,7 @@ public class OrdersGroup : IConfigurableGroup { }
 [MapGroup("/users", ParentGroup = typeof(ApiGroup))]
 public class UsersGroup : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.RequireAuthorization();
     }
@@ -274,11 +272,20 @@ public class GetProductsDirect { }
 // ⚠️ MINEP004: Ambiguous routes detected!
 ```
 
-### Works With MINEP005 (Invalid Group Type)
+### Note: Invalid ParentGroup Is Not Diagnosed
+MINEP005 applies only to the `Group` property on an **endpoint's** Map* attribute — it
+fires when that property references a type without `[MapGroup]`. A `ParentGroup` that points
+at a type without `[MapGroup]` (or at any unknown type) is **not** currently diagnosed: the
+group silently loses its intended parent prefix and is treated as a root group, with no
+compiler feedback.
+
 ```csharp
-[MapGroup("/api", ParentGroup = typeof(InvalidGroup))]  // ❌ MINEP005 if InvalidGroup is invalid
+[MapGroup("/api", ParentGroup = typeof(InvalidGroup))]  // ⚠️ Not diagnosed — silently treated as a root group
 public class ApiGroup : IConfigurableGroup { }
 ```
+
+> A future diagnostic may cover invalid `ParentGroup` references. For now, verify your
+> `ParentGroup` types are real `[MapGroup]`-decorated groups.
 
 ## Debugging Tips
 
@@ -309,7 +316,7 @@ A -> B -> C -> D -> B  // Cycle involves B, C, D
 
 - [MINEP004: Ambiguous Routes](MINEP004.md) - Route conflict detection
 - [MINEP005: Invalid Group Type](MINEP005.md) - Group validation
-- [Documentation: Hierarchical Groups](../README.md#hierarchical-groups)
+- [Documentation: Hierarchical Groups](../../README.md#hierarchical-groups)
 
 ## Technical Details
 

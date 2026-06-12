@@ -9,23 +9,23 @@ This directory contains comprehensive examples demonstrating all features of Min
 - **[02 - Basic Endpoints](02-basic-endpoints.md)** - Simple GET, POST, PUT, DELETE endpoints
 
 ### Core Concepts
-- **[03 - Dependency Injection](03-dependency-injection.md)** - Constructor and parameter injection
-- **[04 - Request Binding](04-request-binding.md)** - Route parameters, query strings, request bodies
-- **[05 - Response Types](05-response-types.md)** - Returning different result types
+- **03 - Dependency Injection** *(coming soon)* - Constructor and parameter injection
+- **04 - Request Binding** *(coming soon)* - Route parameters, query strings, request bodies
+- **05 - Response Types** *(coming soon)* - Returning different result types
 
 ### Advanced Features
-- **[06 - Endpoint Groups](06-endpoint-groups.md)** - Organizing endpoints with IEndpointGroup
-- **[07 - Hierarchical Groups](07-hierarchical-groups.md)** - Multi-level group structures
-- **[08 - Configurable Endpoints](08-configurable-endpoints.md)** - Using IConfigurableEndpoint
-- **[09 - Custom Entry Points](09-custom-entry-points.md)** - Custom method names
-- **[10 - Service Interfaces](10-service-interfaces.md)** - Interface-based registration
+- **06 - Endpoint Groups** *(coming soon)* - Organizing endpoints with `[MapGroup]` and `IConfigurableGroup`
+- **07 - Hierarchical Groups** *(coming soon)* - Multi-level group structures
+- **08 - Configurable Endpoints** *(coming soon)* - Using IConfigurableEndpoint
+- **09 - Custom Entry Points** *(coming soon)* - Custom method names
+- **10 - Service Interfaces** *(coming soon)* - Interface-based registration
 
 ### Integration & Best Practices
 - **[11 - ASP.NET Core Integration](11-aspnetcore-integration.md)** - Versioning, caching, rate limiting, telemetry, authorization
-- **[12 - Validation](12-validation.md)** - Input validation patterns
-- **[13 - Error Handling](13-error-handling.md)** - Handling exceptions and errors
-- **[14 - Testing](14-testing.md)** - Unit and integration testing
-- **[15 - Async Patterns](15-async-patterns.md)** - Async/await and streaming
+- **12 - Validation** *(coming soon)* - Input validation patterns
+- **13 - Error Handling** *(coming soon)* - Handling exceptions and errors
+- **14 - Testing** *(coming soon)* - Unit and integration testing
+- **15 - Async Patterns** *(coming soon)* - Async/await and streaming
 
 ## 🎯 Quick Examples
 
@@ -61,9 +61,9 @@ public class GetUsersEndpoint
 ### Endpoint with Groups
 ```csharp
 [MapGroup("/api/v1")]
-public class ApiV1Group : IEndpointGroup
+public class ApiV1Group : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.RequireAuthorization().WithOpenApi();
     }
@@ -83,8 +83,8 @@ public class GetProductsEndpoint
 
 1. Start with [Getting Started](01-getting-started.md)
 2. Learn [Basic Endpoints](02-basic-endpoints.md)
-3. Explore [Dependency Injection](03-dependency-injection.md)
-4. Master [Endpoint Groups](06-endpoint-groups.md)
+3. Explore [Dependency Injection](../EXAMPLES.md#endpoint-with-dependency-injection)
+4. Master [Endpoint Groups](../EXAMPLES.md#endpoint-groups)
 5. Dive into [ASP.NET Core Integration](11-aspnetcore-integration.md)
 
 **Migrating from another approach?** See [Migration Guide](../MIGRATION.md)
@@ -108,7 +108,7 @@ See the [samples](../../samples/) directory for complete working applications:
 ## 🔗 Related Resources
 
 - [Architecture](../ARCHITECTURE.md) - How it works
-- [API Reference](../API_REFERENCE.md) - Complete API documentation
+- [Examples](../EXAMPLES.md) - Complete example catalog
 - [Diagnostics](../diagnostics/) - Analyzer error codes
 - [Performance](../PERFORMANCE.md) - Benchmarks and optimization
 

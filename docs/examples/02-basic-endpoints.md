@@ -190,9 +190,12 @@ public class UpdateUserEndpoint
 
 ## PATCH - Partial Updates
 
+For partial updates, bind a request DTO whose members are all nullable: a `null` member means "leave this field unchanged", a non-null member means "update it". This binds with the built-in System.Text.Json body binding and needs no extra packages. (The classic `JsonPatchDocument<T>` from `Microsoft.AspNetCore.JsonPatch` is Newtonsoft.Json-based and does not bind in minimal APIs, so a simple partial-update DTO is the simpler choice here.)
+
 ```csharp
-using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
+
+public record PatchUserRequest(string? Name, string? Email, string? Phone);
 
 [MapPatch("/api/users/{id}")]
 public class PatchUserEndpoint
@@ -206,14 +209,20 @@ public class PatchUserEndpoint
 
     public async Task<IResult> HandleAsync(
         int id,
-        [FromBody] JsonPatchDocument<User> patchDoc)
+        [FromBody] PatchUserRequest request)
     {
         var user = await _repository.GetByIdAsync(id);
         if (user == null)
             return Results.NotFound();
 
-        // Apply patch
-        patchDoc.ApplyTo(user);
+        // Apply only the fields that were provided
+        if (request.Name is not null)
+            user.Name = request.Name;
+        if (request.Email is not null)
+            user.Email = request.Email;
+        if (request.Phone is not null)
+            user.Phone = request.Phone;
+
         user.UpdatedAt = DateTime.UtcNow;
 
         await _repository.UpdateAsync(user);
@@ -223,12 +232,12 @@ public class PatchUserEndpoint
 }
 ```
 
-Example PATCH request:
+Example PATCH request (only the fields you want to change):
 ```json
-[
-  { "op": "replace", "path": "/name", "value": "New Name" },
-  { "op": "replace", "path": "/email", "value": "new@email.com" }
-]
+{
+  "name": "New Name",
+  "email": "new@email.com"
+}
 ```
 
 ## DELETE - Remove Resources
@@ -270,6 +279,11 @@ public class DeleteUserEndpoint
 public class SoftDeleteUserEndpoint
 {
     private readonly IUserRepository _repository;
+
+    public SoftDeleteUserEndpoint(IUserRepository repository)
+    {
+        _repository = repository;
+    }
 
     public async Task<IResult> HandleAsync(int id)
     {
@@ -357,6 +371,11 @@ public class ListProductsEndpoint
 {
     private readonly IProductRepository _repository;
 
+    public ListProductsEndpoint(IProductRepository repository)
+    {
+        _repository = repository;
+    }
+
     public async Task<IResult> HandleAsync()
     {
         var products = await _repository.GetAllAsync();
@@ -369,6 +388,11 @@ public class ListProductsEndpoint
 public class GetProductEndpoint
 {
     private readonly IProductRepository _repository;
+
+    public GetProductEndpoint(IProductRepository repository)
+    {
+        _repository = repository;
+    }
 
     public async Task<IResult> HandleAsync(int id)
     {
@@ -383,6 +407,11 @@ public class CreateProductEndpoint
 {
     private readonly IProductRepository _repository;
 
+    public CreateProductEndpoint(IProductRepository repository)
+    {
+        _repository = repository;
+    }
+
     public async Task<IResult> HandleAsync([FromBody] CreateProductRequest request)
     {
         var product = new Product(0, request.Name, request.Price, request.Stock);
@@ -396,6 +425,11 @@ public class CreateProductEndpoint
 public class UpdateProductEndpoint
 {
     private readonly IProductRepository _repository;
+
+    public UpdateProductEndpoint(IProductRepository repository)
+    {
+        _repository = repository;
+    }
 
     public async Task<IResult> HandleAsync(int id, [FromBody] UpdateProductRequest request)
     {
@@ -419,6 +453,11 @@ public class UpdateProductEndpoint
 public class DeleteProductEndpoint
 {
     private readonly IProductRepository _repository;
+
+    public DeleteProductEndpoint(IProductRepository repository)
+    {
+        _repository = repository;
+    }
 
     public async Task<IResult> HandleAsync(int id)
     {
@@ -448,11 +487,11 @@ public class DeleteProductEndpoint
 
 ## Next Steps
 
-- **[Request Binding](04-request-binding.md)** - Deep dive into parameter binding
-- **[Dependency Injection](03-dependency-injection.md)** - Advanced DI patterns
-- **[Validation](12-validation.md)** - Input validation strategies
+- **[ASP.NET Core Integration](11-aspnetcore-integration.md)** - Versioning, caching, rate limiting, telemetry, authorization
+- **[Dependency Injection](../EXAMPLES.md#endpoint-with-dependency-injection)** - Advanced DI patterns
+- **[Validation](../EXAMPLES.md#endpoint-with-validation)** - Input validation strategies
 
 ---
 
-[← Back to Examples](README.md) | [Next: Dependency Injection →](03-dependency-injection.md)
+[← Back to Examples](README.md) | [Next: ASP.NET Core Integration →](11-aspnetcore-integration.md)
 

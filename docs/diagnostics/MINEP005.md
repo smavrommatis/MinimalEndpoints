@@ -54,7 +54,7 @@ For advanced configuration, implement `IConfigurableGroup`:
 [MapGroup("/api/v1")]
 public class ApiV1Group : IConfigurableGroup  // Optional interface
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.RequireAuthorization()
              .WithOpenApi();
@@ -119,7 +119,7 @@ public class GetProductsEndpoint
 [MapGroup("/api/v1")]
 public class ApiV1Group : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.RequireAuthorization()
              .WithOpenApi()
@@ -155,7 +155,7 @@ public class ApiV1Group
 [MapGroup("/admin")]
 public class AdminGroup : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.RequireAuthorization("AdminPolicy");
     }
@@ -171,7 +171,7 @@ public class AdminGroup : IConfigurableGroup
 [MapGroup("/api")]
 public class ApiGroup : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.RequireRateLimiting("fixed");
     }
@@ -183,7 +183,7 @@ public class ApiGroup : IConfigurableGroup
 [MapGroup("/api/v1")]
 public class ApiV1Group : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.WithOpenApi()
              .WithTags("V1");
@@ -196,7 +196,7 @@ public class ApiV1Group : IConfigurableGroup
 [MapGroup("/public")]
 public class PublicGroup : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.RequireCors("AllowAll");
     }
@@ -210,7 +210,7 @@ public class PublicGroup : IConfigurableGroup
 [MapGroup("/api/v1")]
 public class ApiV1Group : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.RequireAuthorization().WithOpenApi();
     }
@@ -220,7 +220,7 @@ public class ApiV1Group : IConfigurableGroup
 [MapGroup("/api/v2")]
 public class ApiV2Group : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.RequireAuthorization()
              .RequireRateLimiting("sliding")
@@ -232,7 +232,7 @@ public class ApiV2Group : IConfigurableGroup
 [MapGroup("/public")]
 public class PublicGroup : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.AllowAnonymous();
     }
@@ -270,5 +270,5 @@ public class GetProductsV2 { }  // ✅ Different routes!
 - [MINEP002: Multiple Attributes](MINEP002.md)
 - [MINEP003: ServiceType Validation](MINEP003.md)
 - [MINEP004: Ambiguous Routes](MINEP004.md)
-- [Documentation: Endpoint Groups](../README.md#endpoint-groups)
+- [Documentation: Endpoint Groups](../../README.md#endpoint-groups)
 

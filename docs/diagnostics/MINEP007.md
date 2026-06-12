@@ -56,7 +56,7 @@ public class UsersClass { }
 [MapGroup("/api")]
 public class ApiGroup : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.WithOpenApi();
     }
@@ -77,7 +77,7 @@ public class UsersClass { }
 [MapGroup("/api")]
 public class ApiGroup : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.WithOpenApi();
     }
@@ -127,7 +127,7 @@ public class GetUsersEndpoint
 [MapGroup("/api/v1")]
 public class ApiV1Group : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.RequireAuthorization();
     }
@@ -155,7 +155,7 @@ This restriction exists because:
 ## Related Diagnostics
 
 - **MINEP005**: Invalid Group Type - Validates group types have `[MapGroup]` attribute
-- **MINEP002**: Multiple MapMethods Attributes - Prevents multiple endpoint attributes
+- **MINEP002**: Multiple Map Attributes - Prevents multiple endpoint attributes
 
 ## See Also
 

@@ -51,7 +51,7 @@ Common issues and their solutions when using MinimalEndpoints.
    ```xml
    <Project Sdk="Microsoft.NET.Sdk.Web">
      <PropertyGroup>
-       <TargetFramework>net8.0</TargetFramework> <!-- or net9.0, net10.0 -->
+       <TargetFramework>net8.0</TargetFramework> <!-- net8.0, net9.0, or net10.0 are all supported -->
        <Nullable>enable</Nullable>
      </PropertyGroup>
    </Project>
@@ -77,25 +77,33 @@ Common issues and their solutions when using MinimalEndpoints.
 2. Find `MinimalEndpointExtensions.g.cs`
 
 **VS Code:**
+
+First opt in to writing generated files to disk by adding this to the consuming project:
+```xml
+<PropertyGroup>
+  <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+</PropertyGroup>
+```
+
+Then, after a build, the generated files are written under:
 ```bash
-# Generated files are in:
-obj/Debug/net8.0/generated/MinimalEndpoints.CodeGeneration/MinimalEndpoints.CodeGeneration.EndpointGenerator/
+# <tfm> matches your project's target framework (e.g. net8.0, net9.0, net10.0):
+obj/Debug/<tfm>/generated/MinimalEndpoints.CodeGeneration/MinimalEndpoints.CodeGeneration.MinimalEndpointsGenerator/
 ```
 
 ### Generator Not Running
 
-**Check MSBuild output:**
+**Confirm the analyzer is loaded:**
 
-```bash
-dotnet build -v:detailed | Select-String "MinimalEndpoints"
-```
+- In Visual Studio or Rider, expand the project's **Dependencies → Analyzers** node and look for
+  `MinimalEndpoints.CodeGeneration` (the source generator `MinimalEndpointsGenerator` ships there).
+- Or inspect the generated output directly by setting `<EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>`
+  on the consuming project, building, and checking for `MinimalEndpointExtensions.g.cs` under
+  `obj/Debug/<tfm>/generated/...` (see [View Generated Code](#view-generated-code)).
+- For a deeper trace, build with a binary log (`dotnet build -bl`) and open `msbuild.binlog` in the
+  MSBuild Structured Log Viewer to inspect analyzer/generator execution.
 
-Look for lines like:
-```
-Executing generator 'MinimalEndpoints.CodeGeneration.EndpointGenerator'...
-```
-
-If not present, the generator isn't loading. Try:
+If the generator isn't loading, try:
 
 1. **Update .NET SDK**
    ```bash
@@ -333,7 +341,7 @@ public class MyGroup  // IConfigurableGroup is optional
 [MapGroup("/api")]
 public class MyGroup : IConfigurableGroup  // ✅ Optional interface
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.WithOpenApi();
     }
@@ -486,21 +494,24 @@ The type or namespace name 'Generated' does not exist in the namespace 'MinimalE
 
 2. **Check Middleware Order**
 
-   Bad:
+   `UseMinimalEndpoints()` only maps the endpoint routes — it is not order-sensitive terminal
+   middleware. The usual ASP.NET Core ordering rules apply: register authentication and
+   authorization **before** the endpoints they protect, exactly as the samples and the
+   [ASP.NET Core integration guide](examples/11-aspnetcore-integration.md) do:
    ```csharp
-   app.UseRouting();
-   app.UseAuthorization();
-   app.UseMinimalEndpoints();  // Too late!
-   app.UseEndpoints(endpoints => { });
-   ```
+   var app = builder.Build();
 
-   Good:
-   ```csharp
-   app.UseRouting();
-   app.UseMinimalEndpoints();  // Before UseEndpoints
+   app.UseHttpsRedirection();
+   app.UseAuthentication();
    app.UseAuthorization();
+
+   app.UseMinimalEndpoints();  // Maps all endpoints
+
    app.Run();
    ```
+
+   The most common cause of a blanket 404 is simply forgetting to call `app.UseMinimalEndpoints()`
+   at all (see step 1), not the relative order of the auth middleware.
 
 3. **Verify Route Patterns**
    ```csharp
@@ -539,7 +550,7 @@ builder.Services.AddMinimalEndpoints();  // Then add endpoints
    [MapGroup("/api")]
    public class ApiGroup : IConfigurableGroup  // For configuration
    {
-       public void ConfigureGroup(RouteGroupBuilder group)
+       public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
        {
            group.RequireAuthorization();  // Configuration here
        }
@@ -611,12 +622,12 @@ builder.Services.AddMinimalEndpoints();  // Then add endpoints
    dotnet_diagnostic.CA1848.severity = none
    ```
 
-2. **Exclude Generated Files from Analysis:**
-   ```xml
-   <PropertyGroup>
-     <GeneratedCodeAnalysis>None</GeneratedCodeAnalysis>
-   </PropertyGroup>
-   ```
+2. **Generated Files Are Already Excluded from Analysis:**
+
+   You do not need to configure anything here — both analyzers (`EndpointsAnalyzer` and
+   `GroupsAnalyzer`) report `GeneratedCodeAnalysisFlags.None`, so they never run over the
+   generated `*.g.cs` output. If you want to silence other analyzers on generated code, mark
+   files as generated via `.editorconfig` (`generated_code = true`).
 
 3. **Increase IDE Memory:**
 
@@ -652,14 +663,9 @@ builder.Services.AddMinimalEndpoints();  // Then add endpoints
    dotnet build --no-dependencies  # Skip dependencies
    ```
 
-3. **Exclude from Hot Reload:**
-
-   If endpoints rarely change:
-   ```xml
-   <PropertyGroup>
-     <GenerateRoslynSourceGeneratorAttribute>false</GenerateRoslynSourceGeneratorAttribute>
-   </PropertyGroup>
-   ```
+   The generator is implemented as an incremental source generator, so unchanged endpoints are
+   not re-generated between builds — keep restores and dependency builds out of the hot loop and
+   the per-build generator cost stays minimal.
 
 ---
 
@@ -709,8 +715,9 @@ builder.Logging.AddConsole();
 ### View Generated Source
 
 ```bash
-# After build, find generated files:
-ls obj/Debug/net8.0/generated/MinimalEndpoints.CodeGeneration/**/*.cs
+# Set <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles> on the consuming project,
+# then after a build find the generated files (<tfm> = your target framework, e.g. net8.0):
+ls obj/Debug/<tfm>/generated/MinimalEndpoints.CodeGeneration/MinimalEndpoints.CodeGeneration.MinimalEndpointsGenerator/*.cs
 ```
 
 ### Test Endpoints Individually

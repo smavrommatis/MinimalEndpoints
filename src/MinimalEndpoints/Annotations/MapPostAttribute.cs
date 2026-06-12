@@ -28,7 +28,7 @@ namespace MinimalEndpoints.Annotations;
 ///         CancellationToken ct)
 ///     {
 ///         var user = await _repository.CreateAsync(request, ct);
-///         return Results.Created($"/api/users/{userId}", user);
+///         return Results.Created($"/api/users/{user.Id}", user);
 ///     }
 /// }
 /// </code>

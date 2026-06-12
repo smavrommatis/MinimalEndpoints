@@ -191,7 +191,7 @@ public class GetProductsEndpoint
 [MapGet("/user")]
 public class GetCurrentUserEndpoint
 {
-    public Task<IResult> HandleAsync(
+    public async Task<IResult> HandleAsync(
         [FromServices] IUserService userService,
         HttpContext context)
     {
@@ -227,7 +227,7 @@ Group related endpoints with shared configuration using `IConfigurableGroup`:
 [MapGroup("/api/v1")]
 public class ApiV1Group : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.RequireAuthorization()
              .WithOpenApi()
@@ -239,7 +239,7 @@ public class ApiV1Group : IConfigurableGroup
 [MapGet("/products", Group = typeof(ApiV1Group))]
 public class ListProductsEndpoint
 {
-    public Task<IResult> HandleAsync() { }
+    public Task<IResult> HandleAsync() => ...;
 }
 // Results in: /api/v1/products with authorization and rate limiting
 ```
@@ -259,7 +259,7 @@ Groups can have parent groups, creating multi-level route structures:
 [MapGroup("/api")]
 public class ApiGroup : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.WithOpenApi();
     }
@@ -269,7 +269,7 @@ public class ApiGroup : IConfigurableGroup
 [MapGroup("/v1", ParentGroup = typeof(ApiGroup))]
 public class V1Group : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.RequireAuthorization();
     }
@@ -279,7 +279,7 @@ public class V1Group : IConfigurableGroup
 [MapGroup("/admin", ParentGroup = typeof(V1Group))]
 public class AdminGroup : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.RequireAuthorization("Admin");
     }
@@ -289,7 +289,7 @@ public class AdminGroup : IConfigurableGroup
 [MapGet("/users", Group = typeof(AdminGroup))]
 public class ListAdminUsersEndpoint
 {
-    public Task<IResult> HandleAsync() { }
+    public Task<IResult> HandleAsync() => ...;
 }
 // Results in: /api/v1/admin/users
 // With OpenAPI + Authorization + Admin Authorization
@@ -309,10 +309,10 @@ Register as an interface instead of concrete class:
 ```csharp
 public interface IHealthCheck { }
 
-[MapGet("/health", ServiceName = typeof(IHealthCheck))]
+[MapGet("/health", ServiceType = typeof(IHealthCheck))]
 public class HealthCheckEndpoint : IHealthCheck
 {
-    public Task<IResult> HandleAsync() { }
+    public Task<IResult> HandleAsync() => ...;
 }
 ```
 
@@ -343,6 +343,39 @@ public class GetAdminUsersEndpoint : IConfigurableEndpoint
     }
 }
 ```
+
+### Conditional Mapping
+
+Implement `IConditionallyMapped` to decide **at startup** whether an endpoint or group is mapped, based on the `IApplicationBuilder` (environment, configuration, feature flags). Implement `static bool ShouldMap(IApplicationBuilder app)`:
+
+```csharp
+using MinimalEndpoints;
+
+// Endpoint mapped only outside Production
+[MapGet("/diagnostics")]
+public class DiagnosticsEndpoint : IConditionallyMapped
+{
+    public IResult Handle() => Results.Ok("diagnostics");
+
+    public static bool ShouldMap(IApplicationBuilder app) =>
+        app.ApplicationServices.GetRequiredService<IHostEnvironment>().IsDevelopment();
+}
+
+// A group can be conditional too — when it is skipped, all of its endpoints
+// (and any child groups) are skipped with it.
+[MapGroup("/api/v2")]
+public class ApiV2Group : IConditionallyMapped
+{
+    public static bool ShouldMap(IApplicationBuilder app) =>
+        app.ApplicationServices.GetRequiredService<IConfiguration>().GetValue<bool>("Features:V2");
+}
+```
+
+Semantics (these are exactly what the generator emits):
+
+- `ShouldMap` gates **route mapping only** — services are still registered with `AddMinimalEndpoints()` regardless, so DI is unaffected.
+- A `false` result on an endpoint skips just that endpoint; a `false` result on a group skips the group **and every endpoint and child group beneath it**.
+- It is evaluated once during `UseMinimalEndpoints()`.
 
 ---
 
@@ -438,9 +471,16 @@ public class DeleteUserEndpoint : IConfigurableEndpoint
 
 ## ✅ Validation
 
-Use standard ASP.NET Core validation attributes:
+You can annotate request types with standard DataAnnotations attributes, but be
+aware that **ASP.NET Core minimal APIs do NOT run DataAnnotations validation
+automatically**. Annotated payloads reach your handler unvalidated unless you
+either enable the .NET 10 validation source generator with
+`builder.Services.AddValidation()` (and `endpoint.WithValidation()` /
+`.AddEndpointFilter`) or validate explicitly inside the handler. On net8.0/net9.0,
+`AddValidation()` is unavailable, so validate manually or use a library such as
+FluentValidation.
 
-````
+```csharp
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
 
@@ -459,11 +499,19 @@ public class CreateUserEndpoint
     public async Task<IResult> HandleAsync(
         [FromBody] CreateUserRequest request)
     {
-        // Validation happens automatically
-        // ...
+        // DataAnnotations are NOT enforced by minimal APIs on their own.
+        // Validate explicitly (or enable AddValidation() on .NET 10):
+        var context = new ValidationContext(request);
+        var results = new List<ValidationResult>();
+        if (!Validator.TryValidateObject(request, context, results, validateAllProperties: true))
+            return Results.ValidationProblem(
+                results.ToDictionary(r => r.MemberNames.FirstOrDefault() ?? "", r => new[] { r.ErrorMessage ?? "" }));
+
+        // ... request is valid
+        return Results.Ok();
     }
 }
-````
+```
 
 ---
 
@@ -493,7 +541,7 @@ public class GetUserEndpoint
 
 ```csharp
 // MinimalEndpointExtensions.g.cs (auto-generated)
-public static class MinimalEndpointExtensions
+internal static partial class MinimalEndpointExtensions
 {
     public static IServiceCollection AddMinimalEndpoints(this IServiceCollection services)
     {
@@ -502,7 +550,7 @@ public static class MinimalEndpointExtensions
         return services;
     }
 
-    public static IEndpointRouteBuilder Map__Api_GetUserEndpoint(
+    private static IEndpointRouteBuilder Map__Api_GetUserEndpoint(
         this IEndpointRouteBuilder builder,
         IApplicationBuilder app)
     {
@@ -803,7 +851,6 @@ Explore complete working examples in the `samples/` directory:
 
 - **[Basic Sample](samples/MinimalEndpoints.Sample/)** - Simple CRUD operations
 - **[Advanced Sample](samples/MinimalEndpoints.AdvancedSample/)** - IConfigurableEndpoint, validation, OpenAPI
-- **[Real-World Sample](samples/MinimalEndpoints.RealWorldSample/)** - Production-ready with database, auth, Docker
 
 ### Quick Examples
 
@@ -897,11 +944,13 @@ Contributions are welcome! Please read [CONTRIBUTING.md](docs/CONTRIBUTING.md) f
 ### Building from Source
 
 ```bash
-git clone https://github.com/blackeye/MinimalEndpoints.git
+git clone https://github.com/smavrommatis/MinimalEndpoints.git
 cd MinimalEndpoints
 dotnet build
 dotnet test
 ```
+
+See [CHANGELOG.md](CHANGELOG.md) for version history.
 
 ---
 
@@ -920,21 +969,6 @@ dotnet test
 ## 📄 License
 
 This project is licensed under the BSD 2-Clause License - see the [LICENSE](LICENSE) file for details.
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please read [CONTRIBUTING.md](docs/CONTRIBUTING.md) for details.
-
-```bash
-git clone https://github.com/smavrommatis/MinimalEndpoints.git
-cd MinimalEndpoints
-dotnet build
-dotnet test
-```
-
-See [CHANGELOG.md](CHANGELOG.md) for version history.
 
 ---
 

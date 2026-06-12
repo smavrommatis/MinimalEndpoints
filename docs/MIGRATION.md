@@ -340,7 +340,7 @@ public class CreateUserEndpoint
 
 ### What Changes
 
-- ⚠️ **No Automatic Model Validation** - Must validate manually or use FluentValidation
+- ⚠️ **No Automatic Model Validation** - DataAnnotations on request types are *not* enforced automatically in minimal APIs. Validate manually, use FluentValidation, or opt in with `builder.Services.AddValidation()` on .NET 10
 - ⚠️ **Different Return Types** - Use `IResult` instead of `ActionResult<T>`
 - ⚠️ **No [ApiController] Magic** - More explicit, but more control
 
@@ -490,7 +490,7 @@ public class UsersModule : CarterModule
 [MapGroup("/api/users")]
 public class UsersGroup : IConfigurableGroup  // Optional: for configuration
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.WithOpenApi();
     }
@@ -566,8 +566,8 @@ public class GetUserEndpoint
 
 Currently on stable release (1.0.0). Future breaking changes will be documented here.
 
-**Anticipated Changes:**
-- Future versions may require .NET 9.0+ for new features
+**Framework support:**
+- The package multi-targets `net8.0`, `net9.0`, and `net10.0`, so the minimum requirement is **.NET 8.0 or later** (see `src/MinimalEndpoints/MinimalEndpoints.csproj` `<TargetFrameworks>` for the authoritative list). Any change to the supported frameworks will be documented here.
 
 ### Handling Breaking Changes
 

@@ -14,7 +14,9 @@ An endpoint class is marked with a MapMethods attribute (e.g., `[MapGet]`, `[Map
 
 ## Message
 
-> Class '{0}' is marked with MapMethodsAttribute but does not contain a valid entry point method. Add a public instance method named 'Handle', 'HandleAsync', or specify a custom method name using the EntryPoint property.
+> Class '{0}' is marked with {1} but does not contain a valid entry point method. Add a public instance method named 'Handle', 'HandleAsync' or specify a custom method name using the EntryPoint property.
+
+`{1}` is rendered as the mapping attribute name, e.g. `[MapGet]`.
 
 ## Cause
 
@@ -157,7 +159,7 @@ public class GetUsersEndpoint
 
 ## See Also
 
-- [MINEP002: Multiple MapMethods Attributes](MINEP002.md)
+- [MINEP002: Multiple Map Attributes](MINEP002.md)
 - [MINEP003: ServiceType Interface Missing Entry Point](MINEP003.md)
-- [Documentation: Creating Endpoints](../README.md#endpoint-classes)
+- [Documentation: Creating Endpoints](../../README.md#endpoint-classes)
 

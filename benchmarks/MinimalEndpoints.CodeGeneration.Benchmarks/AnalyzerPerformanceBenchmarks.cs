@@ -21,9 +21,7 @@ public class AnalyzerPerformanceBenchmarks
     private Compilation _compilation10 = null!;
     private Compilation _compilation50 = null!;
     private Compilation _compilation100 = null!;
-    private CompilationWithAnalyzers _withAnalyzers10 = null!;
-    private CompilationWithAnalyzers _withAnalyzers50 = null!;
-    private CompilationWithAnalyzers _withAnalyzers100 = null!;
+    private ImmutableArray<DiagnosticAnalyzer> _analyzers;
 
     [GlobalSetup]
     public void Setup()
@@ -31,34 +29,22 @@ public class AnalyzerPerformanceBenchmarks
         _compilation10 = CreateCompilationWithEndpoints(10);
         _compilation50 = CreateCompilationWithEndpoints(50);
         _compilation100 = CreateCompilationWithEndpoints(100);
-
-        var analyzers = ImmutableArray.Create<DiagnosticAnalyzer>(
-            new EndpointsAnalyzer(),
-            new GroupsAnalyzer()
-        );
-
-        _withAnalyzers10 = _compilation10.WithAnalyzers(analyzers);
-        _withAnalyzers50 = _compilation50.WithAnalyzers(analyzers);
-        _withAnalyzers100 = _compilation100.WithAnalyzers(analyzers);
+        _analyzers = ImmutableArray.Create<DiagnosticAnalyzer>(new EndpointsAnalyzer(), new GroupsAnalyzer());
     }
 
+    // A fresh CompilationWithAnalyzers per invocation: caching it in setup and reusing it measured
+    // Roslyn's internal result cache (near-zero) instead of the actual analysis work.
     [Benchmark(Baseline = true)]
-    public async Task<ImmutableArray<Diagnostic>> AnalyzeEndpoints_10()
-    {
-        return await _withAnalyzers10.GetAllDiagnosticsAsync();
-    }
+    public Task<ImmutableArray<Diagnostic>> AnalyzeEndpoints_10() =>
+        _compilation10.WithAnalyzers(_analyzers).GetAllDiagnosticsAsync();
 
     [Benchmark]
-    public async Task<ImmutableArray<Diagnostic>> AnalyzeEndpoints_50()
-    {
-        return await _withAnalyzers50.GetAllDiagnosticsAsync();
-    }
+    public Task<ImmutableArray<Diagnostic>> AnalyzeEndpoints_50() =>
+        _compilation50.WithAnalyzers(_analyzers).GetAllDiagnosticsAsync();
 
     [Benchmark]
-    public async Task<ImmutableArray<Diagnostic>> AnalyzeEndpoints_100()
-    {
-        return await _withAnalyzers100.GetAllDiagnosticsAsync();
-    }
+    public Task<ImmutableArray<Diagnostic>> AnalyzeEndpoints_100() =>
+        _compilation100.WithAnalyzers(_analyzers).GetAllDiagnosticsAsync();
 
     private static Compilation CreateCompilationWithEndpoints(int count)
     {
@@ -122,6 +108,10 @@ public class Endpoint{i}
             MetadataReference.CreateFromFile(typeof(IResult).Assembly.Location),
             MetadataReference.CreateFromFile(typeof(MapGetAttribute).Assembly.Location),
             MetadataReference.CreateFromFile(typeof(IConfigurableGroup).Assembly.Location),
+            MetadataReference.CreateFromFile(typeof(Results).Assembly.Location),
+            MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.DependencyInjection.ServiceLifetime).Assembly.Location),
+            MetadataReference.CreateFromFile(typeof(Microsoft.AspNetCore.Builder.IApplicationBuilder).Assembly.Location),
+            MetadataReference.CreateFromFile(typeof(Microsoft.AspNetCore.Routing.RouteGroupBuilder).Assembly.Location),
         };
 
         foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())

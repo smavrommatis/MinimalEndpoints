@@ -161,7 +161,7 @@ public class GetUsersEndpoint
     public async Task<IResult> HandleAsync([FromServices] IUserRepo repo)
     {
         // Service resolved on every request!
-        var users = await _repo.GetAllAsync();
+        var users = await repo.GetAllAsync();
         return Results.Ok(users);
     }
 }
@@ -284,9 +284,9 @@ public class ConfigEndpoint
 ✅ **Good - Logical Grouping:**
 ```csharp
 [MapGroup("/api/v1")]
-public class V1Group : IEndpointGroup
+public class V1Group : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.RequireAuthorization();  // Applied once
     }
@@ -297,7 +297,7 @@ public class V1Group : IEndpointGroup
 ```csharp
 // Don't create a group for every single endpoint
 [MapGroup("/api/users/active/recent")]
-public class VerySpecificGroup : IEndpointGroup { }
+public class VerySpecificGroup { }
 ```
 
 ---

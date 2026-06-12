@@ -6,31 +6,21 @@ This directory contains sample projects demonstrating various features of Minima
 
 ### 1. MinimalEndpoints.Sample
 Basic example showing fundamental features:
-- Simple GET/POST/PUT/DELETE endpoints
+- Simple GET and POST endpoints (`/test/{id}`, `/test-with-dependency`, `/v2/test-with-dependency`, POST `/test`)
 - Dependency injection
-- Parameter binding
+- Parameter binding (route parameter `{id}`)
 - Basic configuration
 
 ### 2. MinimalEndpoints.AdvancedSample
 Advanced features demonstration:
 - `IConfigurableEndpoint` implementation
-- `ServiceType` with interfaces
-- Route constraints and parameters
-- Authentication and authorization
-- OpenAPI/Swagger integration
-- Validation
-- File uploads
-
-### 3. MinimalEndpoints.RealWorldSample
-Production-ready example application:
-- Complete CRUD operations
-- Database integration (EF Core)
-- Authentication with JWT
-- Authorization policies
-- Error handling
-- Logging
-- Health checks
-- Docker support
+- Hierarchical groups with `[MapGroup]` and `ParentGroup`
+- Conditional mapping via `IConditionallyMapped`
+- Route constraints and parameters (`{id:int}`)
+- Constructor dependency injection and `ILogger`
+- OpenAPI (Scalar API reference UI)
+- Manual request validation
+- Output caching
 
 ## Running the Samples
 
@@ -44,7 +34,7 @@ cd samples/MinimalEndpoints.Sample
 dotnet run
 ```
 
-Then navigate to: `https://localhost:5001/swagger`
+Then navigate to: `https://localhost:7207/scalar` (Scalar API reference; HTTP profile: `http://localhost:5160/scalar`)
 
 ### Advanced Sample
 ```bash
@@ -52,28 +42,17 @@ cd samples/MinimalEndpoints.AdvancedSample
 dotnet run
 ```
 
-### Real-World Sample
-```bash
-cd samples/MinimalEndpoints.RealWorldSample
-dotnet run
-```
-
-Or with Docker:
-```bash
-cd samples/MinimalEndpoints.RealWorldSample
-docker-compose up
-```
+Then navigate to: `https://localhost:7207/scalar` (Scalar API reference; HTTP profile: `http://localhost:5160/scalar`)
 
 ## Learning Path
 
 1. Start with **MinimalEndpoints.Sample** to understand the basics
 2. Explore **MinimalEndpoints.AdvancedSample** for advanced patterns
-3. Study **MinimalEndpoints.RealWorldSample** for production best practices
 
 ## Support
 
 For questions or issues:
 - 📚 [Documentation](../docs/)
-- 💬 [Discussions](https://github.com/blackeye/MinimalEndpoints/discussions)
-- 🐛 [Issues](https://github.com/blackeye/MinimalEndpoints/issues)
+- 💬 [Discussions](https://github.com/smavrommatis/MinimalEndpoints/discussions)
+- 🐛 [Issues](https://github.com/smavrommatis/MinimalEndpoints/issues)
 

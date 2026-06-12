@@ -5,9 +5,9 @@ namespace MinimalEndpoints.Sample.Endpoints;
 [MapPost("/test")]
 public class PostTest: IConfigurableEndpoint
 {
-    public async Task<IResult> HandleAsync()
+    public Task<IResult> HandleAsync()
     {
-        return Results.Ok();
+        return Task.FromResult(Results.Ok());
     }
 
     public static void Configure(IApplicationBuilder app, RouteHandlerBuilder endpoint)

@@ -13,6 +13,7 @@
 10. [Complex Types](#complex-types)
 11. [Endpoint Groups](#endpoint-groups)
 12. [Hierarchical Groups](#hierarchical-groups)
+13. [Conditional Mapping](#conditional-mapping)
 
 ---
 
@@ -189,7 +190,9 @@ public class UpdateUserEndpoint
         [FromRoute] int id,
         [FromBody] UpdateUserRequest request)
     {
-        // Validation happens automatically via model binding
+        // NOTE: Minimal APIs do NOT enforce DataAnnotations automatically.
+        // On .NET 10, call builder.Services.AddValidation() to enable it;
+        // otherwise validate manually or use FluentValidation.
         var user = await _repository.GetByIdAsync(id);
         if (user == null)
             return Results.NotFound();
@@ -295,7 +298,7 @@ public interface IHealthCheckEndpoint
     Task<IResult> HandleAsync();
 }
 
-[MapGet("/health", ServiceName = typeof(IHealthCheckEndpoint))]
+[MapGet("/health", ServiceType = typeof(IHealthCheckEndpoint))]
 public class HealthCheckEndpoint : IHealthCheckEndpoint
 {
     private readonly IDatabase _database;
@@ -310,7 +313,7 @@ public class HealthCheckEndpoint : IHealthCheckEndpoint
         var isHealthy = await _database.PingAsync();
         return isHealthy
             ? Results.Ok(new { status = "healthy" })
-            : Results.ServiceUnavailable();
+            : Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
     }
 }
 ```
@@ -1154,7 +1157,7 @@ using MinimalEndpoints.Annotations;
 [MapGroup("/api/v1")]
 public class ApiV1Group : IConfigurableGroup  // Optional: for configuration
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.RequireAuthorization()
              .WithOpenApi()
@@ -1206,7 +1209,7 @@ builder.Services.AddRateLimiter(options =>
 [MapGroup("/api")]
 public class PublicApiGroup : IConfigurableGroup  // Optional interface
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.RequireRateLimiting("api")
              .WithOpenApi();
@@ -1242,9 +1245,9 @@ builder.Services.AddCors(options =>
 
 // Define group with CORS
 [MapGroup("/api/external")]
-public class ExternalApiGroup : IEndpointGroup
+public class ExternalApiGroup : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.RequireCors("ApiPolicy")
              .WithOpenApi();
@@ -1271,7 +1274,7 @@ using MinimalEndpoints.Annotations;
 [MapGroup("/api/v1")]
 public class ApiV1Group : IConfigurableGroup  // Optional interface
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.WithTags("V1")
              .WithOpenApi();
@@ -1282,7 +1285,7 @@ public class ApiV1Group : IConfigurableGroup  // Optional interface
 [MapGroup("/api/v2")]
 public class ApiV2Group : IConfigurableGroup  // Optional interface
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.WithTags("V2")
              .WithOpenApi()
@@ -1329,9 +1332,9 @@ using MinimalEndpoints.Annotations;
 
 // Root group
 [MapGroup("/api")]
-public class ApiGroup : IEndpointGroup
+public class ApiGroup : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.WithOpenApi();  // Applies to all descendants
     }
@@ -1339,9 +1342,9 @@ public class ApiGroup : IEndpointGroup
 
 // Child group
 [MapGroup("/v1", ParentGroup = typeof(ApiGroup))]
-public class V1Group : IEndpointGroup
+public class V1Group : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.RequireAuthorization();  // Applies to all V1 endpoints
     }
@@ -1368,9 +1371,9 @@ using MinimalEndpoints.Annotations;
 
 // Level 1: Root
 [MapGroup("/api")]
-public class ApiGroup : IEndpointGroup
+public class ApiGroup : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.WithOpenApi()
              .WithTags("API");
@@ -1379,9 +1382,9 @@ public class ApiGroup : IEndpointGroup
 
 // Level 2: Version
 [MapGroup("/v1", ParentGroup = typeof(ApiGroup))]
-public class V1Group : IEndpointGroup
+public class V1Group : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.RequireAuthorization()
              .WithTags("V1");
@@ -1390,9 +1393,9 @@ public class V1Group : IEndpointGroup
 
 // Level 3: Feature/Module
 [MapGroup("/admin", ParentGroup = typeof(V1Group))]
-public class AdminGroup : IEndpointGroup
+public class AdminGroup : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.RequireAuthorization("Admin")
              .WithTags("Admin")
@@ -1429,9 +1432,9 @@ using MinimalEndpoints.Annotations;
 
 // Root group
 [MapGroup("/api")]
-public class ApiGroup : IEndpointGroup
+public class ApiGroup : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.WithOpenApi();
     }
@@ -1439,9 +1442,9 @@ public class ApiGroup : IEndpointGroup
 
 // Branch 1: Public API (V1)
 [MapGroup("/v1", ParentGroup = typeof(ApiGroup))]
-public class V1Group : IEndpointGroup
+public class V1Group : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.WithTags("V1");
     }
@@ -1449,9 +1452,9 @@ public class V1Group : IEndpointGroup
 
 // Branch 2: Internal API (V2)
 [MapGroup("/v2", ParentGroup = typeof(ApiGroup))]
-public class V2Group : IEndpointGroup
+public class V2Group : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.RequireAuthorization()
              .WithTags("V2");
@@ -1460,9 +1463,9 @@ public class V2Group : IEndpointGroup
 
 // Sub-branch: V1 Products
 [MapGroup("/products", ParentGroup = typeof(V1Group))]
-public class V1ProductsGroup : IEndpointGroup
+public class V1ProductsGroup : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.WithTags("Products");
     }
@@ -1470,9 +1473,9 @@ public class V1ProductsGroup : IEndpointGroup
 
 // Sub-branch: V2 Products (with auth)
 [MapGroup("/products", ParentGroup = typeof(V2Group))]
-public class V2ProductsGroup : IEndpointGroup
+public class V2ProductsGroup : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.WithTags("Products");
     }
@@ -1511,9 +1514,9 @@ using MinimalEndpoints.Annotations;
 
 // Root API group
 [MapGroup("/api")]
-public class ApiGroup : IEndpointGroup
+public class ApiGroup : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.WithOpenApi()
              .RequireAuthorization();
@@ -1522,9 +1525,9 @@ public class ApiGroup : IEndpointGroup
 
 // Orders module
 [MapGroup("/orders", ParentGroup = typeof(ApiGroup))]
-public class OrdersGroup : IEndpointGroup
+public class OrdersGroup : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.WithTags("Orders")
              .RequireRateLimiting("orders");
@@ -1533,9 +1536,9 @@ public class OrdersGroup : IEndpointGroup
 
 // Products module
 [MapGroup("/products", ParentGroup = typeof(ApiGroup))]
-public class ProductsGroup : IEndpointGroup
+public class ProductsGroup : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.WithTags("Products");
     }
@@ -1543,9 +1546,9 @@ public class ProductsGroup : IEndpointGroup
 
 // Users module
 [MapGroup("/users", ParentGroup = typeof(ApiGroup))]
-public class UsersGroup : IEndpointGroup
+public class UsersGroup : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.WithTags("Users")
              .RequireAuthorization("UserManagement");
@@ -1604,5 +1607,73 @@ ApiGroup (/api)                          [OpenAPI]
   └─ V2Group (/api/v2)                   [OpenAPI + AdminAuth]
       └─ ProductsGroup (/api/v2/products)[OpenAPI + AdminAuth + Cache]
 ```
+
+---
+
+## Conditional Mapping
+
+Implement `IConditionallyMapped` to decide **at application startup** whether an endpoint or an entire group is mapped, based on the `IApplicationBuilder` (environment, configuration, feature flags). The contract is a single static method:
+
+```csharp
+// src/MinimalEndpoints/IConditionallyMapped.cs
+static abstract bool ShouldMap(IApplicationBuilder app);
+```
+
+### Environment-gated endpoint
+
+```csharp
+using MinimalEndpoints;
+using MinimalEndpoints.Annotations;
+
+// Only mapped outside Production — e.g. a diagnostics endpoint.
+[MapGet("/diagnostics")]
+public class DiagnosticsEndpoint : IConditionallyMapped
+{
+    public IResult Handle() => Results.Ok(new { status = "ok" });
+
+    public static bool ShouldMap(IApplicationBuilder app)
+    {
+        var env = app.ApplicationServices.GetRequiredService<IHostEnvironment>();
+        return !env.IsProduction();
+    }
+}
+```
+
+### Feature-flag-gated group
+
+```csharp
+using MinimalEndpoints;
+using MinimalEndpoints.Annotations;
+
+// When ShouldMap returns false, the WHOLE group is skipped: none of its
+// endpoints (and none of its child groups) are mapped.
+[MapGroup("/api/v2")]
+public class ApiV2Group : IConditionallyMapped
+{
+    public static bool ShouldMap(IApplicationBuilder app)
+    {
+        var config = app.ApplicationServices.GetRequiredService<IConfiguration>();
+        return config.GetValue<bool>("Features:V2");
+    }
+}
+
+[MapGet("/products", Group = typeof(ApiV2Group))]
+public class ListV2ProductsEndpoint
+{
+    // Mapped only when Features:V2 is enabled; route /api/v2/products
+    public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok(new[] { "v2-product" }));
+}
+```
+
+A type can implement both `IConfigurableGroup` and `IConditionallyMapped` (the AdvancedSample's `ApiV1Group` does).
+
+### Semantics
+
+These match exactly what the generator emits in `MinimalEndpointsFileBuilder`:
+
+- **Registration is unconditional.** `AddMinimalEndpoints()` registers every endpoint and group in DI regardless of `ShouldMap`; only **route mapping** is gated.
+- **Endpoint guard**: a `false` result skips mapping just that endpoint.
+- **Group guard**: a `false` result skips the group and **every endpoint and descendant group beneath it** (the conditional result propagates down the hierarchy).
+- `ShouldMap` is evaluated once, during `UseMinimalEndpoints()`.
 
 

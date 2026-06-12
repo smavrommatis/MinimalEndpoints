@@ -12,9 +12,9 @@ public class GetTestWithDependencyV2
         _httpContextAccessor = httpContextAccessor;
     }
 
-    public async Task<IResult> HandleAsync()
+    public Task<IResult> HandleAsync()
     {
         var isNull = _httpContextAccessor.HttpContext is null;
-        return Results.Ok($"HttpContext is null: {isNull}");
+        return Task.FromResult(Results.Ok($"HttpContext is null: {isNull}"));
     }
 }

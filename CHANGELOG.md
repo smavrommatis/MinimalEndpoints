@@ -22,14 +22,15 @@ This is the first production-ready stable release of MinimalEndpoints, bringing 
   - 500 endpoints: 649μs, 32KB allocated
 - **Incremental Generation**: Only regenerates changed code
 
-#### Diagnostic Analyzers (7 Total)
+#### Diagnostic Analyzers (8 Total)
 - **MINEP001**: Missing entry point method detection - ensures endpoint has Handle/HandleAsync method
-- **MINEP002**: Multiple MapMethods attributes validation - prevents conflicting attributes
+- **MINEP002**: Multiple Map attributes validation - prevents conflicting attributes
 - **MINEP003**: ServiceType interface validation - validates interface compatibility
 - **MINEP004**: Ambiguous route detection - warns about duplicate route patterns
 - **MINEP005**: Invalid endpoint group validation - ensures groups have [MapGroup] attribute
 - **MINEP006**: Cyclic group hierarchy detection - prevents circular parent-child relationships
 - **MINEP007**: Mixed endpoint/group detection - prevents classes from being both endpoint and group
+- **MINEP008**: Unsupported endpoint/group shape detection - skips generic, file-local, or below-internal classes
 
 #### Code Fixes
 - Automatic entry point method generation
@@ -104,7 +105,7 @@ Works seamlessly with all built-in ASP.NET Core features:
 ### 📚 Documentation
 
 - Complete README with quick start guide
-- 4 diagnostic documentation files (MINEP001-007)
+- 9 diagnostic documentation files (MINEP001-008, MINEP999)
 - 3 comprehensive example guides
 - Architecture documentation
 - Performance benchmarking guide
@@ -118,16 +119,16 @@ Works seamlessly with all built-in ASP.NET Core features:
 - 240+ unit tests
 - Integration test suite
 - Benchmark suite for performance validation
-- Real-world sample projects
+- Sample projects (MinimalEndpoints.Sample, MinimalEndpoints.AdvancedSample)
 
 ### 📦 Technical Details
 
 **Target Frameworks:**
-- .NET 10.0
-- C# 14.0
+- .NET 8.0, .NET 9.0, .NET 10.0 (runtime package multi-targets `net8.0;net9.0;net10.0`)
+- Source generator/analyzer: Roslyn 4.8.0 floor (SDK 8.0.100 / VS 17.8)
 
 **Key Dependencies:**
-- Microsoft.CodeAnalysis.CSharp 4.11.0 (analyzer/generator)
+- Microsoft.CodeAnalysis.CSharp 4.8.0 (analyzer/generator)
 - Microsoft.AspNetCore.App (runtime)
 
 **NuGet Package:**
@@ -137,7 +138,7 @@ Works seamlessly with all built-in ASP.NET Core features:
 ### 🔒 Known Limitations
 
 - Groups must not form circular hierarchies (MINEP006 detects this)
-- Only one MapMethods attribute per endpoint class (MINEP002 detects this)
+- Only one Map attribute per endpoint class (MINEP002 detects this)
 - Entry point method must be public, instance (non-static) (MINEP001 validates this)
 - Classes cannot be both endpoint and group (MINEP007 prevents this)
 

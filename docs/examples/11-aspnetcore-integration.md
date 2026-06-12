@@ -160,7 +160,7 @@ public class GetUsersV2Endpoint : IConfigurableEndpoint
 [MapGroup("/api/v1")]
 public class V1Group : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.WithOpenApi();
     }
@@ -169,20 +169,22 @@ public class V1Group : IConfigurableGroup
 [MapGroup("/api/v2")]
 public class V2Group : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group.WithOpenApi();
     }
 }
 
-// All endpoints in V1Group automatically have version 1.0
+// All endpoints in V1Group are served under the /api/v1 prefix.
+// For actual ApiVersion metadata, attach it per endpoint with the
+// HasApiVersion configuration shown earlier on this page.
 [MapGet("/users", Group = typeof(V1Group))]
 public class GetUsersV1Endpoint
 {
     public async Task<IResult> HandleAsync() => Results.Ok();
 }
 
-// All endpoints in V2Group automatically have version 2.0
+// All endpoints in V2Group are served under the /api/v2 prefix.
 [MapGet("/users", Group = typeof(V2Group))]
 public class GetUsersV2Endpoint
 {
@@ -462,7 +464,7 @@ public class GenerateReportEndpoint : IConfigurableEndpoint
 [MapGroup("/api/public")]
 public class PublicApiGroup : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         // All endpoints in this group are rate limited
         group.RequireRateLimiting("sliding");
@@ -738,7 +740,7 @@ public class UpdateUserEndpoint : IConfigurableEndpoint
 [MapGroup("/api/admin")]
 public class AdminGroup : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         // All endpoints in this group require Admin role
         group.RequireAuthorization("AdminOnly");
@@ -860,7 +862,7 @@ public class GetReportsEndpoint : IConfigurableEndpoint
 [MapGroup("/api/v{version:apiVersion}")]
 public class ApiGroup : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group
             .RequireAuthorization() // All endpoints require auth

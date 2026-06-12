@@ -146,8 +146,8 @@ builder.Services.AddCors(options =>
     options.AddPolicy("Production",
         policy => policy
             .WithOrigins("https://yourdomain.com") // Specific origins only
-            .AllowedHeaders("Content-Type", "Authorization")
-            .AllowedMethods("GET", "POST")
+            .WithHeaders("Content-Type", "Authorization")
+            .WithMethods("GET", "POST")
             .AllowCredentials());
 });
 ```

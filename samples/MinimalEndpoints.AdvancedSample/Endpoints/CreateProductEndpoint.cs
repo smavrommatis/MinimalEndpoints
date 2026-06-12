@@ -53,7 +53,9 @@ public class CreateProductEndpoint : IConfigurableEndpoint
 
         _logger.LogInformation("Product created with ID: {ProductId}", created.Id);
 
-        return Results.Created($"/api/products/{created.Id}", created);
+        // Use the named GetProduct route so the Location header reflects the real grouped route
+        // (/api/v1/products/{id}) instead of a hand-built path that 404s when followed.
+        return Results.CreatedAtRoute("GetProduct", new { id = created.Id }, created);
     }
 
     public static void Configure(IApplicationBuilder app, RouteHandlerBuilder endpoint)

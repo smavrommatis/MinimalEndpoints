@@ -73,7 +73,7 @@ Unsure where to begin? You can start by looking through `good-first-issue` and `
 
 ```bash
 # Clone the repository
-git clone https://github.com/blackeye/MinimalEndpoints.git
+git clone https://github.com/smavrommatis/MinimalEndpoints.git
 cd MinimalEndpoints
 
 # Restore dependencies
@@ -91,15 +91,21 @@ dotnet test
 ```
 MinimalEndpoints/
 ├── src/
-│   ├── MinimalEndpoints/              # Core library with attributes
-│   ├── MinimalEndpoints.CodeGeneration/    # Roslyn analyzers and generators
-│   └── MinimalEndpoints.CodeFixes/    # Code fix providers
+│   ├── MinimalEndpoints/                          # Core library with attributes
+│   ├── MinimalEndpoints.CodeGeneration/           # Source generator + analyzers (MinimalEndpointsGenerator, EndpointsAnalyzer, GroupsAnalyzer)
+│   └── MinimalEndpoints.CodeFixes/                # Code fix providers
 ├── tests/
-│   └── MinimalEndpoints.CodeGeneration.Tests/  # Unit and integration tests
+│   ├── MinimalEndpoints.CodeGeneration.Tests/             # Generator/analyzer unit tests
+│   ├── MinimalEndpoints.CodeGeneration.IntegrationTests/  # Generator integration tests
+│   ├── MinimalEndpoints.CodeFixes.Tests/                  # Code fix tests
+│   ├── MinimalEndpoints.EndToEnd.Tests/                   # End-to-end tests
+│   ├── MinimalEndpoints.EndToEnd.TestApp/                 # Test app driven by the E2E tests
+│   └── MinimalEndpoints.Tests.Common/                     # Shared test helpers
 ├── samples/
-│   └── MinimalEndpoints.Sample/       # Sample application
-├── docs/                              # Documentation
-└── benchmarks/                        # Performance benchmarks
+│   ├── MinimalEndpoints.Sample/                   # Basic sample application
+│   └── MinimalEndpoints.AdvancedSample/           # Advanced sample (groups, configuration)
+├── docs/                                          # Documentation
+└── benchmarks/                                    # Performance benchmarks
 ```
 
 ### Running the Sample
@@ -109,7 +115,10 @@ cd samples/MinimalEndpoints.Sample
 dotnet run
 ```
 
-Visit `https://localhost:5001` to see the sample API in action.
+Visit `https://localhost:7207` (or `http://localhost:5160`) to see the sample API in action; the
+browsable API reference is served at `/scalar` (e.g. `https://localhost:7207/scalar`). The
+`MinimalEndpoints.AdvancedSample` project demonstrates groups and per-endpoint configuration and can
+be run the same way.
 
 ### Debugging the generator
 

@@ -293,9 +293,10 @@ public class DataEndpoint
 Now that you have the basics:
 
 1. **[Basic Endpoints](02-basic-endpoints.md)** - Explore all HTTP methods
-2. **[Dependency Injection](03-dependency-injection.md)** - Advanced DI patterns
-3. **[Endpoint Groups](06-endpoint-groups.md)** - Organize related endpoints
-4. **[Configurable Endpoints](08-configurable-endpoints.md)** - Advanced configuration
+2. **[ASP.NET Core Integration](11-aspnetcore-integration.md)** - Versioning, caching, rate limiting, telemetry, authorization
+3. **[Dependency Injection](../EXAMPLES.md#endpoint-with-dependency-injection)** - Advanced DI patterns
+4. **[Endpoint Groups](../EXAMPLES.md#endpoint-groups)** - Organize related endpoints
+5. **[Configurable Endpoints](../EXAMPLES.md#configurable-endpoint)** - Advanced configuration
 
 ## Troubleshooting
 

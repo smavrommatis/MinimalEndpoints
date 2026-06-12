@@ -305,7 +305,7 @@ public class HealthMonitor
 ## See Also
 
 - [MINEP001: Endpoint Missing Entry Point Method](MINEP001.md)
-- [MINEP002: Multiple MapMethods Attributes](MINEP002.md)
-- [Documentation: Service Interfaces](../README.md#service-interface)
+- [MINEP002: Multiple Map Attributes](MINEP002.md)
+- [Documentation: Service Interfaces](../../README.md#service-interface)
 - [Examples: ServiceType with IConfigurableEndpoint](../EXAMPLES.md#servicetype-with-iconfigurableendpoint)
 

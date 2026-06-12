@@ -1,6 +1,6 @@
 ---
 name: Analyzer Issue
-about: Report a problem with MINEP001, MINEP002, MINEP003, or MINEP004 analyzers
+about: Report a problem with a MINEP analyzer rule
 title: '[MINEP00X] Brief description of the issue'
 labels: analyzer
 assignees: ''
@@ -14,6 +14,10 @@ Which analyzer is causing the issue?
 - [ ] MINEP002 - Multiple Attributes
 - [ ] MINEP003 - ServiceType Validation
 - [ ] MINEP004 - Ambiguous Routes
+- [ ] MINEP005 - Invalid Group Type
+- [ ] MINEP006 - Cyclic Group Hierarchy
+- [ ] MINEP007 - Endpoint and Group Conflict
+- [ ] MINEP008 - Unsupported Endpoint Shape
 
 ## Issue Type
 

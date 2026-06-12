@@ -16,7 +16,7 @@ internal static class Diagnostics
         description: "Endpoints must have a valid entry point method to handle requests." +
         "The method should be public, non-static, and return a value." +
         "Example: public async Task<IResult> HandleAsync() { return Results.Ok(); }.",
-        helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/docs/MINEP001.md"
+        helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/blob/main/docs/diagnostics/MINEP001.md"
     );
 
     public static readonly DiagnosticDescriptor MultipleAttributesDetected = new DiagnosticDescriptor(
@@ -30,7 +30,7 @@ internal static class Diagnostics
         isEnabledByDefault: true,
         description: "Endpoints must not have more than one Map attribute. " +
         "If you need to handle multiple HTTP methods, use [MapMethods(\"/route\", new[] { \"GET\", \"POST\" })].",
-        helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/docs/MINEP002.md"
+        helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/blob/main/docs/diagnostics/MINEP002.md"
     );
 
     public static readonly DiagnosticDescriptor ServiceTypeMissingEntryPoint = new DiagnosticDescriptor(
@@ -45,7 +45,7 @@ internal static class Diagnostics
         description: "When ServiceType is specified, the interface must contain the entry point method that will be called." +
         "The interface method should match the signature of the endpoint's entry point." +
         "Example: public interface IMyEndpoint { Task<IResult> HandleAsync(); }.",
-        helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/docs/diagnostics/MINEP003.md"
+        helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/blob/main/docs/diagnostics/MINEP003.md"
     );
 
     public static readonly DiagnosticDescriptor AmbiguousRoutes = new DiagnosticDescriptor(
@@ -62,7 +62,7 @@ internal static class Diagnostics
         "Consider using different route patterns, route constraints, or consolidating the endpoints. " +
         "Route parameters are compared by position only — routes that differ solely by parameter name " +
         "or route constraint (e.g. '{id:int}' vs '{id:alpha}') are conservatively reported as conflicts.",
-        helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/docs/diagnostics/MINEP004.md",
+        helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/blob/main/docs/diagnostics/MINEP004.md",
         customTags: WellKnownDiagnosticTags.CompilationEnd
     );
 
@@ -77,7 +77,7 @@ internal static class Diagnostics
         isEnabledByDefault: true,
         description: "Endpoint groups must decorated with MapGroupAttribute." +
         "Example: [MapGroup(\"/api/v1\")] public class ApiV1Group { }.",
-        helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/docs/diagnostics/MINEP005.md"
+        helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/blob/main/docs/diagnostics/MINEP005.md"
     );
 
     public static readonly DiagnosticDescriptor CyclicGroupHierarchy = new DiagnosticDescriptor(
@@ -92,7 +92,7 @@ internal static class Diagnostics
         description: "Group hierarchies must be acyclic. A group cannot directly or indirectly reference itself as a parent. " +
         "Example of invalid hierarchy: GroupA -> GroupB -> GroupC -> GroupA (cycle). " +
         "Ensure each group's ParentGroup property forms a proper tree structure without cycles.",
-        helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/docs/diagnostics/MINEP006.md",
+        helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/blob/main/docs/diagnostics/MINEP006.md",
         customTags: WellKnownDiagnosticTags.CompilationEnd
     );
 
@@ -108,7 +108,7 @@ internal static class Diagnostics
         description: "A class cannot serve as both an endpoint and a group. " +
         "Ensure that classes intended to define endpoint groups are only decorated with MapGroupAttribute, "+
         "and classes intended to define endpoints are only decorated with Map* attributes.",
-        helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/docs/diagnostics/MINEP007.md"
+        helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/blob/main/docs/diagnostics/MINEP007.md"
     );
 
     public static readonly DiagnosticDescriptor UnsupportedEndpointShape = new DiagnosticDescriptor(
@@ -124,7 +124,7 @@ internal static class Diagnostics
         "register it for dependency injection. Open generic types, file-local types, and types whose effective " +
         "accessibility is below internal cannot be referenced from the generated code, so they are skipped. " +
         "Make the class a non-generic, at-least-internal, non-file-local class to map it.",
-        helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/docs/diagnostics/MINEP008.md"
+        helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/blob/main/docs/diagnostics/MINEP008.md"
     );
 
     /// <summary>
@@ -145,6 +145,6 @@ internal static class Diagnostics
         isEnabledByDefault: true,
         description: "An unexpected exception in the generator's output step is caught and surfaced as this " +
         "diagnostic instead of the opaque CS8785, so the failure is visible and actionable at build time.",
-        helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/docs/diagnostics/MINEP999.md"
+        helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/blob/main/docs/diagnostics/MINEP999.md"
     );
 }
