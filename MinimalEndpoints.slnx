@@ -39,6 +39,8 @@
     <Project Path="tests/MinimalEndpoints.CodeFixes.Tests/MinimalEndpoints.CodeFixes.Tests.csproj" />
     <Project Path="tests/MinimalEndpoints.CodeGeneration.IntegrationTests/MinimalEndpoints.CodeGeneration.IntegrationTests.csproj" />
     <Project Path="tests/MinimalEndpoints.CodeGeneration.Tests/MinimalEndpoints.CodeGeneration.Tests.csproj" />
+    <Project Path="tests/MinimalEndpoints.EndToEnd.TestApp/MinimalEndpoints.EndToEnd.TestApp.csproj" />
+    <Project Path="tests/MinimalEndpoints.EndToEnd.Tests/MinimalEndpoints.EndToEnd.Tests.csproj" />
     <Project Path="tests/MinimalEndpoints.Tests.Common/MinimalEndpoints.Tests.Common.csproj" />
   </Folder>
   <Folder Name="/Soluction Items/">
