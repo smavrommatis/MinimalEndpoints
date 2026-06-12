@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-test:
+    name: Build & test (coverage gate)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore MinimalEndpoints.slnx
+
+      - name: Build
+        run: dotnet build MinimalEndpoints.slnx --configuration Release --no-restore
+
+      # The >= 60% coverage gate lives here, not in the test csprojs. coverlet.msbuild instruments
+      # during this build, so the test step intentionally does NOT pass --no-build. The threshold
+      # and exclusions (runtime library + test-helper assembly) are supplied on the command line so
+      # the gate is owned by CI and local `dotnet test` stays ungated. Commas in multi-value props
+      # are %2C-escaped: a literal comma is split by the dotnet CLI argument parser (MSB1006), and
+      # MSBuild un-escapes %2C back to a comma in the property value.
+      - name: Test with coverage gate
+        run: >
+          dotnet test MinimalEndpoints.slnx
+          --configuration Release
+          --no-restore
+          -p:CollectCoverage=true
+          -p:CoverletOutputFormat=cobertura
+          -p:Threshold=60
+          -p:ThresholdType=line%2Cbranch%2Cmethod
+          -p:ThresholdStat=total
+          -p:ExcludeByFile="**/obj/**/*.*%2C**/bin/**/*.*"
+          -p:Exclude="[MinimalEndpoints]*%2C[MinimalEndpoints.Tests.Common]*"

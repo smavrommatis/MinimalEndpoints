@@ -6,19 +6,9 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
 
-    <!-- Code Coverage Configuration. With coverlet.msbuild referenced and CollectCoverage=true,
-         these thresholds are enforced on every `dotnet test`. Threshold is a ratchet pinned just
-         below the current coverage of the code under test (the generator/analyzer); raise it as
-         coverage improves. The runtime library and the test-helper assembly are excluded — they
-         are not what this project exercises (the runtime is covered by the EndToEnd tests). -->
-    <CollectCoverage>true</CollectCoverage>
-    <CoverletOutputFormat>cobertura,opencover,lcov</CoverletOutputFormat>
-    <CoverletOutput>$(MSBuildProjectDirectory)/TestResults/</CoverletOutput>
-    <Threshold>60</Threshold>
-    <ThresholdType>line,branch,method</ThresholdType>
-    <ThresholdStat>total</ThresholdStat>
-    <ExcludeByFile>**/obj/**/*.*,**/bin/**/*.*</ExcludeByFile>
-    <Exclude>[MinimalEndpoints]*,[MinimalEndpoints.Tests.Common]*</Exclude>
+    <!-- Coverage collection (coverlet.msbuild) is driven from CI, not the project: the 60% gate
+         lives in .github/workflows/ci.yml, which runs `dotnet test` with -p:CollectCoverage and the
+         -p:Threshold/-p:Exclude props. Local `dotnet test` is therefore ungated and does not collect. -->
   </PropertyGroup>
 
   <ItemGroup>
