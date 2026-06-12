@@ -31,10 +31,11 @@ public class TestGroup
     }
 
     [Fact]
-    public void Constructor_WithNoPrefixArgument_UsesDefaultSlash()
+    public void Constructor_WithEmptyPrefix_KeepsEmptyString()
     {
-        // Arrange - need to test edge case, but MapGroup requires a string parameter
-        // We'll test the default behavior indirectly through Factory
+        // An explicit empty prefix is preserved as "". The constructor's `?? "/"` fallback only
+        // fires when the prefix argument is absent/non-string, which valid C# cannot express
+        // (MapGroupAttribute requires a string prefix), so it is not exercised here.
         var code = @"
 namespace TestApp;
 

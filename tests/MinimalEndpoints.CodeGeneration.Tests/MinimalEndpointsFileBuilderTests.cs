@@ -134,11 +134,11 @@ public class TestClass
     }
 
     [Fact]
-    public void GetLifetimeMethodName_ReturnsCorrectMethod_ForAllLifetimes()
+    public void MapMethodsAttribute_ParsesAllLifetimes()
     {
-        // This is a private method, but we can test it indirectly through registration
-
-        // Test through public API
+        // Asserts only that each ServiceLifetime is parsed onto the attribute definition. The
+        // AddSingleton/AddScoped/AddTransient emission is covered end-to-end by
+        // EndpointsCodeGenerationTests.GeneratedCode_HandlesDifferentLifetimes_Correctly.
         var code =
             @"
             using MinimalEndpoints.Annotations;

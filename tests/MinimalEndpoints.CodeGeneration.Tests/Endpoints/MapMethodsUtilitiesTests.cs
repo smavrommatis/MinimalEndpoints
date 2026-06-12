@@ -772,7 +772,7 @@ public class TransientEndpoint
     }
 
     [Fact]
-    public void GetMapMethodsAttributeDefinition_ShouldReturnNull_ForMultipleAttributes()
+    public void GetMapMethodsAttributeDefinition_IgnoresNonMapAttributes()
     {
         // Arrange
         var code = @"

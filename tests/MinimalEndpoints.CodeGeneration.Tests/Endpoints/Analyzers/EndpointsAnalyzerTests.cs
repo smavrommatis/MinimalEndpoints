@@ -499,7 +499,10 @@ public class TestEndpoint
     [Fact]
     public void MissingEntryPoint_MethodWithVoidReturn_NoError()
     {
-        // Arrange
+        // NOTE (pending product decision): the analyzer intentionally accepts a void-returning
+        // handler, but the MINEP001 description (Diagnostics.cs) says a handler "should be
+        // public, non-static, and return a value." This test pins current behaviour; the
+        // analyzer-vs-description conflict is being escalated, not resolved here.
         var code = @"
 namespace TestApp;
 
