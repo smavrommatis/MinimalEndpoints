@@ -68,7 +68,7 @@ internal sealed class EndpointDefinition : SymbolDefinition
         var isConfigurable = symbol.IsConfigurableEndpoint();
         var isConditionallyMapped = symbol.IsConditionallyMapped();
 
-        return new EndpointDefinition(symbol)
+        var definition = new EndpointDefinition(symbol)
         {
             ClassType = new TypeDefinition(symbol),
             MapMethodsAttribute = mapMethodsAttribute,
@@ -92,5 +92,30 @@ internal sealed class EndpointDefinition : SymbolDefinition
             IsConfigurable = isConfigurable,
             IsConditionallyMapped = isConditionallyMapped
         };
+
+        definition._equalityKey = definition.BuildEqualityKey();
+        return definition;
+    }
+
+    private static readonly HashSet<string> s_emptyUsings = new();
+
+    private string _equalityKey;
+
+    protected override string EqualityKey => _equalityKey;
+
+    private string BuildEqualityKey()
+    {
+        var attr = MapMethodsAttribute;
+
+        var parameters = string.Join(";", EntryPoint.Parameters.Values.Select(p =>
+            $"{p.Name}:{p.Type.FullName}:{p.Nullable}:{p.DefaultValue}:" +
+            string.Join("+", p.Attributes.Select(a => a.ToDisplayString(s_emptyUsings)))));
+
+        return
+            $"{ClassType.FullName}|{attr.Pattern}|{attr.EndpointBuilderMethodName}|" +
+            $"{(attr.Methods is null ? "" : string.Join(",", attr.Methods))}|{attr.Lifetime}|" +
+            $"{attr.EntryPoint}|{attr.ServiceName}|{attr.GroupType?.ToDisplayString()}|" +
+            $"{EntryPoint.Name}|{EntryPoint.ReturnType.FullName}|{EntryPoint.IsAsync}|" +
+            $"{parameters}|{IsConfigurable}|{IsConditionallyMapped}";
     }
 }

@@ -13,6 +13,7 @@ internal class EndpointGroupDefinition : SymbolDefinition
         create: (symbol, attributeData) => new EndpointGroupDefinition(symbol, attributeData));
 
     private bool? _hierarchyConditionallyMapped = null;
+    private readonly string _equalityKey;
 
     public EndpointGroupDefinition(INamedTypeSymbol symbol, AttributeData attributeData) : base(symbol)
     {
@@ -21,6 +22,29 @@ internal class EndpointGroupDefinition : SymbolDefinition
         IsConditionallyMapped = symbol.IsConditionallyMapped();
         IsConfigurable = symbol.IsConfigurableGroupEndpoint();
         Prefix = attributeData.ConstructorArguments.FirstOrDefault().Value as string ?? "/";
+
+        // Captured eagerly from transform-time data so the later hierarchy mutation
+        // (ParentGroup) cannot corrupt the cache key. The parent is keyed by its type name,
+        // matching how FillHierarchyAndDetectCycles resolves it from the same named argument.
+        _equalityKey =
+            $"{ClassType.FullName}|{Prefix}|{IsConfigurable}|{IsConditionallyMapped}|" +
+            ResolveParentGroupTypeName(attributeData);
+    }
+
+    protected override string EqualityKey => _equalityKey;
+
+    private static string ResolveParentGroupTypeName(AttributeData attributeData)
+    {
+        foreach (var namedArgument in attributeData.NamedArguments)
+        {
+            if (namedArgument.Key == "ParentGroup" &&
+                namedArgument.Value.Value is INamedTypeSymbol parentGroupSymbol)
+            {
+                return parentGroupSymbol.ToDisplayString();
+            }
+        }
+
+        return null;
     }
 
     public AttributeData AttributeData { get; }
