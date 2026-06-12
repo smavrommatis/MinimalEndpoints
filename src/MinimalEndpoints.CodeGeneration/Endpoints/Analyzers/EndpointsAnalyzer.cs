@@ -68,9 +68,16 @@ public class EndpointsAnalyzer : DiagnosticAnalyzer
 
         if (entryPoint == null)
         {
+            // Hand the requested (custom) entry-point name to the code fix via the properties bag so it
+            // can generate a method with that exact name instead of always emitting Handle/HandleAsync.
+            var properties = string.IsNullOrEmpty(mapMethodsAttributeDefinition.EntryPoint)
+                ? ImmutableDictionary<string, string>.Empty
+                : ImmutableDictionary<string, string>.Empty.Add("EntryPoint", mapMethodsAttributeDefinition.EntryPoint);
+
             var missingEntryPointDiagnostic = Diagnostic.Create(
                 Diagnostics.MissingEntryPoint,
                 classDeclaration.Identifier.GetLocation(),
+                properties,
                 namedTypeSymbol.Name,
                 mapMethodsAttributeDefinition.EntryPoint
             );
