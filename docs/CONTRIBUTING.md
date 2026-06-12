@@ -346,7 +346,13 @@ public class TypeDefinitionTests
 
 ### Test Coverage
 
-- **Aim for 80%+ code coverage**
+- Coverage is collected and **enforced automatically on `dotnet test`** for the unit and
+  integration test projects (via `coverlet.msbuild`; `CollectCoverage` is set in each
+  `.csproj`). The build fails if line, branch, or method coverage of the generator/analyzer
+  code under test drops below the `Threshold` declared in that project's `.csproj`.
+- That threshold is a **ratchet** pinned just below current coverage; raise it as coverage
+  improves. The long-term aim is **80%+**.
+- Coverage reports are written to each project's `TestResults/` (cobertura, opencover, lcov).
 - **Test edge cases** (null, empty, boundary values)
 - **Test error conditions**
 - **Test happy paths**

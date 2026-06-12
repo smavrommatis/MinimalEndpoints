@@ -6,18 +6,27 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
 
-    <!-- Code Coverage Configuration -->
+    <!-- Code Coverage Configuration. With coverlet.msbuild referenced and CollectCoverage=true,
+         these thresholds are enforced on every `dotnet test`. Threshold is a ratchet pinned just
+         below the current coverage of the code under test (the generator/analyzer); raise it as
+         coverage improves. The runtime library and the test-helper assembly are excluded — they
+         are not what this project exercises (the runtime is covered by the EndToEnd tests). -->
     <CollectCoverage>true</CollectCoverage>
     <CoverletOutputFormat>cobertura,opencover,lcov</CoverletOutputFormat>
     <CoverletOutput>$(MSBuildProjectDirectory)/TestResults/</CoverletOutput>
-    <Threshold>80</Threshold>
+    <Threshold>60</Threshold>
     <ThresholdType>line,branch,method</ThresholdType>
     <ThresholdStat>total</ThresholdStat>
     <ExcludeByFile>**/obj/**/*.*,**/bin/**/*.*</ExcludeByFile>
+    <Exclude>[MinimalEndpoints]*,[MinimalEndpoints.Tests.Common]*</Exclude>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.4"/>
+    <PackageReference Include="coverlet.msbuild" Version="6.0.4">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1"/>
     <PackageReference Include="xunit" Version="2.9.3"/>
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4"/>
