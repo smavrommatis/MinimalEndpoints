@@ -10,7 +10,7 @@ namespace MinimalEndpoints.Annotations;
 /// This abstract class provides common functionality for all endpoint mapping attributes.
 /// Use specific derived attributes like <see cref="MapGetAttribute"/>, <see cref="MapPostAttribute"/>, etc.
 /// </remarks>
-[AttributeUsage(AttributeTargets.Class)]
+[AttributeUsage(AttributeTargets.Class, Inherited = false)]
 public abstract class MapMethodsBaseAttribute : Attribute
 {
     /// <summary>
@@ -96,7 +96,7 @@ public abstract class MapMethodsBaseAttribute : Attribute
     /// [MapGroup("/api/v1")]
     /// public class ApiV1Group : IConfigurableGroup
     /// {
-    ///     public void ConfigureGroup(RouteGroupBuilder group)
+    ///     public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     ///     {
     ///         group.RequireAuthorization();
     ///     }
@@ -115,14 +115,17 @@ public abstract class MapMethodsBaseAttribute : Attribute
     /// <param name="pattern">The route pattern for the endpoint.</param>
     /// <param name="methods">The HTTP methods this endpoint responds to.</param>
     /// <param name="lifetime">The service lifetime for dependency injection. Default is <see cref="ServiceLifetime.Scoped"/>.</param>
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="pattern"/> or <paramref name="methods"/> is <see langword="null"/>.
+    /// </exception>
     protected MapMethodsBaseAttribute(
         [StringSyntax("Route")] string pattern,
         string[] methods,
         ServiceLifetime lifetime = ServiceLifetime.Scoped
     )
     {
-        Pattern = pattern;
-        Methods = methods;
+        Pattern = pattern ?? throw new ArgumentNullException(nameof(pattern));
+        Methods = methods ?? throw new ArgumentNullException(nameof(methods));
         Lifetime = lifetime;
     }
 }

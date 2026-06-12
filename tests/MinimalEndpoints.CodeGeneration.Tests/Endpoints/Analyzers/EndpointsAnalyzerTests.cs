@@ -34,6 +34,30 @@ public class TestEndpoint
     }
 
     [Fact]
+    public void MissingEntryPoint_Message_NamesTheAttribute_NoBlankPlaceholder()
+    {
+        // The {1} placeholder names the attribute the class is marked with. It used to receive the
+        // (null) custom EntryPoint, rendering "marked with  but" with a blank and a double space.
+        var code = @"
+namespace TestApp;
+
+[MapGet(""/test"")]
+public class TestEndpoint
+{
+    public void SomeOtherMethod() { }
+}";
+
+        // Act
+        var diagnostics = GetDiagnostics(code);
+
+        // Assert
+        var error = Assert.Single(diagnostics, d => d.Id == "MINEP001");
+        var message = error.GetMessage();
+        Assert.Contains("[MapGet]", message);
+        Assert.DoesNotContain("marked with  ", message);
+    }
+
+    [Fact]
     public void AnalyzeClassDeclaration_WithIncompleteAttribute_DoesNotCrash()
     {
         // '[MapGet]' with no pattern (mid-typing). The analyzer must not crash (AD0001) — the
@@ -247,6 +271,39 @@ namespace TestApp;
 public interface ITestEndpoint
 {
     Task<IResult> HandleAsync();
+}
+
+[MapGet(""/test"", ServiceType = typeof(ITestEndpoint))]
+public class TestEndpoint : ITestEndpoint
+{
+    public Task<IResult> HandleAsync()
+    {
+        return Task.FromResult(Results.Ok());
+    }
+}";
+
+        // Act
+        var diagnostics = GetDiagnostics(code);
+
+        // Assert
+        Assert.DoesNotContain(diagnostics, d => d.Id == "MINEP003");
+    }
+
+    [Fact]
+    public void ServiceTypeValidation_WithInheritedInterfaceMember_NoError()
+    {
+        // The entry point is declared on a BASE interface that the ServiceType extends. Searching
+        // only direct members (GetMembers) raised a false MINEP003; including AllInterfaces fixes it.
+        var code = @"
+namespace TestApp;
+
+public interface IBaseEndpoint
+{
+    Task<IResult> HandleAsync();
+}
+
+public interface ITestEndpoint : IBaseEndpoint
+{
 }
 
 [MapGet(""/test"", ServiceType = typeof(ITestEndpoint))]

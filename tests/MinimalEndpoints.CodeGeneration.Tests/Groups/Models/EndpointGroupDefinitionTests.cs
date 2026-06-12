@@ -320,7 +320,7 @@ namespace TestApp;
 [MapGroup(""/api"")]
 public class TestGroup : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder builder) { }
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder builder) { }
 }";
 
         var compilation = new CompilationBuilder(code).WithMvcReferences().Build();

@@ -89,7 +89,7 @@ namespace TestApp;
 
 public class ApiGroup : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group) { }
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group) { }
 }";
 
         var compilation = new CompilationBuilder(code).WithMvcReferences().Build();

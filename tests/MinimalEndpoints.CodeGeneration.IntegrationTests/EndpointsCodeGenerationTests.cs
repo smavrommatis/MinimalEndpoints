@@ -861,9 +861,104 @@ public class TestEndpoint
 
         // Assert
         Assert.NotNull(generatedCode);
-        // Default values should be present in generated handler signature
-        Assert.Contains("int page", generatedCode);
-        Assert.Contains("int pageSize", generatedCode);
+        // The default values must be reproduced in the generated handler signature, otherwise a
+        // missing query value yields HTTP 400 instead of binding the default.
+        Assert.Contains("int page = 1", generatedCode);
+        Assert.Contains("int pageSize = 10", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratedCode_WithDefaultValuesOfVariousKinds_EmitsValidLiterals()
+    {
+        // Arrange — each kind must round-trip to a compilable C# literal (bool lowercase, quoted
+        // string, char, suffixed numerics, re-qualified enum, struct default).
+        var code = @"
+namespace TestApp.Endpoints;
+
+public enum Mode { None, Fast }
+
+[MapGet(""/defaults"")]
+public class DefaultsEndpoint
+{
+    public IResult Handle(
+        bool flag = true,
+        string name = ""hi"",
+        long big = 5,
+        double ratio = 1.5,
+        Mode mode = Mode.Fast,
+        System.Threading.CancellationToken ct = default) => Results.Ok();
+}";
+
+        // Act
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
+
+        var (generatedCode, _) = CompilationUtilities.GenerateCodeAndCompile(compilation, validateCompilation: true);
+
+        // Assert — the generated code compiled (validateCompilation), and each default is a valid literal.
+        Assert.NotNull(generatedCode);
+        Assert.Contains("bool flag = true", generatedCode);
+        Assert.Contains("string name = \"hi\"", generatedCode);
+        Assert.Contains("long big = 5L", generatedCode);
+        Assert.Contains("double ratio = 1.5d", generatedCode);
+        Assert.Contains("TestApp.Endpoints.Mode mode = TestApp.Endpoints.Mode.Fast", generatedCode);
+        Assert.Contains("ct = default", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratedCode_WithKeywordParameterName_Compiles()
+    {
+        // Arrange — a parameter named after a C# keyword must be emitted as @event in both the
+        // handler signature and the inner call, or the generated code fails with CS1001/CS1003.
+        var code = @"
+namespace TestApp.Endpoints;
+
+[MapGet(""/events"")]
+public class EventEndpoint
+{
+    public IResult Handle(int @event) => Results.Ok(@event);
+}";
+
+        // Act
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
+
+        // validateCompilation proves the generated source compiles with the escaped identifier.
+        var (generatedCode, _) = CompilationUtilities.GenerateCodeAndCompile(compilation, validateCompilation: true);
+
+        // Assert
+        Assert.NotNull(generatedCode);
+        Assert.Contains("@event", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratedCode_WithSpecialTypeParameter_RendersQualifiedName_NotObject()
+    {
+        // Arrange — a parameter typed System.IDisposable must not render as `object`, which would
+        // change the bound type and break the inner handler call.
+        var code = @"
+using System;
+
+namespace TestApp.Endpoints;
+
+[MapPost(""/dispose"")]
+public class DisposeEndpoint
+{
+    public IResult Handle(IDisposable resource) => Results.Ok();
+}";
+
+        // Act
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
+
+        var (generatedCode, _) = CompilationUtilities.GenerateCodeAndCompile(compilation, validateCompilation: true);
+
+        // Assert
+        Assert.NotNull(generatedCode);
+        Assert.Contains("IDisposable resource", generatedCode);
     }
 
     [Fact]

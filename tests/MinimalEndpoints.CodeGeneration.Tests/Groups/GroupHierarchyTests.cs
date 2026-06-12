@@ -190,6 +190,41 @@ public class GroupC { }";
         Assert.NotEmpty(hierarchy.Cycles);
     }
 
+    [Fact]
+    public void Build_CycleAttribution_IsDeterministic_RegardlessOfInputOrder()
+    {
+        // The same A -> C -> B -> A cycle, fed in two different input orders. Attribution (smallest
+        // FQN) and the recorded path must be identical — they previously flapped with the analyzer's
+        // unordered ConcurrentDictionary iteration.
+        var code = @"
+using MinimalEndpoints.Annotations;
+
+[MapGroup(""/a"", ParentGroup = typeof(GroupC))]
+public class GroupA { }
+
+[MapGroup(""/b"", ParentGroup = typeof(GroupA))]
+public class GroupB { }
+
+[MapGroup(""/c"", ParentGroup = typeof(GroupB))]
+public class GroupC { }";
+
+        var compilation = new CompilationBuilder(code).WithMvcReferences().Build();
+        var a = Group(compilation, "GroupA");
+        var b = Group(compilation, "GroupB");
+        var c = Group(compilation, "GroupC");
+
+        var forward = GroupHierarchy.Build(new[] { a, b, c });
+        var reversed = GroupHierarchy.Build(new[] { c, b, a });
+
+        var forwardCycle = Assert.Single(forward.Cycles);
+        var reversedCycle = Assert.Single(reversed.Cycles);
+
+        // Blamed group is a real cycle member chosen by smallest FQN, identical across orders.
+        Assert.Equal("GroupA", forwardCycle.Group.Name);
+        Assert.Equal(forwardCycle.Group.Name, reversedCycle.Group.Name);
+        Assert.Equal(forwardCycle.Names, reversedCycle.Names);
+    }
+
     #endregion
 
     #region Diamond and Edge Cases

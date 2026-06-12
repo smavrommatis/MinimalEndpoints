@@ -15,13 +15,13 @@ namespace TestApp;
 [MapGroup(""/api"")]
 public class ApiGroup : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group) { }
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group) { }
 }
 
 [MapGroup(""/v1"", ParentGroup = typeof(ApiGroup))]
 public class V1Group : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group) { }
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group) { }
 }
 
 [MapGet(""/products"", Group = typeof(V1Group))]
@@ -40,9 +40,11 @@ public class GetProductsEndpoint
         // Assert
         Assert.NotNull(generatedCode);
 
-        // Should include ApiGroup registration even though no endpoint directly uses it
-        Assert.Contains("services.AddSingleton<TestApp.ApiGroup>();", generatedCode);
-        Assert.Contains("services.AddSingleton<TestApp.V1Group>();", generatedCode);
+        // Groups are no longer registered in DI; ConfigureGroup is invoked statically.
+        Assert.DoesNotContain("services.AddSingleton<TestApp.ApiGroup>", generatedCode);
+        Assert.DoesNotContain("services.AddSingleton<TestApp.V1Group>", generatedCode);
+        Assert.Contains("TestApp.ApiGroup.ConfigureGroup(app, group);", generatedCode);
+        Assert.Contains("TestApp.V1Group.ConfigureGroup(app, group);", generatedCode);
 
         // Should include MapGroup__ApiGroup method
         Assert.Contains("private static RouteGroupBuilder MapGroup__TestApp_ApiGroup(", generatedCode);
@@ -65,19 +67,19 @@ namespace TestApp;
 [MapGroup(""/api"")]
 public class ApiGroup : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group) { }
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group) { }
 }
 
 [MapGroup(""/v1"", ParentGroup = typeof(ApiGroup))]
 public class V1Group : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group) { }
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group) { }
 }
 
 [MapGroup(""/admin"", ParentGroup = typeof(V1Group))]
 public class AdminGroup : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group) { }
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group) { }
 }
 
 [MapGet(""/users"", Group = typeof(AdminGroup))]
@@ -96,10 +98,13 @@ public class GetUsersEndpoint
         // Assert
         Assert.NotNull(generatedCode);
 
-        // All three groups should be registered
-        Assert.Contains("services.AddSingleton<TestApp.ApiGroup>();", generatedCode);
-        Assert.Contains("services.AddSingleton<TestApp.V1Group>();", generatedCode);
-        Assert.Contains("services.AddSingleton<TestApp.AdminGroup>();", generatedCode);
+        // No group is registered in DI; each configurable group is configured statically.
+        Assert.DoesNotContain("services.AddSingleton<TestApp.ApiGroup>", generatedCode);
+        Assert.DoesNotContain("services.AddSingleton<TestApp.V1Group>", generatedCode);
+        Assert.DoesNotContain("services.AddSingleton<TestApp.AdminGroup>", generatedCode);
+        Assert.Contains("TestApp.ApiGroup.ConfigureGroup(app, group);", generatedCode);
+        Assert.Contains("TestApp.V1Group.ConfigureGroup(app, group);", generatedCode);
+        Assert.Contains("TestApp.AdminGroup.ConfigureGroup(app, group);", generatedCode);
 
         // All three MapGroup methods should exist
         Assert.Contains("private static RouteGroupBuilder MapGroup__TestApp_ApiGroup(", generatedCode);
@@ -130,19 +135,19 @@ namespace TestApp;
 [MapGroup(""/api"")]
 public class ApiGroup : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group) { }
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group) { }
 }
 
 [MapGroup(""/v1"", ParentGroup = typeof(ApiGroup))]
 public class V1Group : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group) { }
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group) { }
 }
 
 [MapGroup(""/v2"", ParentGroup = typeof(ApiGroup))]
 public class V2Group : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group) { }
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group) { }
 }
 
 [MapGet(""/products"", Group = typeof(V1Group))]
@@ -167,8 +172,8 @@ public class GetProductsV2Endpoint
         // Assert
         Assert.NotNull(generatedCode);
 
-        // Shared parent ApiGroup should be included
-        Assert.Contains("services.AddSingleton<TestApp.ApiGroup>();", generatedCode);
+        // Shared parent ApiGroup should be included (no DI registration anymore)
+        Assert.DoesNotContain("services.AddSingleton<TestApp.ApiGroup>", generatedCode);
         Assert.Contains("private static RouteGroupBuilder MapGroup__TestApp_ApiGroup(", generatedCode);
         Assert.Contains("var group_TestApp_ApiGroup = builder.MapGroup__TestApp_ApiGroup(app);", generatedCode);
 
@@ -176,11 +181,11 @@ public class GetProductsV2Endpoint
         Assert.Contains("var group_TestApp_V1Group = builder.MapGroup__TestApp_V1Group(app, group_TestApp_ApiGroup);", generatedCode);
         Assert.Contains("var group_TestApp_V2Group = builder.MapGroup__TestApp_V2Group(app, group_TestApp_ApiGroup);", generatedCode);
 
-        // ApiGroup should only be registered once
-        var apiGroupRegistrations = System.Text.RegularExpressions.Regex.Matches(
+        // The shared parent's group method (and its single ConfigureGroup call) is emitted once.
+        var apiGroupConfigureCalls = System.Text.RegularExpressions.Regex.Matches(
             generatedCode,
-            @"services\.AddSingleton<TestApp.ApiGroup>\(\);").Count;
-        Assert.Equal(1, apiGroupRegistrations);
+            @"TestApp\.ApiGroup\.ConfigureGroup\(app, group\);").Count;
+        Assert.Equal(1, apiGroupConfigureCalls);
     }
 
     [Fact]
@@ -193,7 +198,7 @@ namespace TestApp;
 [MapGroup(""/api"")]
 public class ApiGroup : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group) { }
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group) { }
 }
 
 [MapGet(""/products"", Group = typeof(ApiGroup))]
@@ -211,7 +216,8 @@ public class GetProductsEndpoint
 
         // Assert
         Assert.NotNull(generatedCode);
-        Assert.Contains("services.AddSingleton<TestApp.ApiGroup>();", generatedCode);
+        Assert.DoesNotContain("services.AddSingleton<TestApp.ApiGroup>", generatedCode);
+        Assert.Contains("TestApp.ApiGroup.ConfigureGroup(app, group);", generatedCode);
         Assert.Contains("private static RouteGroupBuilder MapGroup__TestApp_ApiGroup(", generatedCode);
 
         // Should NOT have parent parameter (root group)

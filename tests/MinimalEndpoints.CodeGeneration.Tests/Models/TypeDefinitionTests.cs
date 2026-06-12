@@ -708,6 +708,106 @@ namespace MyNamespace
         Assert.Equal("Task<MyCustomClass>", displayName);
     }
 
+    [Fact]
+    public void BuildFullTypeName_SpecialTypeWithoutKeyword_RendersQualifiedName_NotObject()
+    {
+        // System.IDisposable has SpecialType != None but no C# keyword alias; it must render as its
+        // qualified name, not collapse to "object" (which produced non-compiling handler signatures).
+        var code = @"
+using System;
+
+public class Test
+{
+    public IDisposable Disposable { get; set; }
+}";
+        var typeSymbol = GetPropertyType(code, "Test", "Disposable");
+        var typeDef = new TypeDefinition(typeSymbol);
+
+        Assert.Equal("System.IDisposable", typeDef.FullName);
+        Assert.Equal("IDisposable", typeDef.ToDisplayString(new HashSet<string> { "System" }));
+    }
+
+    [Fact]
+    public void BuildFullTypeName_NonGenericIEnumerable_RendersQualifiedName_NotObject()
+    {
+        var code = @"
+public class Test
+{
+    public System.Collections.IEnumerable Sequence { get; set; }
+}";
+        var typeSymbol = GetPropertyType(code, "Test", "Sequence");
+        var typeDef = new TypeDefinition(typeSymbol);
+
+        Assert.Equal("System.Collections.IEnumerable", typeDef.FullName);
+    }
+
+    [Fact]
+    public void BuildFullTypeName_GenericNestedInGeneric_IncludesContainingType()
+    {
+        // Outer<int>.Inner<string> used to render as "MyNs.Inner<string>" — the container was dropped.
+        var code = @"
+namespace MyNs
+{
+    public class Outer<T>
+    {
+        public class Inner<U> { }
+    }
+
+    public class Test
+    {
+        public Outer<int>.Inner<string> Prop { get; set; }
+    }
+}";
+        var typeSymbol = GetPropertyType(code, "MyNs.Test", "Prop");
+        var typeDef = new TypeDefinition(typeSymbol);
+
+        Assert.Equal("MyNs.Outer<int>.Inner<string>", typeDef.FullName);
+    }
+
+    [Fact]
+    public void BuildFullTypeName_NonGenericNestedInGeneric_IncludesContainingType()
+    {
+        var code = @"
+namespace MyNs
+{
+    public class Outer<T>
+    {
+        public class Inner { }
+    }
+
+    public class Test
+    {
+        public Outer<int>.Inner Prop { get; set; }
+    }
+}";
+        var typeSymbol = GetPropertyType(code, "MyNs.Test", "Prop");
+        var typeDef = new TypeDefinition(typeSymbol);
+
+        Assert.Equal("MyNs.Outer<int>.Inner", typeDef.FullName);
+    }
+
+    [Fact]
+    public void BuildFullTypeName_GenericNestedInNonGeneric_IncludesContainingType()
+    {
+        var code = @"
+namespace MyNs
+{
+    public class Outer
+    {
+        public class Inner<T> { }
+    }
+
+    public class Test
+    {
+        public Outer.Inner<int> Prop { get; set; }
+    }
+}";
+        var typeSymbol = GetPropertyType(code, "MyNs.Test", "Prop");
+        var typeDef = new TypeDefinition(typeSymbol);
+
+        Assert.Equal("MyNs.Outer.Inner<int>", typeDef.FullName);
+    }
+
     private static ITypeSymbol GetTypeSymbol(string code, string typeName)
     {
         var compilation = new CompilationBuilder(code).Build();

@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using System.Globalization;
 using MinimalEndpoints.CodeGeneration.Models;
+using MinimalEndpoints.CodeGeneration.Utilities;
 
 namespace MinimalEndpoints.CodeGeneration.Endpoints.Models;
 
@@ -103,15 +104,21 @@ internal sealed class AttributeDefinition
                 return typeSymbol != null ? $"typeof({new TypeDefinition(typeSymbol).FullName})" : "null";
 
             case TypedConstantKind.Array:
+                // Emit an explicitly-typed array so an empty one still compiles: `new[] { }` is
+                // CS0826 (no best type) when there are no elements to infer from.
+                var elementTypeName = constant.Type is IArrayTypeSymbol arrayType
+                    ? new TypeDefinition(arrayType.ElementType).FullName
+                    : "object";
+
                 // A malformed/error-state array argument can leave Values as a default
                 // ImmutableArray, whose enumeration throws. Guard before projecting.
-                if (constant.Values.IsDefault)
+                if (constant.Values.IsDefault || constant.Values.Length == 0)
                 {
-                    return "new[] { }";
+                    return $"new {elementTypeName}[0]";
                 }
 
                 var elements = constant.Values.Select(FormatArgumentValue);
-                return $"new[] {{ {string.Join(", ", elements)} }}";
+                return $"new {elementTypeName}[] {{ {string.Join(", ", elements)} }}";
 
             default:
                 return constant.Value?.ToString() ?? "null";
@@ -122,8 +129,8 @@ internal sealed class AttributeDefinition
     {
         return constant.Type?.SpecialType switch
         {
-            SpecialType.System_String => $"\"{EscapeString(constant.Value?.ToString() ?? "")}\"",
-            SpecialType.System_Char => $"'{EscapeChar((char)(constant.Value ?? '\0'))}'",
+            SpecialType.System_String => $"\"{CSharpLiteral.EscapeStringContent(constant.Value?.ToString() ?? "")}\"",
+            SpecialType.System_Char => $"'{CSharpLiteral.EscapeCharContent((char)(constant.Value ?? '\0'))}'",
             SpecialType.System_Boolean => constant.Value?.ToString()?.ToLowerInvariant() ?? "false",
             SpecialType.System_Single => FormatFloat(constant.Value),
             SpecialType.System_Double => FormatDouble(constant.Value),
@@ -186,29 +193,6 @@ internal sealed class AttributeDefinition
         }
 
         return $"({enumType.FullName}){enumValue}";
-    }
-
-    private static string EscapeString(string value)
-    {
-        return value
-            .Replace("\\", "\\\\")
-            .Replace("\"", "\\\"")
-            .Replace("\n", "\\n")
-            .Replace("\r", "\\r")
-            .Replace("\t", "\\t");
-    }
-
-    private static char EscapeChar(char value)
-    {
-        return value switch
-        {
-            '\'' => '\\',
-            '\\' => '\\',
-            '\n' => 'n',
-            '\r' => 'r',
-            '\t' => 't',
-            _ => value
-        };
     }
 }
 

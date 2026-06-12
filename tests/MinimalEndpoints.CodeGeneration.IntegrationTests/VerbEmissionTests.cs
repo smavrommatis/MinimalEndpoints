@@ -33,7 +33,7 @@ public class MultiVerbEndpoint
 
         var generated = Generate(code);
 
-        Assert.Contains(@"MapMethods(""/multi"", [""GET"", ""POST""], Handler)", generated);
+        Assert.Contains(@"MapMethods(""/multi"", new string[] { ""GET"", ""POST"" }, Handler)", generated);
     }
 
     [Fact]
@@ -85,7 +85,7 @@ public class HealthHeadEndpoint
         var generated = Generate(code);
 
         // HEAD has no dedicated IEndpointRouteBuilder method, so it is emitted via MapMethods.
-        Assert.Contains(@"MapMethods(""/health"", [""HEAD""], Handler)", generated);
+        Assert.Contains(@"MapMethods(""/health"", new string[] { ""HEAD"" }, Handler)", generated);
     }
 
     [Fact]
@@ -103,6 +103,6 @@ public class SingleVerbEndpoint
         var generated = Generate(code);
 
         // A single-element [MapMethods] still emits the methods array.
-        Assert.Contains(@"MapMethods(""/single"", [""GET""], Handler)", generated);
+        Assert.Contains(@"MapMethods(""/single"", new string[] { ""GET"" }, Handler)", generated);
     }
 }

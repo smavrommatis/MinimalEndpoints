@@ -16,7 +16,7 @@ namespace MinimalEndpoints.Annotations;
 /// [MapGroup("/api/v1", GroupName = "V1 API")]
 /// public class ApiV1Group : IConfigurableGroup
 /// {
-///     public void ConfigureGroup(RouteGroupBuilder group)
+///     public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
 ///     {
 ///         group.RequireAuthorization().WithOpenApi();
 ///     }

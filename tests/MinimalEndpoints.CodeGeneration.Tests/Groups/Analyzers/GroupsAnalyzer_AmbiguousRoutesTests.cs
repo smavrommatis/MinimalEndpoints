@@ -587,9 +587,11 @@ public class GetAdminUsersDirectEndpoint
     }
 
     [Fact]
-    public void GroupWithTrailingSlash_NoConflict()
+    public void GroupWithTrailingSlash_DetectsConflict()
     {
-        // Arrange
+        // Arrange — "/api/" (group prefix, trailing slash) + "/users" joins to "/api/users", the same
+        // route as the direct "/api/users" endpoint. The trailing slash must not produce "/api//users"
+        // and hide the conflict.
         var code = @"
 namespace TestApp;
 
@@ -612,7 +614,36 @@ public class GetUsersDirectEndpoint
         var diagnostics = GetDiagnostics(code);
 
         // Assert
-        Assert.DoesNotContain(diagnostics, d => d.Id == "MINEP004");
+        var warning = Assert.Single(diagnostics, d => d.Id == "MINEP004");
+        Assert.Equal(DiagnosticSeverity.Warning, warning.Severity);
+    }
+
+    [Fact]
+    public void MixedCaseHttpMethods_DetectsConflict()
+    {
+        // [MapMethods("/a", new[] { "get" })] and [MapGet("/a")] both resolve to GET /a. Verb casing
+        // must be normalized (the generator uppercases) before grouping, or the conflict is missed.
+        var code = @"
+namespace TestApp;
+
+[MapMethods(""/a"", new[] { ""get"" })]
+public class LowerGetEndpoint
+{
+    public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok());
+}
+
+[MapGet(""/a"")]
+public class UpperGetEndpoint
+{
+    public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok());
+}";
+
+        // Act
+        var diagnostics = GetDiagnostics(code);
+
+        // Assert
+        var warning = Assert.Single(diagnostics, d => d.Id == "MINEP004");
+        Assert.Equal(DiagnosticSeverity.Warning, warning.Severity);
     }
 
     [Fact]

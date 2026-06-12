@@ -23,10 +23,14 @@ internal sealed class GroupHierarchy
             Names = names;
         }
 
-        /// <summary>The group at which the cycle was recorded (the walk's starting group).</summary>
+        /// <summary>
+        /// A group that actually participates in the cycle (the member with the smallest
+        /// fully-qualified name), chosen deterministically so the diagnostic location is stable
+        /// across builds rather than flapping with iteration order.
+        /// </summary>
         public EndpointGroupDefinition Group { get; }
 
-        /// <summary>The simple names along the detected cycle path, e.g. <c>[A, B, A]</c>.</summary>
+        /// <summary>The simple names along the actual cycle path, e.g. <c>[A, B, A]</c>.</summary>
         public IReadOnlyList<string> Names { get; }
     }
 
@@ -84,10 +88,13 @@ internal sealed class GroupHierarchy
 
     private void DetectAndBreakCycles()
     {
-        foreach (var group in _ordered)
+        // Walk groups in a deterministic FQN-sorted order: the analyzer feeds groups from a
+        // ConcurrentDictionary whose enumeration order is unspecified, which previously made cycle
+        // attribution and which-edge-gets-broken flap between builds.
+        foreach (var group in _ordered.OrderBy(g => g.ClassType.FullName, StringComparer.Ordinal))
         {
             var visited = new HashSet<string>();
-            var path = new List<string>(capacity: 1);
+            var path = new List<string>();
             string prev = null;
             var current = group.ClassType.FullName;
 
@@ -102,14 +109,28 @@ internal sealed class GroupHierarchy
                 }
                 else
                 {
-                    // Cycle detected: break the last edge and record the path (matching the
-                    // previous symbol-based DetectAndBreakCycles behaviour exactly).
+                    // Cycle detected. Break the edge that closes it so the rest of the build sees an
+                    // acyclic hierarchy and the same cycle is not re-reported from another start node.
                     if (prev != null)
                     {
                         _parent[prev] = null;
                     }
 
-                    _cycles.Add(new CycleInfo(group, path.Select(fqn => _byName[fqn].Name).ToArray()));
+                    // Trim the lead-in: the actual cycle runs from the first occurrence of the
+                    // repeated node to the end (e.g. D -> A -> B -> C -> A records only A -> B -> C -> A).
+                    var cycleStart = path.IndexOf(current);
+                    var cycleFqns = path.GetRange(cycleStart, path.Count - cycleStart);
+
+                    // Attribute the diagnostic to a node genuinely in the cycle — the smallest FQN —
+                    // rather than the (possibly lead-in) start node, for stable, correct blame.
+                    var ownerFqn = cycleFqns
+                        .Take(cycleFqns.Count - 1)
+                        .OrderBy(fqn => fqn, StringComparer.Ordinal)
+                        .First();
+
+                    _cycles.Add(new CycleInfo(
+                        _byName[ownerFqn],
+                        cycleFqns.Select(fqn => _byName[fqn].Name).ToArray()));
                     break;
                 }
             }

@@ -270,7 +270,7 @@ public class ApiGroup : IConditionallyMapped, IConfigurableGroup
 {
     public static bool ShouldMap(IApplicationBuilder app) => true;
 
-    public void ConfigureGroup(RouteGroupBuilder group) { }
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group) { }
 }
 
 [MapGet(""/products"", Group = typeof(ApiGroup))]
@@ -288,7 +288,8 @@ public class GetProductsEndpoint
 
         // Assert
         Assert.NotNull(generatedCode);
-        Assert.Contains("groupInstance.ConfigureGroup(group);", generatedCode);
+        Assert.Contains("TestApp.ApiGroup.ConfigureGroup(app, group);", generatedCode);
+        Assert.DoesNotContain("services.AddSingleton<TestApp.ApiGroup>", generatedCode);
         Assert.Contains("if (!TestApp.ApiGroup.ShouldMap(app))", generatedCode);
     }
 
@@ -557,7 +558,7 @@ public class ApiGroup : IConditionallyMapped
 
         // Assert
         Assert.NotNull(generatedCode);
-        Assert.Contains("services.AddSingleton<TestApp.ApiGroup>", generatedCode);
+        Assert.DoesNotContain("services.AddSingleton<TestApp.ApiGroup>", generatedCode);
         Assert.Contains("private static RouteGroupBuilder? MapGroup__TestApp_ApiGroup", generatedCode);
         Assert.Contains("if (!TestApp.ApiGroup.ShouldMap(app))", generatedCode);
     }

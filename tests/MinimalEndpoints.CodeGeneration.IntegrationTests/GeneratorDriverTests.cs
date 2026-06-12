@@ -290,7 +290,8 @@ public class GetUsers
         // Assert: no generator exception, exactly one group definition emitted.
         Assert.Null(result.Results[0].Exception);
         var generated = Assert.Single(result.GeneratedTrees).ToString();
-        Assert.Equal(1, CountOccurrences(generated, "services.AddSingleton<TestApp.Endpoints.ApiGroup>();"));
+        // Groups are no longer registered in DI; a bare group emits no AddSingleton at all.
+        Assert.Equal(0, CountOccurrences(generated, "services.AddSingleton<TestApp.Endpoints.ApiGroup>();"));
         Assert.Equal(1, CountOccurrences(generated, "RouteGroupBuilder MapGroup__TestApp_Endpoints_ApiGroup("));
     }
 

@@ -131,7 +131,7 @@ public class EndpointsAnalyzer : DiagnosticAnalyzer
                 classDeclaration.Identifier.GetLocation(),
                 properties,
                 namedTypeSymbol.Name,
-                mapMethodsAttributeDefinition.EntryPoint
+                FormatAttributeName(attributes[0])
             );
 
             context.ReportDiagnostic(missingEntryPointDiagnostic);
@@ -143,7 +143,10 @@ public class EndpointsAnalyzer : DiagnosticAnalyzer
             var serviceTypeSymbol = GetServiceTypeSymbol(attributes[0]);
             if (serviceTypeSymbol != null)
             {
+                // Include inherited interface members: an entry point declared on a base interface
+                // is a valid match, so search the service type AND every interface it extends.
                 var interfaceHasMethod = serviceTypeSymbol.GetMembers()
+                    .Concat(serviceTypeSymbol.AllInterfaces.SelectMany(i => i.GetMembers()))
                     .OfType<IMethodSymbol>()
                     .Any(m => m.Name == entryPoint.Name &&
                               !m.IsStatic &&
@@ -246,6 +249,24 @@ public class EndpointsAnalyzer : DiagnosticAnalyzer
 
             context.ReportDiagnostic(diagnostic);
         }
+    }
+
+    /// <summary>
+    /// Renders an attribute's name as written in source — without the "Attribute" suffix, wrapped in
+    /// brackets (e.g. "[MapGet]") — for the MINEP001 message. The descriptor's {1} placeholder names
+    /// the attribute the class is marked with; passing the (usually null) custom EntryPoint there
+    /// produced "marked with  but …" with a blank and a double space.
+    /// </summary>
+    private static string FormatAttributeName(AttributeData attribute)
+    {
+        var name = attribute.AttributeClass?.Name ?? "Map";
+        const string suffix = "Attribute";
+        if (name.EndsWith(suffix, StringComparison.Ordinal))
+        {
+            name = name.Substring(0, name.Length - suffix.Length);
+        }
+
+        return $"[{name}]";
     }
 
     private static INamedTypeSymbol GetServiceTypeSymbol(AttributeData attributeData)

@@ -59,7 +59,9 @@ internal static class Diagnostics
         isEnabledByDefault: true,
         description: "Multiple endpoints should not have identical route patterns for the same HTTP method. " +
         "This will cause routing ambiguity and unpredictable behavior at runtime. " +
-        "Consider using different route patterns, route constraints, or consolidating the endpoints.",
+        "Consider using different route patterns, route constraints, or consolidating the endpoints. " +
+        "Route parameters are compared by position only — routes that differ solely by parameter name " +
+        "or route constraint (e.g. '{id:int}' vs '{id:alpha}') are conservatively reported as conflicts.",
         helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/docs/diagnostics/MINEP004.md",
         customTags: WellKnownDiagnosticTags.CompilationEnd
     );

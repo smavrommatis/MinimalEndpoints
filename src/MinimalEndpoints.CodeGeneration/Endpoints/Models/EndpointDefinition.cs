@@ -81,7 +81,7 @@ internal sealed class EndpointDefinition : SymbolDefinition
                     Name = p.Name,
                     Type = new TypeDefinition(p.Type),
                     Nullable = p.NullableAnnotation == NullableAnnotation.Annotated,
-                    DefaultValue = p.HasExplicitDefaultValue ? p.ExplicitDefaultValue?.ToString() : null,
+                    DefaultValue = p.FormatDefaultValueLiteral(),
                     Attributes = p.GetAttributes()
                         .Select(AttributeDefinition.FromAttributeData)
                         .Where(attr => attr != null)

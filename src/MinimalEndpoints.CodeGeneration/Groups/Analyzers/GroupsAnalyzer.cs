@@ -224,7 +224,10 @@ public class GroupsAnalyzer : DiagnosticAnalyzer
             })
             .SelectMany(x => x.HttpMethods.Select(httpMethod => new
             {
-                HttpMethod = httpMethod, x.NormalizedPattern, x.Path, x.Symbol,
+                // Normalize verb casing to match the generator (which uppercases each verb), so e.g.
+                // [MapMethods("/a", new[] { "get" })] and [MapGet("/a")] are recognized as the same
+                // method and their route conflict is detected.
+                HttpMethod = (httpMethod ?? string.Empty).ToUpperInvariant(), x.NormalizedPattern, x.Path, x.Symbol,
             }))
             .GroupBy(x => (x.NormalizedPattern, x.HttpMethod))
             .Where(x => x.Count() > 1)
@@ -268,7 +271,25 @@ public class GroupsAnalyzer : DiagnosticAnalyzer
             return facts.Pattern ?? string.Empty;
         }
 
-        return hierarchy.FullPrefixOf(groupDefinition) + facts.Pattern;
+        return JoinRoute(hierarchy.FullPrefixOf(groupDefinition), facts.Pattern);
+    }
+
+    /// <summary>
+    /// Joins a group prefix and an endpoint pattern with exactly one separating slash, so a trailing
+    /// slash on the prefix (or a leading slash on the pattern) does not produce a phantom "//"
+    /// segment that would hide a real conflict (e.g. "/api/" + "/users" must equal "/api/users").
+    /// </summary>
+    private static string JoinRoute(string prefix, string pattern)
+    {
+        var left = (prefix ?? string.Empty).TrimEnd('/');
+        var right = pattern ?? string.Empty;
+
+        if (right.Length == 0)
+        {
+            return left;
+        }
+
+        return right[0] == '/' ? left + right : left + "/" + right;
     }
 
     private static string NormalizeRoutePattern(string pattern)
@@ -283,6 +304,10 @@ public class GroupsAnalyzer : DiagnosticAnalyzer
 
         // Convert to lowercase for case-insensitive comparison
         normalized = normalized.ToLowerInvariant();
+
+        // Collapse interior duplicate slashes ("a//b" -> "a/b") so a stray slash in a pattern or at
+        // a prefix/pattern boundary does not mask an otherwise-identical route.
+        normalized = Regex.Replace(normalized, "/{2,}", "/");
 
         // Replace ALL route parameters with a generic placeholder
         // This correctly identifies ambiguous routes:

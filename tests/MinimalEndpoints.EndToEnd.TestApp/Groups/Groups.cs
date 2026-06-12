@@ -14,7 +14,7 @@ public class ApiGroup;
 [MapGroup("/v1", ParentGroup = typeof(ApiGroup))]
 public class ApiV1Group : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group) =>
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group) =>
         group.AddEndpointFilter(async (context, next) =>
         {
             context.HttpContext.Response.Headers["X-Group"] = "v1";

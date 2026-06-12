@@ -63,6 +63,7 @@ public class AnalyzerPerformanceBenchmarks
     private static Compilation CreateCompilationWithEndpoints(int count)
     {
         var sb = new StringBuilder();
+        sb.AppendLine("using Microsoft.AspNetCore.Builder;");
         sb.AppendLine("using Microsoft.AspNetCore.Http;");
         sb.AppendLine("using Microsoft.AspNetCore.Routing;");
         sb.AppendLine("using MinimalEndpoints;");
@@ -74,13 +75,13 @@ public class AnalyzerPerformanceBenchmarks
 [MapGroup(""/api"")]
 public class ApiGroup : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group) { }
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group) { }
 }
 
 [MapGroup(""/v1"", ParentGroup = typeof(ApiGroup))]
 public class V1Group : IConfigurableGroup
 {
-    public void ConfigureGroup(RouteGroupBuilder group) { }
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group) { }
 }
 ");
 

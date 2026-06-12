@@ -8,7 +8,7 @@ namespace MinimalEndpoints.AdvancedSample.Groups;
 [MapGroup("/api/v1")]
 public class ApiV1Group : IConfigurableGroup, IConditionallyMapped
 {
-    public void ConfigureGroup(RouteGroupBuilder group)
+    public static void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)
     {
         group
             .WithTags("V1")

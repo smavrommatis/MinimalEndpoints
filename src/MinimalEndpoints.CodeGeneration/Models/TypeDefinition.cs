@@ -44,10 +44,17 @@ internal class TypeDefinition
 
     private static string BuildFullTypeName(ITypeSymbol symbol)
     {
-        // Handle special/built-in types
+        // Handle special/built-in types that have a C# keyword alias (or DateTime).
         if (symbol.SpecialType != SpecialType.None)
         {
-            return GetSpecialTypeName(symbol.SpecialType);
+            var specialName = GetSpecialTypeName(symbol.SpecialType);
+            if (specialName != null)
+            {
+                return specialName;
+            }
+            // Other special types (IDisposable, non-generic IEnumerable, IntPtr, Enum, Array, …)
+            // have no keyword: fall through to normal qualified-name rendering instead of
+            // collapsing to "object", which produced non-compiling handler signatures.
         }
 
         // Handle tuple types
@@ -72,19 +79,15 @@ internal class TypeDefinition
             return $"{underlyingTypeName}?";
         }
 
-        // Handle generic types
-        if (symbol is INamedTypeSymbol namedType && namedType.IsGenericType)
+        // Handle all named types (generic or not, nested or not) including the full
+        // containing-type chain so nested types like Outer<T>.Inner<U> render correctly.
+        if (symbol is INamedTypeSymbol namedType)
         {
-            return BuildGenericTypeName(namedType);
+            return BuildNamedTypeName(namedType);
         }
 
-        // Handle regular types (including nested types)
-        var namespaceName = symbol.ContainingNamespace?.ToDisplayString();
-        var typeName = BuildNestedTypeName(symbol);
-
-        return string.IsNullOrEmpty(namespaceName) || namespaceName == "<global namespace>"
-            ? typeName
-            : $"{namespaceName}.{typeName}";
+        // Fallback for type parameters and any other symbol kind.
+        return symbol.Name;
     }
 
     private static string BuildTupleTypeName(INamedTypeSymbol tupleType)
@@ -92,8 +95,8 @@ internal class TypeDefinition
         var elements = tupleType.TupleElements;
         if (elements.IsDefaultOrEmpty)
         {
-            // Fallback to regular generic type representation
-            return BuildGenericTypeName(tupleType);
+            // Fallback to regular named-type representation
+            return BuildNamedTypeName(tupleType);
         }
 
         var elementTypes = elements
@@ -110,44 +113,30 @@ internal class TypeDefinition
         return $"({string.Join(", ", elementTypes)})";
     }
 
-    private static string BuildGenericTypeName(INamedTypeSymbol namedType)
+    private static string BuildNamedTypeName(INamedTypeSymbol named)
     {
-        var namespaceName = namedType.ContainingNamespace?.ToDisplayString();
-        var baseName = namedType.Name;
-
-        // Build full base name with namespace
-        var baseFullName = string.IsNullOrEmpty(namespaceName) || namespaceName == "<global namespace>"
-            ? baseName
-            : $"{namespaceName}.{baseName}";
-
-        // Build generic arguments
-        var typeArgs = namedType.TypeArguments;
-        if (typeArgs.Length == 0)
+        // Qualifier: the containing type (recursively, preserving ITS own generic arguments) when
+        // this is a nested type, otherwise the namespace. Walking ContainingType is what makes
+        // Outer<T>.Inner<U> render in full instead of losing the container.
+        string qualifier;
+        if (named.ContainingType != null)
         {
-            return baseFullName;
+            qualifier = BuildFullTypeName(named.ContainingType);
+        }
+        else
+        {
+            var namespaceName = named.ContainingNamespace?.ToDisplayString();
+            qualifier = string.IsNullOrEmpty(namespaceName) || namespaceName == "<global namespace>"
+                ? null
+                : namespaceName;
         }
 
-        var typeArgNames = typeArgs.Select(BuildFullTypeName).ToList();
-        return $"{baseFullName}<{string.Join(", ", typeArgNames)}>";
-    }
+        var typeArgs = named.TypeArguments;
+        var self = typeArgs.Length == 0
+            ? named.Name
+            : $"{named.Name}<{string.Join(", ", typeArgs.Select(BuildFullTypeName))}>";
 
-    private static string BuildNestedTypeName(ITypeSymbol symbol)
-    {
-        var parts = new List<string>();
-        var current = symbol;
-
-        while (current != null && current.ContainingType != null)
-        {
-            parts.Insert(0, current.Name);
-            current = current.ContainingType;
-        }
-
-        if (current != null)
-        {
-            parts.Insert(0, current.Name);
-        }
-
-        return string.Join(".", parts);
+        return qualifier == null ? self : $"{qualifier}.{self}";
     }
 
     private static string GetSpecialTypeName(SpecialType specialType) => specialType switch
@@ -169,7 +158,8 @@ internal class TypeDefinition
         SpecialType.System_Double => "double",
         SpecialType.System_String => "string",
         SpecialType.System_DateTime => "System.DateTime",
-        _ => "object"
+        // No C# keyword: return null so the caller renders the fully-qualified name instead of "object".
+        _ => null
     };
 
     private static string SimplifyTypeName(string fullTypeName, HashSet<string> availableUsings)
