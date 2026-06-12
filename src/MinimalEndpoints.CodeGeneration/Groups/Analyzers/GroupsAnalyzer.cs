@@ -19,12 +19,11 @@ namespace MinimalEndpoints.CodeGeneration.Groups.Analyzers;
 public class GroupsAnalyzer : DiagnosticAnalyzer
 {
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
-        [
+        ImmutableArray.Create(
             Diagnostics.AmbiguousRoutes,
             Diagnostics.CyclicGroupHierarchy,
             Diagnostics.InvalidSymbolKind,
-            Diagnostics.UnsupportedEndpointShape
-        ];
+            Diagnostics.UnsupportedEndpointShape);
 
     public override void Initialize(AnalysisContext context)
     {

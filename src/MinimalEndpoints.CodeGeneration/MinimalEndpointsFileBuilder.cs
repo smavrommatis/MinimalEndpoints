@@ -29,7 +29,7 @@ internal static class MinimalEndpointsFileBuilder
         // the declaration and every call site use the same (unique) identifier.
         var names = GeneratedNames.Build(endpoints, hierarchy.Groups);
 
-        fileScope.AddMinimalEndpointsRegistrationMethod(endpoints, [..hierarchy.Groups]);
+        fileScope.AddMinimalEndpointsRegistrationMethod(endpoints, hierarchy.Groups.ToImmutableArray());
 
         // Add group mapping methods
         foreach (var group in hierarchy.Groups)

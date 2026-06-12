@@ -1,0 +1,62 @@
+name: Release
+
+# Tag-triggered release: build + test the released commit, pack deterministically, validate the
+# package layout/version, then push to nuget.org. The package <Version> is maintained in
+# src/MinimalEndpoints/MinimalEndpoints.csproj and must match the tag (e.g. tag v1.0.1 -> 1.0.1).
+on:
+  push:
+    tags: [ 'v*' ]
+
+jobs:
+  release:
+    name: Build, validate, and publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore MinimalEndpoints.slnx
+
+      - name: Build
+        run: dotnet build MinimalEndpoints.slnx --configuration Release --no-restore
+
+      # A release must never ship untested.
+      - name: Test
+        run: dotnet test MinimalEndpoints.slnx --configuration Release --no-build
+
+      - name: Pack
+        run: dotnet pack src/MinimalEndpoints/MinimalEndpoints.csproj --configuration Release --no-build -p:ContinuousIntegrationBuild=true
+
+      # Validate the package version matches the tag and the layout is complete before publishing.
+      - name: Validate package
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="artifacts/Blackeye.MinimalEndpoints.${tag}.nupkg"
+          echo "Expecting $pkg for tag $GITHUB_REF_NAME"
+          test -f "$pkg" || { echo "Package for version $tag not found (does csproj <Version> match the tag?)"; ls -l artifacts; exit 1; }
+          tmp="$(mktemp -d)"
+          unzip -o "$pkg" -d "$tmp" >/dev/null
+          test -f "$tmp/analyzers/dotnet/cs/MinimalEndpoints.CodeGeneration.dll" || { echo "missing generator dll"; exit 1; }
+          test -f "$tmp/analyzers/dotnet/cs/MinimalEndpoints.CodeFixes.dll" || { echo "missing code-fix dll"; exit 1; }
+          test -f "$tmp/README.md" || { echo "missing README.md"; exit 1; }
+          for tfm in net8.0 net9.0 net10.0; do
+            test -f "$tmp/lib/$tfm/MinimalEndpoints.dll" || { echo "missing lib/$tfm/MinimalEndpoints.dll"; exit 1; }
+          done
+          echo "Package validated."
+
+      # --skip-duplicate makes re-runs safe; the matching .snupkg is pushed alongside the .nupkg.
+      - name: Push to NuGet
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: dotnet nuget push "artifacts/*.nupkg" --source https://api.nuget.org/v3/index.json --api-key "$NUGET_API_KEY" --skip-duplicate

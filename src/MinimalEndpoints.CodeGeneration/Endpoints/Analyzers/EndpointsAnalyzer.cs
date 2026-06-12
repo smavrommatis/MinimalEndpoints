@@ -14,13 +14,12 @@ namespace MinimalEndpoints.CodeGeneration.Endpoints.Analyzers;
 public class EndpointsAnalyzer : DiagnosticAnalyzer
 {
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
-    [
-        Diagnostics.MissingEntryPoint,
-        Diagnostics.MultipleAttributesDetected,
-        Diagnostics.ServiceTypeMissingEntryPoint,
-        Diagnostics.InvalidGroupType,
-        Diagnostics.UnsupportedEndpointShape
-    ];
+        ImmutableArray.Create(
+            Diagnostics.MissingEntryPoint,
+            Diagnostics.MultipleAttributesDetected,
+            Diagnostics.ServiceTypeMissingEntryPoint,
+            Diagnostics.InvalidGroupType,
+            Diagnostics.UnsupportedEndpointShape);
 
     public override void Initialize(AnalysisContext context)
     {

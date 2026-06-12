@@ -20,7 +20,11 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" PrivateAssets="all"/>
+    <!-- Pin the MINIMUM supported Roslyn (the floor for host compilers, not a toolchain choice).
+         4.8.0 = SDK 8.0.100 / VS 17.8, the oldest toolchain that supports net8.0. A higher pin
+         makes older SDK/VS hosts skip the generator (CS9057). The generator uses
+         ForAttributeWithMetadataName (4.3+), so 4.8.0 is safe. -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" PrivateAssets="all"/>
   </ItemGroup>
 
 </Project>

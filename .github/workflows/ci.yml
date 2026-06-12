@@ -45,3 +45,20 @@ jobs:
           -p:ThresholdStat=total
           -p:ExcludeByFile="**/obj/**/*.*%2C**/bin/**/*.*"
           -p:Exclude="[MinimalEndpoints]*%2C[MinimalEndpoints.Tests.Common]*"
+
+      # Pack only the runtime package (the Roslyn/sample/benchmark/test projects are IsPackable=false),
+      # with deterministic ContinuousIntegrationBuild so SourceLink/snupkg are meaningful.
+      - name: Pack
+        run: >
+          dotnet pack src/MinimalEndpoints/MinimalEndpoints.csproj
+          --configuration Release
+          -p:ContinuousIntegrationBuild=true
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nupkg
+          path: |
+            artifacts/*.nupkg
+            artifacts/*.snupkg
+          if-no-files-found: error

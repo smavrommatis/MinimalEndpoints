@@ -1,6 +1,21 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <!-- Multi-target so net8.0 (LTS) and net9.0 consumers can install the package; the public
+         surface uses no net10-only API. The repo-wide singular TargetFramework from
+         Directory.Build.props is cleared here so TargetFrameworks takes effect (otherwise the
+         inherited singular value wins and the package ships net10.0-only). -->
+    <TargetFramework></TargetFramework>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+
+    <!-- Re-enable packing (Directory.Build.props defaults IsPackable=false for every project). -->
+    <IsPackable>true</IsPackable>
+
+    <!-- Ship XML IntelliSense docs in the package. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <PropertyGroup>
     <!-- Package metadata -->
     <PackageId>Blackeye.MinimalEndpoints</PackageId>
     <Version>1.0.0</Version>
@@ -40,30 +55,39 @@
     <None Include="..\..\icon.png" Pack="true" PackagePath="\" Condition="Exists('..\..\icon.png')" />
   </ItemGroup>
 
-  <ItemGroup>
-    <!-- Pack the analyzer into the NuGet package -->
-    <None Include="..\MinimalEndpoints.CodeGeneration\bin\$(Configuration)\netstandard2.0\MinimalEndpoints.CodeGeneration.dll"
-          Pack="true"
-          PackagePath="analyzers/dotnet/cs"
-          Visible="false" />
+  <!-- Analyzer assembly paths. Analyzers are always netstandard2.0 (a Roslyn requirement), so the
+       TFM is fixed; the paths are validated before packing so a missing build output fails the pack
+       loudly instead of silently shipping a generator-less package. -->
+  <PropertyGroup>
+    <_CodeGenerationAnalyzer>..\MinimalEndpoints.CodeGeneration\bin\$(Configuration)\netstandard2.0\MinimalEndpoints.CodeGeneration.dll</_CodeGenerationAnalyzer>
+    <_CodeFixesAnalyzer>..\MinimalEndpoints.CodeFixes\bin\$(Configuration)\netstandard2.0\MinimalEndpoints.CodeFixes.dll</_CodeFixesAnalyzer>
+  </PropertyGroup>
 
-    <None Include="..\MinimalEndpoints.CodeFixes\bin\$(Configuration)\netstandard2.0\MinimalEndpoints.CodeFixes.dll"
-          Pack="true"
-          PackagePath="analyzers/dotnet/cs"
-          Visible="false" />
+  <Target Name="_ValidateAnalyzerOutputs" BeforeTargets="Pack">
+    <Error Condition="!Exists('$(_CodeGenerationAnalyzer)')"
+           Text="Analyzer assembly not found at '$(_CodeGenerationAnalyzer)'. Build the solution in $(Configuration) before packing so the generator ships in the package." />
+    <Error Condition="!Exists('$(_CodeFixesAnalyzer)')"
+           Text="Code-fix assembly not found at '$(_CodeFixesAnalyzer)'. Build the solution in $(Configuration) before packing so the code fixes ship in the package." />
+  </Target>
+
+  <ItemGroup>
+    <!-- Pack the source generator and code fixes into the analyzer slot (TFM-agnostic). -->
+    <None Include="$(_CodeGenerationAnalyzer)" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    <None Include="$(_CodeFixesAnalyzer)" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Reference source generator as analyzer -->
+    <!-- Reference the generator and code fixes as analyzers. PrivateAssets="all" keeps them from
+         flowing to consumers as package dependencies (they ship only as the analyzer dlls above). -->
+    <ProjectReference Include="..\MinimalEndpoints.CodeGeneration\MinimalEndpoints.CodeGeneration.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false"
+                      PrivateAssets="all" />
 
-    <!-- Reference analyzers as analyzer -->
-    <ProjectReference Include="..\MinimalEndpoints.CodeGeneration\MinimalEndpoints.CodeGeneration.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="none" />
-
-    <!-- Reference code fixes as analyzer -->
     <ProjectReference Include="..\MinimalEndpoints.CodeFixes\MinimalEndpoints.CodeFixes.csproj"
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false"
-                      PrivateAssets="none"/>
+                      PrivateAssets="all" />
   </ItemGroup>
 
 </Project>

@@ -1,5 +1,5 @@
 <Solution>
-  <Folder Name="/bechmarks/">
+  <Folder Name="/benchmarks/">
     <Project Path="benchmarks/MinimalEndpoints.CodeGeneration.Benchmarks/MinimalEndpoints.CodeGeneration.Benchmarks.csproj" />
   </Folder>
   <Folder Name="/docs/">
@@ -43,7 +43,7 @@
     <Project Path="tests/MinimalEndpoints.EndToEnd.Tests/MinimalEndpoints.EndToEnd.Tests.csproj" />
     <Project Path="tests/MinimalEndpoints.Tests.Common/MinimalEndpoints.Tests.Common.csproj" />
   </Folder>
-  <Folder Name="/Soluction Items/">
+  <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />
     <File Path=".gitattributes" />
     <File Path=".gitignore" />

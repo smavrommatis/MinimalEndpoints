@@ -4,5 +4,10 @@
     <Nullable>enable</Nullable>
     <LangVersion>14.0</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- Nothing is packable by default; only the runtime package (src/MinimalEndpoints) opts back
+         in. Keeps a solution-level `dotnet pack` from emitting broken analyzer-only sibling
+         packages for the generator/codefix/sample/benchmark/test-helper projects. -->
+    <IsPackable>false</IsPackable>
   </PropertyGroup>
 </Project>

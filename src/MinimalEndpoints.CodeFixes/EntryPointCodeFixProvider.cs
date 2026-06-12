@@ -13,7 +13,10 @@ namespace MinimalEndpoints.CodeFixes;
 [ExportCodeFixProvider(LanguageNames.CSharp, Name = nameof(EntryPointCodeFixProvider)), Shared]
 public class EntryPointCodeFixProvider : CodeFixProvider
 {
-    public sealed override ImmutableArray<string> FixableDiagnosticIds => ["MINEP001"];
+    // ImmutableArray.Create rather than a collection expression: the lowered Roslyn floor (4.8.0)
+    // brings a System.Collections.Immutable whose ImmutableArray<T> predates collection-expression
+    // support (CS9210).
+    public sealed override ImmutableArray<string> FixableDiagnosticIds => ImmutableArray.Create("MINEP001");
 
     public sealed override FixAllProvider GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
 

@@ -1,4 +1,3 @@
-using System.Collections.Frozen;
 using Microsoft.CodeAnalysis;
 using MinimalEndpoints.CodeGeneration.Endpoints.Models;
 using MinimalEndpoints.CodeGeneration.Models;
@@ -7,7 +6,10 @@ namespace MinimalEndpoints.CodeGeneration.Endpoints;
 
 internal static class MapMethodsUtilities
 {
-    private static readonly FrozenDictionary<string, (string Method, string EndpointBuilderMethodName)>
+    // Plain read-only dictionary rather than FrozenDictionary: FrozenDictionary needs
+    // System.Collections.Immutable 8.0+, which the lowered Roslyn floor (4.8.0) does not bring,
+    // and analyzers must not bundle their own BCL. The lookup is tiny, so there is no perf concern.
+    private static readonly IReadOnlyDictionary<string, (string Method, string EndpointBuilderMethodName)>
         s_mapMethodAttributes =
             new Dictionary<string, (string Method, string EndpointBuilderMethodName)>()
             {
@@ -19,7 +21,7 @@ internal static class MapMethodsUtilities
                 // IEndpointRouteBuilder has no MapHead extension, so HEAD is emitted via
                 // MapMethods(pattern, ["HEAD"], Handler) rather than a dedicated builder call.
                 { WellKnownTypes.Annotations.MapHeadAttributeName, ("HEAD", "MapMethods") }
-            }.ToFrozenDictionary();
+            };
 
     public static MapMethodsAttributeDefinition GetMapMethodAttributeDefinition(this AttributeData attributeData)
     {
