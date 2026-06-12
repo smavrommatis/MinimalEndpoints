@@ -226,7 +226,10 @@ internal static class MinimalEndpointsFileBuilder
         // Determine the builder to use (group parameter or main builder)
         var builderExpression = hasGroup ? "group" : "builder";
 
-        if (endpoint.MapMethodsAttribute.Methods.Length > 1)
+        // The dedicated MapGet/MapPost/MapPut/MapDelete/MapPatch builder methods take only a
+        // pattern and handler. Everything else (explicit [MapMethods], plus verbs with no
+        // dedicated method such as HEAD) goes through MapMethods(pattern, [verbs], Handler).
+        if (endpoint.MapMethodsAttribute.EndpointBuilderMethodName == "MapMethods")
         {
             var methods = string.Join(", ",
                 endpoint.MapMethodsAttribute.Methods.Select(m => $"\"{m.ToUpperInvariant()}\""));

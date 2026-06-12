@@ -405,7 +405,7 @@ public class HealthCheckEndpoint
         Assert.NotNull(result);
         Assert.Equal("/health", result.Pattern);
         Assert.Equal(ServiceLifetime.Scoped, result.Lifetime);
-        Assert.Equal("MapHead", result.EndpointBuilderMethodName);
+        Assert.Equal("MapMethods", result.EndpointBuilderMethodName); // HEAD has no dedicated builder method
         Assert.Single(result.Methods);
         Assert.Contains("HEAD", result.Methods);
         Assert.Null(result.EntryPoint);
@@ -441,7 +441,7 @@ public class HealthCheckEndpoint : IHealthCheck
         Assert.NotNull(result);
         Assert.Equal("/api/health", result.Pattern);
         Assert.Equal(ServiceLifetime.Singleton, result.Lifetime);
-        Assert.Equal("MapHead", result.EndpointBuilderMethodName);
+        Assert.Equal("MapMethods", result.EndpointBuilderMethodName); // HEAD has no dedicated builder method
         Assert.Single(result.Methods);
         Assert.Contains("HEAD", result.Methods);
         Assert.Equal("CheckAsync", result.EntryPoint);

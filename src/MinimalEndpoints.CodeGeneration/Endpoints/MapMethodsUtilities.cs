@@ -16,7 +16,9 @@ internal static class MapMethodsUtilities
                 { WellKnownTypes.Annotations.MapPutAttributeName, ("PUT", "MapPut") },
                 { WellKnownTypes.Annotations.MapDeleteAttributeName, ("DELETE", "MapDelete") },
                 { WellKnownTypes.Annotations.MapPatchAttributeName, ("PATCH", "MapPatch") },
-                { WellKnownTypes.Annotations.MapHeadAttributeName, ("HEAD", "MapHead") }
+                // IEndpointRouteBuilder has no MapHead extension, so HEAD is emitted via
+                // MapMethods(pattern, ["HEAD"], Handler) rather than a dedicated builder call.
+                { WellKnownTypes.Annotations.MapHeadAttributeName, ("HEAD", "MapMethods") }
             }.ToFrozenDictionary();
 
     public static MapMethodsAttributeDefinition GetMapMethodAttributeDefinition(this AttributeData attributeData)
