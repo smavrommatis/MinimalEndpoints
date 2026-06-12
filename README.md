@@ -905,24 +905,29 @@ Source generator execution time and memory usage:
 
 | Endpoints | Mean     | Error     | StdDev    | Gen0     | Gen1    | Allocated  |
 |-----------|----------|-----------|-----------|----------|---------|------------|
-| 10        | 1.525 ms | 0.555 ms  | 0.367 ms  | 39.0625  | 3.9063  | 832.22 KB  |
-| 50        | 3.428 ms | 0.904 ms  | 0.538 ms  | 101.5625 | 31.2500 | 3437.14 KB |
-| 100       | 6.669 ms | 3.676 ms  | 2.431 ms  | 203.1250 | 78.1250 | 8251.23 KB |
+| 10        | 1.359 ms | 0.603 ms  | 0.399 ms  | 15.6250  | -       | 345.29 KB  |
+| 50        | 2.819 ms | 1.027 ms  | 0.680 ms  | 54.6875  | 7.8125  | 1314.10 KB |
+| 100       | 6.320 ms | 3.490 ms  | 2.308 ms  | 62.5000  | 15.6250 | 2512.93 KB |
 
 #### Code Generation Performance
 
-| Endpoints | Mean      | Error    | StdDev   | Gen0   | Allocated |
-|-----------|-----------|----------|----------|--------|-----------|
-| 10        | 48.27 μs  | 0.253 μs | 0.133 μs | 0.9766 | 20.34 KB  |
-| 50        | 98.56 μs  | 0.803 μs | 0.420 μs | 0.9766 | 20.7 KB   |
-| 100       | 160.81 μs | 0.594 μs | 0.393 μs | 0.9766 | 23.21 KB  |
-| 500       | 649.14 μs | 6.088 μs | 3.623 μs | -      | 32.47 KB  |
+| Scenario          | Mean       | Error     | StdDev    | Gen0     | Allocated  |
+|-------------------|------------|-----------|-----------|----------|------------|
+| 10 (cold)         | 329.5 μs   | 44.85 μs  | 26.69 μs  | 11.7188  | 245.99 KB  |
+| 50 (cold)         | 1,069.6 μs | 100.77 μs | 52.70 μs  | 39.0625  | 821.77 KB  |
+| 100 (cold)        | 2,321.7 μs | 280.33 μs | 146.62 μs | 62.5000  | 1538.35 KB |
+| 500 (cold)        | 8,999.8 μs | 177.88 μs | 117.66 μs | 171.8750 | 7259.79 KB |
+| 100 (incremental) | 444.0 μs   | 3.30 μs   | 2.18 μs   | 19.5313  | 387.52 KB  |
+
+_**Cold** = a fresh generator driver over a clean N-endpoint compilation. **Incremental** = a warm
+re-run after a single-line edit, exercising Roslyn's incremental caching. The 500-endpoint cold run
+also triggers Gen1/Gen2 collections; see the [detailed report](benchmarks/README.md)._
 
 **Key Takeaways:**
-- ⚡ **Sub-millisecond generation** for typical projects (<100 endpoints)
-- 💾 **Minimal memory allocation** (~20-30 KB for most projects)
-- 🚀 **Linear scaling** with endpoint count
-- ✅ **Incremental generation** - only regenerates what changed
+- ⚡ **Fast cold generation** — ~0.33 ms for 10 endpoints, scaling roughly linearly to ~9 ms for 500
+- ✅ **Incremental re-builds are ~5× cheaper** — a warm re-run after a one-line edit on a 100-endpoint project takes ~0.44 ms vs ~2.3 ms cold
+- 💾 **Allocation scales linearly** at roughly ~15 KB per generated endpoint
+- 🔍 **Analyzer diagnostics** stay under ~7 ms for 100 endpoints
 
 **Why Zero Runtime Overhead?**
 

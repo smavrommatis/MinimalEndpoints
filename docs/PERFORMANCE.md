@@ -45,44 +45,54 @@ Performance of diagnostic analysis across different project sizes:
 
 | Endpoints | Mean     | Error     | StdDev    | Ratio | Gen0     | Gen1    | Allocated  | Alloc Ratio |
 |-----------|----------|-----------|-----------|-------|----------|---------|------------|-------------|
-| 10        | 1.525 ms | 0.555 ms  | 0.367 ms  | 1.05  | 39.0625  | 3.9063  | 832.22 KB  | 1.00        |
-| 50        | 3.428 ms | 0.904 ms  | 0.538 ms  | 2.37  | 101.5625 | 31.2500 | 3437.14 KB | 4.13        |
-| 100       | 6.669 ms | 3.676 ms  | 2.431 ms  | 4.60  | 203.1250 | 78.1250 | 8251.23 KB | 9.91        |
+| 10        | 1.359 ms | 0.603 ms  | 0.399 ms  | 1.07  | 15.6250  | -       | 345.29 KB  | 1.00        |
+| 50        | 2.819 ms | 1.027 ms  | 0.680 ms  | 2.23  | 54.6875  | 7.8125  | 1314.10 KB | 3.81        |
+| 100       | 6.320 ms | 3.490 ms  | 2.308 ms  | 4.99  | 62.5000  | 15.6250 | 2512.93 KB | 7.28        |
 
 **Key Insights:**
-- Sub-7ms analysis time for 100 endpoints
-- Linear scaling with endpoint count
-- Efficient memory usage with proper GC patterns
+- Sub-7ms analysis time for 100 endpoints (~6.3 ms)
+- Roughly linear scaling with endpoint count
+- Allocations grow with the endpoint count (~2.5 MB at 100 endpoints)
 
 ### Code Generation Performance
 
 Performance of source code generation:
 
-| Endpoints | Mean      | Error    | StdDev   | Ratio | Gen0   | Allocated | Alloc Ratio |
-|-----------|-----------|----------|----------|-------|--------|-----------|-------------|
-| 10        | 48.27 μs  | 0.253 μs | 0.133 μs | 1.00  | 0.9766 | 20.34 KB  | 1.00        |
-| 50        | 98.56 μs  | 0.803 μs | 0.420 μs | 2.04  | 0.9766 | 20.7 KB   | 1.02        |
-| 100       | 160.81 μs | 0.594 μs | 0.393 μs | 3.33  | 0.9766 | 23.21 KB  | 1.14        |
-| 500       | 649.14 μs | 6.088 μs | 3.623 μs | 13.45 | -      | 32.47 KB  | 1.60        |
+| Scenario          | Mean       | Error     | StdDev    | Ratio | Gen0     | Allocated  | Alloc Ratio |
+|-------------------|------------|-----------|-----------|-------|----------|------------|-------------|
+| 10 (cold)         | 329.5 μs   | 44.85 μs  | 26.69 μs  | 1.01  | 11.7188  | 245.99 KB  | 1.00        |
+| 50 (cold)         | 1,069.6 μs | 100.77 μs | 52.70 μs  | 3.26  | 39.0625  | 821.77 KB  | 3.34        |
+| 100 (cold)        | 2,321.7 μs | 280.33 μs | 146.62 μs | 7.08  | 62.5000  | 1538.35 KB | 6.25        |
+| 500 (cold)        | 8,999.8 μs | 177.88 μs | 117.66 μs | 27.46 | 171.8750 | 7259.79 KB | 29.51       |
+| 100 (incremental) | 444.0 μs   | 3.30 μs   | 2.18 μs   | 1.35  | 19.5313  | 387.52 KB  | 1.58        |
+
+*Cold* runs build a fresh generator driver over a clean N-endpoint compilation. The *incremental*
+row is a warm second run after a single-line source edit, exercising Roslyn's incremental caching.
+(The 500-endpoint cold run also triggers Gen1/Gen2 collections, omitted here for brevity.)
 
 **Key Insights:**
-- **Sub-millisecond generation** for typical projects (<100 endpoints)
-- **Minimal memory allocation** - stays under 25 KB even for 100 endpoints
-- **Excellent scaling** - 500 endpoints in under 1ms
-- **Constant allocation per endpoint** - ~0.06 KB per endpoint
+- **Sub-millisecond cold generation** only for very small projects (~0.33 ms at 10 endpoints)
+- **Cold generation scales roughly linearly** - ~2.3 ms at 100 endpoints, ~9 ms at 500
+- **Incremental re-builds are ~5× cheaper** - a warm re-run after one edit takes ~0.44 ms at 100 endpoints
+- **Allocation scales linearly** - roughly ~15 KB per generated endpoint
 
 ### Build Time Impact
 
-Typical overhead added to build times:
+Generation cost added per compilation (measured cold via the Roslyn driver — see the
+[Benchmarks README](../benchmarks/README.md) for why these are upper-bound, not MSBuild deltas):
 
-| Project Size | Clean Build | Incremental Build | Memory Used |
-|--------------|-------------|-------------------|-------------|
-| 10 endpoints | +50μs       | +20μs             | ~20 KB      |
-| 50 endpoints | +100μs      | +40μs             | ~21 KB      |
-| 100 endpoints| +160μs      | +65μs             | ~23 KB      |
-| 500 endpoints| +650μs      | +250μs            | ~32 KB      |
+| Project Size  | Cold Generation | Incremental (warm) | Allocated |
+|---------------|-----------------|--------------------|-----------|
+| 10 endpoints  | ~330 μs         | —                  | ~246 KB   |
+| 50 endpoints  | ~1.07 ms        | —                  | ~822 KB   |
+| 100 endpoints | ~2.32 ms        | ~0.44 ms           | ~1.5 MB   |
+| 500 endpoints | ~9.0 ms         | —                  | ~7.3 MB   |
 
-**For a typical project (50-100 endpoints): < 200μs overhead** ✅
+The incremental (warm) figure is only benchmarked for the 100-endpoint case; the other sizes' warm
+cost is not separately measured. Real `dotnet build`/IDE rebuilds benefit from incremental caching
+and are expected to track the warm column far more closely than the cold one.
+
+**For a typical project (50-100 endpoints): ~1-2.3 ms cold, and well under 0.5 ms on warm rebuilds** ✅
 
 ### Incremental Generation
 
@@ -93,15 +103,15 @@ MinimalEndpoints uses **incremental source generation**:
 3. **Code Generation (Fast)** - Generate extension methods
 
 ```
-Full Recompile:        [████████████] ~160μs (100 endpoints)
-Changed 1 Endpoint:    [██          ] ~50μs
-No Changes:            [            ] 0μs (cached)
+Full (cold) generation:   [████████████] ~2.32 ms (100 endpoints)
+Warm re-build (1 edit):   [██          ] ~0.44 ms
+No Changes:               [            ] ~0 (fully cached)
 ```
 
 ### IDE Performance
 
 - **IntelliSense**: < 50ms (imperceptible)
-- **Analyzer Execution**: ~7ms for 100 endpoints
+- **Analyzer Execution**: ~6.3ms for 100 endpoints
 - **Code Fixes**: < 10ms
 - **Real-time Diagnostics**: Updates as you type
 
@@ -111,16 +121,17 @@ No Changes:            [            ] 0μs (cached)
 
 ### Compile-Time Memory
 
-Source generator memory allocation (from benchmarks):
+Source generator memory allocation, cold run (from benchmarks):
 
 ```
-10 endpoints:    ~20 KB
-50 endpoints:    ~21 KB
-100 endpoints:   ~23 KB
-500 endpoints:   ~32 KB
+10 endpoints:    ~246 KB
+50 endpoints:    ~822 KB
+100 endpoints:   ~1.5 MB
+500 endpoints:   ~7.3 MB
 ```
 
-**Key Insight:** Memory usage is remarkably efficient, staying under 25 KB for most projects.
+**Key Insight:** Allocation scales roughly linearly with the endpoint count — about ~15 KB per
+generated endpoint. A warm/incremental re-run allocates far less (~388 KB for 100 endpoints).
 
 ### Runtime Memory
 
@@ -496,5 +507,5 @@ dotnet-counters monitor --process-id <PID> System.Runtime
 
 ---
 
-**Last Updated:** December 21, 2025
+**Last Updated:** June 13, 2026
 

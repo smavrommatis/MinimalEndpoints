@@ -49,6 +49,7 @@ public class AnalyzerPerformanceBenchmarks
     private static Compilation CreateCompilationWithEndpoints(int count)
     {
         var sb = new StringBuilder();
+        sb.AppendLine("using System.Threading.Tasks;");
         sb.AppendLine("using Microsoft.AspNetCore.Builder;");
         sb.AppendLine("using Microsoft.AspNetCore.Http;");
         sb.AppendLine("using Microsoft.AspNetCore.Routing;");

@@ -66,6 +66,7 @@ public class GeneratorPerformanceBenchmarks
     private static Compilation CreateCompilationWithEndpoints(int count)
     {
         var sb = new StringBuilder();
+        sb.AppendLine("using System.Threading.Tasks;");
         sb.AppendLine("using Microsoft.AspNetCore.Http;");
         sb.AppendLine("using MinimalEndpoints.Annotations;");
         sb.AppendLine();

@@ -16,10 +16,10 @@ This is the first production-ready stable release of MinimalEndpoints, bringing 
 #### Source Generator
 - **Zero Runtime Overhead**: All code generated at compile-time using Roslyn incremental source generators
 - **Automatic Discovery**: Endpoints automatically discovered and registered
-- **Fast Build Times**: Sub-millisecond generation for typical projects
-  - 10 endpoints: 48μs, 20KB allocated
-  - 100 endpoints: 161μs, 23KB allocated
-  - 500 endpoints: 649μs, 32KB allocated
+- **Fast Build Times**: Cold generation scales roughly linearly; warm/incremental re-builds ~5× cheaper
+  - 10 endpoints: 330μs, 246KB allocated
+  - 100 endpoints: 2.32ms, 1.5MB allocated (warm re-build ~0.44ms)
+  - 500 endpoints: 9.0ms, 7.3MB allocated
 - **Incremental Generation**: Only regenerates changed code
 
 #### Diagnostic Analyzers (8 Total)
@@ -92,9 +92,9 @@ Works seamlessly with all built-in ASP.NET Core features:
 ### 📊 Performance
 
 **Compile-Time Performance:**
-- Analyzer execution: 1.5ms (10 endpoints), 6.7ms (100 endpoints)
-- Code generation: Sub-millisecond for most projects
-- Memory efficient: ~20-32KB allocation for typical projects
+- Analyzer execution: 1.4ms (10 endpoints), 6.3ms (100 endpoints)
+- Code generation: ~0.33ms (10 endpoints) to ~2.3ms (100 endpoints) cold; ~0.44ms warm
+- Memory: ~246KB (10 endpoints) to ~1.5MB (100 endpoints), ~15KB per generated endpoint
 
 **Runtime Performance:**
 - Zero overhead compared to hand-written Minimal APIs
