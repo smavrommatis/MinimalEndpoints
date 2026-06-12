@@ -29,6 +29,37 @@ public class TestGroup
         Assert.Equal("/api", result.Prefix);
         Assert.NotNull(result.ClassType);
         Assert.Contains("TestGroup", result.ClassType.FullName);
+        Assert.Equal("TestGroup", result.Name);
+        Assert.Null(result.ParentGroupName);
+    }
+
+    [Fact]
+    public void Constructor_WithParentGroup_CapturesParentGroupName()
+    {
+        // Arrange
+        var code = @"
+namespace TestApp;
+
+[MapGroup(""/api"")]
+public class ParentGroup
+{
+}
+
+[MapGroup(""/v1"", ParentGroup = typeof(ParentGroup))]
+public class ChildGroup
+{
+}";
+
+        var compilation = new CompilationBuilder(code).WithMvcReferences().Build();
+        var classSymbol = GetClassSymbol(compilation, "ChildGroup");
+        var attribute = classSymbol.GetAttributes().First();
+
+        // Act
+        var result = new EndpointGroupDefinition(classSymbol, attribute);
+
+        // Assert — the parent is captured as a fully-qualified-name string (no symbol retained),
+        // keyed identically to the parent group's own ClassType.FullName.
+        Assert.Equal("TestApp.ParentGroup", result.ParentGroupName);
     }
 
     [Fact]
@@ -280,289 +311,6 @@ public class TestGroup
     }
 
     [Fact]
-    public void Depth_WithRootGroup_ReturnsOne()
-    {
-        // Arrange
-        var code = @"
-namespace TestApp;
-
-[MapGroup(""/api"")]
-public class TestGroup
-{
-}";
-
-        var compilation = new CompilationBuilder(code).WithMvcReferences().Build();
-        var classSymbol = GetClassSymbol(compilation, "TestGroup");
-        var attribute = classSymbol.GetAttributes().First();
-        var group = new EndpointGroupDefinition(classSymbol, attribute);
-
-        // Act
-        var result = group.Depth;
-
-        // Assert
-        Assert.Equal(1, result);
-    }
-
-    [Fact]
-    public void Depth_WithNestedGroup_ReturnsCorrectDepth()
-    {
-        // Arrange
-        var code = @"
-namespace TestApp;
-
-[MapGroup(""/api"")]
-public class ParentGroup
-{
-}
-
-[MapGroup(""/v1"", ParentGroup = typeof(ParentGroup))]
-public class ChildGroup
-{
-}";
-
-        var compilation = new CompilationBuilder(code).WithMvcReferences().Build();
-
-        var parentSymbol = GetClassSymbol(compilation, "ParentGroup");
-        var parentAttribute = parentSymbol.GetAttributes().First();
-        var parentGroup = new EndpointGroupDefinition(parentSymbol, parentAttribute);
-
-        var childSymbol = GetClassSymbol(compilation, "ChildGroup");
-        var childAttribute = childSymbol.GetAttributes().First();
-        var childGroup = new EndpointGroupDefinition(childSymbol, childAttribute)
-        {
-            ParentGroup = parentGroup
-        };
-
-        // Act
-        var result = childGroup.Depth;
-
-        // Assert
-        Assert.Equal(2, result);
-    }
-
-    [Fact]
-    public void Depth_WithDeeplyNestedGroup_ReturnsCorrectDepth()
-    {
-        // Arrange
-        var code = @"
-namespace TestApp;
-
-[MapGroup(""/api"")]
-public class Level1Group
-{
-}
-
-[MapGroup(""/v1"", ParentGroup = typeof(Level1Group))]
-public class Level2Group
-{
-}
-
-[MapGroup(""/users"", ParentGroup = typeof(Level2Group))]
-public class Level3Group
-{
-}";
-
-        var compilation = new CompilationBuilder(code).WithMvcReferences().Build();
-
-        var level1Symbol = GetClassSymbol(compilation, "Level1Group");
-        var level1Attribute = level1Symbol.GetAttributes().First();
-        var level1Group = new EndpointGroupDefinition(level1Symbol, level1Attribute);
-
-        var level2Symbol = GetClassSymbol(compilation, "Level2Group");
-        var level2Attribute = level2Symbol.GetAttributes().First();
-        var level2Group = new EndpointGroupDefinition(level2Symbol, level2Attribute)
-        {
-            ParentGroup = level1Group
-        };
-
-        var level3Symbol = GetClassSymbol(compilation, "Level3Group");
-        var level3Attribute = level3Symbol.GetAttributes().First();
-        var level3Group = new EndpointGroupDefinition(level3Symbol, level3Attribute)
-        {
-            ParentGroup = level2Group
-        };
-
-        // Act
-        var result = level3Group.Depth;
-
-        // Assert
-        Assert.Equal(3, result);
-    }
-
-    [Fact]
-    public void HierarchyConditionallyMapped_WithConditionalGroup_ReturnsTrue()
-    {
-        // Arrange
-        var code = @"
-namespace TestApp;
-
-[MapGroup(""/api"")]
-public class TestGroup : IConditionallyMapped
-{
-    public static bool ShouldMap(IApplicationBuilder app) => true;
-}";
-
-        var compilation = new CompilationBuilder(code).WithMvcReferences().Build();
-        var classSymbol = GetClassSymbol(compilation, "TestGroup");
-        var attribute = classSymbol.GetAttributes().First();
-        var group = new EndpointGroupDefinition(classSymbol, attribute);
-
-        // Act
-        var result = group.HierarchyConditionallyMapped;
-
-        // Assert
-        Assert.True(result);
-    }
-
-    [Fact]
-    public void HierarchyConditionallyMapped_WithConditionalParent_ReturnsTrue()
-    {
-        // Arrange
-        var code = @"
-namespace TestApp;
-
-[MapGroup(""/api"")]
-public class ParentGroup : IConditionallyMapped
-{
-    public static bool ShouldMap(IApplicationBuilder app) => true;
-}
-
-[MapGroup(""/v1"", ParentGroup = typeof(ParentGroup))]
-public class ChildGroup
-{
-}";
-
-        var compilation = new CompilationBuilder(code).WithMvcReferences().Build();
-
-        var parentSymbol = GetClassSymbol(compilation, "ParentGroup");
-        var parentAttribute = parentSymbol.GetAttributes().First();
-        var parentGroup = new EndpointGroupDefinition(parentSymbol, parentAttribute);
-
-        var childSymbol = GetClassSymbol(compilation, "ChildGroup");
-        var childAttribute = childSymbol.GetAttributes().First();
-        var childGroup = new EndpointGroupDefinition(childSymbol, childAttribute)
-        {
-            ParentGroup = parentGroup
-        };
-
-        // Act
-        var result = childGroup.HierarchyConditionallyMapped;
-
-        // Assert
-        Assert.True(result);
-    }
-
-    [Fact]
-    public void HierarchyConditionallyMapped_WithNoConditionalMapping_ReturnsFalse()
-    {
-        // Arrange
-        var code = @"
-namespace TestApp;
-
-[MapGroup(""/api"")]
-public class TestGroup
-{
-}";
-
-        var compilation = new CompilationBuilder(code).WithMvcReferences().Build();
-        var classSymbol = GetClassSymbol(compilation, "TestGroup");
-        var attribute = classSymbol.GetAttributes().First();
-        var group = new EndpointGroupDefinition(classSymbol, attribute);
-
-        // Act
-        var result = group.HierarchyConditionallyMapped;
-
-        // Assert
-        Assert.False(result);
-    }
-
-    [Fact]
-    public void FullPrefix_WithRootGroup_ReturnsPrefix()
-    {
-        // Arrange
-        var code = @"
-namespace TestApp;
-
-[MapGroup(""/api"")]
-public class TestGroup
-{
-}";
-
-        var compilation = new CompilationBuilder(code).WithMvcReferences().Build();
-        var classSymbol = GetClassSymbol(compilation, "TestGroup");
-        var attribute = classSymbol.GetAttributes().First();
-        var group = new EndpointGroupDefinition(classSymbol, attribute);
-
-        // Act
-        var result = group.FullPrefix;
-
-        // Assert
-        Assert.Equal("/api", result);
-    }
-
-    [Fact]
-    public void FullPrefix_WithNestedGroup_ConcatenatesPrefixes()
-    {
-        // Arrange
-        var code = @"
-namespace TestApp;
-
-[MapGroup(""/api"")]
-public class ParentGroup
-{
-}
-
-[MapGroup(""/v1"", ParentGroup = typeof(ParentGroup))]
-public class ChildGroup
-{
-}";
-
-        var compilation = new CompilationBuilder(code).WithMvcReferences().Build();
-
-        var parentSymbol = GetClassSymbol(compilation, "ParentGroup");
-        var parentAttribute = parentSymbol.GetAttributes().First();
-        var parentGroup = new EndpointGroupDefinition(parentSymbol, parentAttribute);
-
-        var childSymbol = GetClassSymbol(compilation, "ChildGroup");
-        var childAttribute = childSymbol.GetAttributes().First();
-        var childGroup = new EndpointGroupDefinition(childSymbol, childAttribute)
-        {
-            ParentGroup = parentGroup
-        };
-
-        // Act
-        var result = childGroup.FullPrefix;
-
-        // Assert
-        Assert.Equal("/api/v1", result);
-    }
-
-    [Fact]
-    public void FullPrefix_CachesResult()
-    {
-        // Arrange
-        var code = @"
-namespace TestApp;
-
-[MapGroup(""/api"")]
-public class TestGroup
-{
-}";
-
-        var compilation = new CompilationBuilder(code).WithMvcReferences().Build();
-        var classSymbol = GetClassSymbol(compilation, "TestGroup");
-        var attribute = classSymbol.GetAttributes().First();
-        var group = new EndpointGroupDefinition(classSymbol, attribute);
-
-        // Act
-        var result1 = group.FullPrefix;
-        var result2 = group.FullPrefix;
-
-        // Assert
-        Assert.Same(result1, result2);
-    }
-
-    [Fact]
     public void IsConfigurable_WithConfigurableGroup_ReturnsTrue()
     {
         // Arrange
@@ -583,29 +331,4 @@ public class TestGroup : IConfigurableGroup
         // Act & Assert
         Assert.True(group.IsConfigurable);
     }
-
-    [Fact]
-    public void Cycles_InitializesEmpty()
-    {
-        // Arrange
-        var code = @"
-namespace TestApp;
-
-[MapGroup(""/api"")]
-public class TestGroup
-{
-}";
-
-        var compilation = new CompilationBuilder(code).WithMvcReferences().Build();
-        var classSymbol = GetClassSymbol(compilation, "TestGroup");
-        var attribute = classSymbol.GetAttributes().First();
-
-        // Act
-        var group = new EndpointGroupDefinition(classSymbol, attribute);
-
-        // Assert
-        Assert.NotNull(group.Cycles);
-        Assert.Empty(group.Cycles);
-    }
 }
-

@@ -12,3 +12,4 @@
 | MINEP005 | MinimalEndpoints | Error | EndpointsAnalyzer |
 | MINEP006 | MinimalEndpoints | Error | GroupsAnalyzer    |
 | MINEP007 | MinimalEndpoints | Error | GroupsAnalyzer    |
+| MINEP008 | MinimalEndpoints | Warning | EndpointsAnalyzer, GroupsAnalyzer |

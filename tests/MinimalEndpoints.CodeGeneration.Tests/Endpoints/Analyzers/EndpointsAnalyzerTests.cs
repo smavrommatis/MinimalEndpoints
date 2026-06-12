@@ -774,5 +774,169 @@ public class TestEndpoint : ITestEndpoint<string>
 
     #endregion
 
+    #region Partial-class de-duplication
+
+    [Fact]
+    public void MultipleAttributes_PartialClassThreeParts_ReportsOnce()
+    {
+        // Map attributes split across two parts, plus a third bare part. The merged symbol carries
+        // both, so a per-part analyzer would report MINEP002 three times (including on the bare
+        // part). It must be reported exactly once, on a Map-attributed part.
+        var code = @"
+namespace TestApp;
+
+[MapGet(""/a"")]
+public partial class E
+{
+    public IResult Handle() => Results.Ok();
+}
+
+[MapPost(""/a"")]
+public partial class E
+{
+}
+
+public partial class E
+{
+}";
+
+        // Act
+        var diagnostics = GetDiagnostics(code);
+
+        // Assert
+        Assert.Single(diagnostics, d => d.Id == "MINEP002");
+    }
+
+    [Fact]
+    public void MissingEntryPoint_PartialClass_ReportsOnce()
+    {
+        // A partial endpoint with the Map attribute on one part and no entry point. MINEP001 must
+        // be reported once, not once per partial part.
+        var code = @"
+namespace TestApp;
+
+[MapGet(""/a"")]
+public partial class E
+{
+}
+
+public partial class E
+{
+}";
+
+        // Act
+        var diagnostics = GetDiagnostics(code);
+
+        // Assert
+        Assert.Single(diagnostics, d => d.Id == "MINEP001");
+    }
+
+    #endregion
+
+    #region MINEP008 - Unsupported endpoint shape
+
+    [Fact]
+    public void GenericEndpoint_ReportsMinep008()
+    {
+        var code = @"
+namespace TestApp;
+
+[MapGet(""/items"")]
+public class ListEndpoint<T>
+{
+    public IResult Handle() => Results.Ok();
+}";
+
+        // Act
+        var diagnostics = GetDiagnostics(code);
+
+        // Assert
+        var warning = Assert.Single(diagnostics, d => d.Id == "MINEP008");
+        Assert.Equal(DiagnosticSeverity.Warning, warning.Severity);
+        Assert.Contains("ListEndpoint", warning.GetMessage());
+    }
+
+    [Fact]
+    public void FileLocalEndpoint_ReportsMinep008()
+    {
+        var code = @"
+namespace TestApp;
+
+[MapGet(""/x"")]
+file class Hidden
+{
+    public IResult Handle() => Results.Ok();
+}";
+
+        // Act
+        var diagnostics = GetDiagnostics(code);
+
+        // Assert
+        Assert.Single(diagnostics, d => d.Id == "MINEP008");
+    }
+
+    [Fact]
+    public void PrivateNestedEndpoint_ReportsMinep008()
+    {
+        var code = @"
+namespace TestApp;
+
+public class Container
+{
+    [MapGet(""/x"")]
+    private class Inner
+    {
+        public IResult Handle() => Results.Ok();
+    }
+}";
+
+        // Act
+        var diagnostics = GetDiagnostics(code);
+
+        // Assert
+        Assert.Single(diagnostics, d => d.Id == "MINEP008");
+    }
+
+    [Fact]
+    public void ValidEndpoint_NoMinep008()
+    {
+        var code = @"
+namespace TestApp;
+
+[MapGet(""/x"")]
+public class ValidEndpoint
+{
+    public IResult Handle() => Results.Ok();
+}";
+
+        // Act
+        var diagnostics = GetDiagnostics(code);
+
+        // Assert
+        Assert.DoesNotContain(diagnostics, d => d.Id == "MINEP008");
+    }
+
+    [Fact]
+    public void AbstractEndpoint_NoMinep008()
+    {
+        // Abstract endpoints are skipped silently (legitimate base pattern) — NOT reported.
+        var code = @"
+namespace TestApp;
+
+[MapGet(""/x"")]
+public abstract class BaseEndpoint
+{
+    public IResult Handle() => Results.Ok();
+}";
+
+        // Act
+        var diagnostics = GetDiagnostics(code);
+
+        // Assert
+        Assert.DoesNotContain(diagnostics, d => d.Id == "MINEP008");
+    }
+
+    #endregion
+
 }
 

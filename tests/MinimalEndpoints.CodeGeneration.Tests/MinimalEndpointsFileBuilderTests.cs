@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using MinimalEndpoints.CodeGeneration.Endpoints;
 using MinimalEndpoints.CodeGeneration.Endpoints.Models;
+using MinimalEndpoints.CodeGeneration.Groups;
 using MinimalEndpoints.CodeGeneration.Groups.Models;
 using MinimalEndpoints.CodeGeneration.Models;
 using MinimalEndpoints.CodeGeneration.Utilities;
@@ -15,10 +16,10 @@ public class MinimalEndpointsFileBuilderTests
     {
         // Arrange
         var endpoints = new List<EndpointDefinition>();
-        var groups = new Dictionary<INamedTypeSymbol, EndpointGroupDefinition>(SymbolEqualityComparer.Default);
+        var hierarchy = GroupHierarchy.Build(Array.Empty<EndpointGroupDefinition>());
 
         // Act
-        var result = MinimalEndpointsFileBuilder.GenerateFile("TestNamespace", "TestClass", endpoints, groups);
+        var result = MinimalEndpointsFileBuilder.GenerateFile("TestNamespace", "TestClass", endpoints, hierarchy);
 
         // Assert
         Assert.Null(result);

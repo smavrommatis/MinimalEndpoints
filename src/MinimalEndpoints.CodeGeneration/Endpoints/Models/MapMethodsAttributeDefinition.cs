@@ -17,5 +17,10 @@ internal class MapMethodsAttributeDefinition
 
     public string ServiceName { get; set; }
 
-    public INamedTypeSymbol GroupType { get; set; }
+    /// <summary>
+    /// The fully-qualified name of the endpoint's group (the <c>Group = typeof(...)</c> argument),
+    /// or <c>null</c>. Captured as a string at transform time — never a Roslyn symbol — so the
+    /// endpoint→group link resolves by name and stays valid across incremental compilations.
+    /// </summary>
+    public string GroupTypeName { get; set; }
 }

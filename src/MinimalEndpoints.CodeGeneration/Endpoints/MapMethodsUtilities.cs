@@ -116,7 +116,7 @@ internal static class MapMethodsUtilities
     {
         string entryPoint = null;
         string serviceName = null;
-        INamedTypeSymbol groupType = null;
+        string groupTypeName = null;
 
         foreach (var namedArg in attributeData.NamedArguments)
         {
@@ -128,8 +128,12 @@ internal static class MapMethodsUtilities
                 case "ServiceType" when namedArg.Value.Value is INamedTypeSymbol serviceType:
                     serviceName = serviceType.ToDisplayString();
                     break;
+                // Capture the group reference as a fully-qualified-name string (via the same
+                // TypeDefinition path the group uses for its own identity), not the symbol — the
+                // symbol would root the source compilation in the cached model and would not
+                // match the cached group's symbol across incremental compilations.
                 case "Group" when namedArg.Value.Value is INamedTypeSymbol group:
-                    groupType = group;
+                    groupTypeName = new TypeDefinition(group).FullName;
                     break;
             }
         }
@@ -142,7 +146,7 @@ internal static class MapMethodsUtilities
             Lifetime = lifetime,
             EntryPoint = entryPoint,
             ServiceName = serviceName,
-            GroupType = groupType
+            GroupTypeName = groupTypeName
         };
     }
 }

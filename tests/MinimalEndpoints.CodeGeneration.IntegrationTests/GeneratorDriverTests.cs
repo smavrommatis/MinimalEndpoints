@@ -1,3 +1,4 @@
+using System;
 using Microsoft.CodeAnalysis;
 
 namespace MinimalEndpoints.CodeGeneration.IntegrationTests;
@@ -127,6 +128,45 @@ public class ConcreteEndpoint
     }
 
     [Fact]
+    public void Generator_WithAbstractModifierOnOtherPart_SkipsClass()
+    {
+        // The `abstract` modifier is on a different partial part than the [MapGet]. The merged
+        // symbol is abstract; the symbol-level gate must skip it (the old syntax-level filter saw
+        // only the attributed, non-abstract part and would have generated a registration for an
+        // uninstantiable type).
+        var code = @"
+namespace TestApp.Endpoints;
+
+[MapGet(""/split"")]
+public partial class SplitEndpoint
+{
+    public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok());
+}
+
+public abstract partial class SplitEndpoint
+{
+}
+
+[MapGet(""/concrete"")]
+public class ConcreteEndpoint
+{
+    public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok());
+}";
+
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
+
+        // Act
+        var (result, _) = GeneratorDriverUtilities.RunGenerator(compilation);
+
+        // Assert: the concrete endpoint is mapped, the abstract split one is filtered out entirely
+        var generated = Assert.Single(result.GeneratedTrees).ToString();
+        Assert.Contains("Map__TestApp_Endpoints_ConcreteEndpoint", generated);
+        Assert.DoesNotContain("SplitEndpoint", generated);
+    }
+
+    [Fact]
     public void Generator_IncompleteAttributeAlongsideValidEndpoint_DoesNotCrashAndStillGenerates()
     {
         // Arrange: a malformed '[MapGet]' (no pattern — mid-typing) next to a valid endpoint.
@@ -216,5 +256,154 @@ public class NotAnEndpoint
 
         // Assert: the generator emits no source when there are no endpoints
         Assert.Empty(result.GeneratedTrees);
+    }
+
+    [Fact]
+    public void GeneratedCode_PartialGroupWithAttributeOnSecondPart_DoesNotThrow()
+    {
+        // A partial group with [MapGroup] on one part and an unrelated attribute on another.
+        // Per-declaration discovery used to produce two definitions for the same symbol and threw
+        // (ArgumentException) on the duplicate key, crashing the generator. Discovery must now
+        // succeed and emit exactly one group method.
+        var code = @"
+using System.Diagnostics.CodeAnalysis;
+
+namespace TestApp.Endpoints;
+
+[MapGroup(""/api"")]
+public partial class ApiGroup { }
+
+[ExcludeFromCodeCoverage]
+public partial class ApiGroup { }
+
+[MapGet(""/users"", Group = typeof(ApiGroup))]
+public class GetUsers
+{
+    public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok());
+}";
+
+        var compilation = new CompilationBuilder(code).WithMvcReferences().Build();
+
+        // Act
+        var (result, _) = GeneratorDriverUtilities.RunGenerator(compilation);
+
+        // Assert: no generator exception, exactly one group definition emitted.
+        Assert.Null(result.Results[0].Exception);
+        var generated = Assert.Single(result.GeneratedTrees).ToString();
+        Assert.Equal(1, CountOccurrences(generated, "services.AddSingleton<TestApp.Endpoints.ApiGroup>();"));
+        Assert.Equal(1, CountOccurrences(generated, "RouteGroupBuilder MapGroup__TestApp_Endpoints_ApiGroup("));
+    }
+
+    [Fact]
+    public void GeneratedCode_PartialEndpointWithAttributeOnSecondPart_EmitsSingleMapping()
+    {
+        // A partial endpoint with [MapGet] on one part and an unrelated attribute on another.
+        // Per-declaration discovery used to append the handler body twice → CS0128 (duplicate
+        // Handler local / duplicate registration). The generated code must compile and contain a
+        // single registration and a single Handler.
+        var code = @"
+using System;
+
+namespace TestApp.Endpoints;
+
+[MapGet(""/x"")]
+public partial class SplitEndpoint
+{
+    public IResult Handle() => Results.Ok();
+}
+
+[Serializable]
+public partial class SplitEndpoint { }";
+
+        var compilation = new CompilationBuilder(code).WithMvcReferences().Build();
+
+        // GenerateCodeAndCompile validates that the generated code itself compiles — it would
+        // surface CS0128 if the partial parts produced duplicate definitions.
+        var (generatedCode, _) = CompilationUtilities.GenerateCodeAndCompile(compilation, validateCompilation: true);
+
+        Assert.NotNull(generatedCode);
+        Assert.Equal(1, CountOccurrences(generatedCode, "services.AddScoped<TestApp.Endpoints.SplitEndpoint>();"));
+        Assert.Equal(1, CountOccurrences(generatedCode, "static IResult Handler("));
+    }
+
+    [Fact]
+    public void GeneratedCode_WithGenericEndpointClass_GeneratesNothingForIt_NoCrash()
+    {
+        // An open generic endpoint cannot be emitted (unbound type parameter, '<'/'>' in the method
+        // name). Discovery must skip it without crashing the generator, and still map the others.
+        var code = @"
+namespace TestApp.Endpoints;
+
+[MapGet(""/items"")]
+public class ListEndpoint<T>
+{
+    public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok());
+}
+
+[MapGet(""/concrete"")]
+public class ConcreteEndpoint
+{
+    public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok());
+}";
+
+        var compilation = new CompilationBuilder(code).WithMvcReferences().Build();
+
+        // Act
+        var (result, _) = GeneratorDriverUtilities.RunGenerator(compilation);
+
+        // Assert: no crash, the concrete endpoint is mapped, the generic one is skipped entirely.
+        Assert.Null(result.Results[0].Exception);
+        var generated = Assert.Single(result.GeneratedTrees).ToString();
+        Assert.Contains("Map__TestApp_Endpoints_ConcreteEndpoint", generated);
+        Assert.DoesNotContain("ListEndpoint", generated);
+    }
+
+    [Fact]
+    public void GeneratedCode_WithSanitizedNameCollision_Disambiguates()
+    {
+        // namespace My.App and namespace My_App both yield the base method name Map__My_App_Foo
+        // once '.' is replaced by '_'. The names must be disambiguated so the generated code
+        // compiles (no CS0128 duplicate method) and both endpoints are registered.
+        var code = @"
+namespace My.App
+{
+    [MapGet(""/a"")]
+    public class Foo
+    {
+        public IResult Handle() => Results.Ok();
+    }
+}
+
+namespace My_App
+{
+    [MapGet(""/b"")]
+    public class Foo
+    {
+        public IResult Handle() => Results.Ok();
+    }
+}";
+
+        var compilation = new CompilationBuilder(code).WithMvcReferences().Build();
+
+        // GenerateCodeAndCompile validates the generated code compiles — it would throw CS0128 if
+        // the two classes emitted methods with the same name.
+        var (generatedCode, _) = CompilationUtilities.GenerateCodeAndCompile(compilation, validateCompilation: true);
+
+        Assert.NotNull(generatedCode);
+        Assert.Equal(1, CountOccurrences(generatedCode, "services.AddScoped<My.App.Foo>();"));
+        Assert.Equal(1, CountOccurrences(generatedCode, "services.AddScoped<My_App.Foo>();"));
+    }
+
+    private static int CountOccurrences(string haystack, string needle)
+    {
+        var count = 0;
+        var index = 0;
+        while ((index = haystack.IndexOf(needle, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += needle.Length;
+        }
+
+        return count;
     }
 }

@@ -108,4 +108,41 @@ internal static class Diagnostics
         "and classes intended to define endpoints are only decorated with Map* attributes.",
         helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/docs/diagnostics/MINEP007.md"
     );
+
+    public static readonly DiagnosticDescriptor UnsupportedEndpointShape = new DiagnosticDescriptor(
+        id: "MINEP008",
+        title: "Endpoint or group class has an unsupported shape",
+        messageFormat:
+        "Type '{0}' is marked with a MinimalEndpoints attribute but cannot be mapped because it is {1}. " +
+        "Endpoint and group classes must be non-generic, accessible (at least internal), non-file-local classes.",
+        category: "MinimalEndpoints",
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: "The source generator must be able to reference the endpoint or group class by name and " +
+        "register it for dependency injection. Open generic types, file-local types, and types whose effective " +
+        "accessibility is below internal cannot be referenced from the generated code, so they are skipped. " +
+        "Make the class a non-generic, at-least-internal, non-file-local class to map it.",
+        helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/docs/diagnostics/MINEP008.md"
+    );
+
+    /// <summary>
+    /// Reported by the GENERATOR (not an analyzer) when the output step throws unexpectedly. It
+    /// turns an opaque CS8785 ("generator failed to generate source") into an actionable build
+    /// error that names the failure, so generator bugs are visible at build time instead of
+    /// silently producing no output. Because it is generator-reported and not in any analyzer's
+    /// SupportedDiagnostics, it is intentionally not part of analyzer release tracking.
+    /// </summary>
+    public static readonly DiagnosticDescriptor GeneratorFailure = new DiagnosticDescriptor(
+        id: "MINEP999",
+        title: "MinimalEndpoints source generator failed",
+        messageFormat:
+        "The MinimalEndpoints source generator failed unexpectedly and produced no output: {0}. " +
+        "This is a bug in the generator — please report it with the details above.",
+        category: "MinimalEndpoints",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "An unexpected exception in the generator's output step is caught and surfaced as this " +
+        "diagnostic instead of the opaque CS8785, so the failure is visible and actionable at build time.",
+        helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/docs/diagnostics/MINEP999.md"
+    );
 }

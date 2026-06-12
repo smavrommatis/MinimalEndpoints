@@ -1,3 +1,4 @@
+using System;
 using System.Text;
 
 namespace MinimalEndpoints.CodeGeneration.Models;
@@ -45,12 +46,19 @@ internal sealed class CSharpFileScope
 
     public CSharpFileMethodBuilder AddMethod(string modifiers, string returnType, string methodName, string parameters)
     {
-        if (!_methods.TryGetValue(methodName, out var method))
+        // Fail loudly on a true name collision instead of silently returning the existing builder
+        // and appending a second body into it (which produced duplicate Handler locals → CS0128).
+        // Callers de-duplicate definitions and disambiguate sanitized names before emission, so a
+        // collision here means an unexpected bug, not user input — this guard should never fire.
+        if (_methods.ContainsKey(methodName))
         {
-            method = new CSharpFileMethodBuilder(modifiers, returnType, methodName, parameters);
-            _methods[methodName] = method;
+            throw new InvalidOperationException(
+                $"A method named '{methodName}' has already been added to the generated file. " +
+                "Definitions must be de-duplicated and sanitized-name collisions disambiguated before emission.");
         }
 
+        var method = new CSharpFileMethodBuilder(modifiers, returnType, methodName, parameters);
+        _methods[methodName] = method;
         return method;
     }
 

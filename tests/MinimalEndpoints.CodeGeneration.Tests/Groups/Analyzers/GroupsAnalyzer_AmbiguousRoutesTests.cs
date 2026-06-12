@@ -41,6 +41,40 @@ public class ListUsersEndpoint
     }
 
     [Fact]
+    public void AbstractEndpointSharingRoute_NoMinep004()
+    {
+        // An abstract endpoint is never mapped, so it cannot conflict with a concrete endpoint
+        // sharing the same route. Discovery (via the shared TryCreateSymbol gate) skips abstract
+        // classes, so no false-positive MINEP004 is reported.
+        var code = @"
+namespace TestApp;
+
+[MapGet(""/users"")]
+public abstract class BaseUsersEndpoint
+{
+    public Task<IResult> HandleAsync()
+    {
+        return Task.FromResult(Results.Ok());
+    }
+}
+
+[MapGet(""/users"")]
+public class UsersEndpoint
+{
+    public Task<IResult> HandleAsync()
+    {
+        return Task.FromResult(Results.Ok());
+    }
+}";
+
+        // Act
+        var diagnostics = GetDiagnostics(code);
+
+        // Assert
+        Assert.DoesNotContain(diagnostics, d => d.Id == "MINEP004");
+    }
+
+    [Fact]
     public void WithSamePatternDifferentMethods_NoWarning()
     {
         // Arrange

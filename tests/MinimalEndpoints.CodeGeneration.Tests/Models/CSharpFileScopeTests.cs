@@ -156,24 +156,16 @@ public class CSharpFileScopeTests
     }
 
     [Fact]
-    public void AddMethod_WithDuplicateName_ReturnsSameMethod()
+    public void AddMethod_WithDuplicateName_Throws()
     {
         // Arrange
         var scope = new CSharpFileScope("public static", "MyNamespace", "MyClass");
+        scope.AddMethod("public static", "void", "TestMethod", "");
 
-        // Act
-        var method1 = scope.AddMethod("public static", "void", "TestMethod", "");
-        method1.AddLine("Console.WriteLine(\"First\");");
-
-        var method2 = scope.AddMethod("public static", "void", "TestMethod", "");
-        method2.AddLine("Console.WriteLine(\"Second\");");
-
-        var result = scope.Build();
-
-        // Assert
-        Assert.Same(method1, method2);
-        Assert.Contains("Console.WriteLine(\"First\");", result);
-        Assert.Contains("Console.WriteLine(\"Second\");", result);
+        // Act + Assert — a true name collision must fail loudly rather than silently merge a second
+        // body into the existing method (which produced duplicate Handler locals → CS0128).
+        Assert.Throws<InvalidOperationException>(() =>
+            scope.AddMethod("public static", "void", "TestMethod", ""));
     }
 
     [Fact]

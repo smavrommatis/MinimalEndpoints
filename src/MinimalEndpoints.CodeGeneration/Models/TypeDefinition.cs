@@ -10,7 +10,6 @@ namespace MinimalEndpoints.CodeGeneration.Models;
 internal class TypeDefinition
 {
     private readonly string _fullName;
-    private readonly Dictionary<int, string> _displayStringCache = new();
 
     /// <summary>
     /// The fully qualified type name (e.g., "System.Threading.Tasks.Task&lt;int&gt;")
@@ -25,35 +24,18 @@ internal class TypeDefinition
     /// <summary>
     /// Returns the type name simplified based on the provided using directives.
     /// If a namespace is in the usings set, it will be omitted from the type name.
-    /// Results are cached for performance.
     /// </summary>
+    /// <remarks>
+    /// A pure function of <see cref="_fullName"/> and the usings set. It used to memoize results
+    /// in a dictionary keyed by an XOR of the usings' hash codes with no set-equality check, which
+    /// (a) is a latent correctness landmine — a hash collision between two different usings sets
+    /// would return a name simplified against the wrong set — and (b) mutated a cached pipeline
+    /// object during output. There is exactly one usings set per generated file, so the cache only
+    /// ever added overhead; it was removed.
+    /// </remarks>
     /// <param name="availableUsings">Set of namespace strings that are available via using directives</param>
     /// <returns>Simplified type name (e.g., "Task&lt;int&gt;" instead of "System.Threading.Tasks.Task&lt;int&gt;")</returns>
-    public string ToDisplayString(HashSet<string> availableUsings)
-    {
-        // Create a cache key based on the usings set
-        var cacheKey = ComputeUsingsHashCode(availableUsings);
-
-        if (_displayStringCache.TryGetValue(cacheKey, out var cached))
-        {
-            return cached;
-        }
-
-        var result = SimplifyTypeName(_fullName, availableUsings);
-        _displayStringCache[cacheKey] = result;
-        return result;
-    }
-
-    private static int ComputeUsingsHashCode(HashSet<string> usings)
-    {
-        // Use XOR of hash codes for a simple, order-independent hash
-        var hash = 0;
-        foreach (var u in usings)
-        {
-            hash ^= u.GetHashCode();
-        }
-        return hash;
-    }
+    public string ToDisplayString(HashSet<string> availableUsings) => SimplifyTypeName(_fullName, availableUsings);
 
     /// <summary>
     /// Returns the fully qualified type name.

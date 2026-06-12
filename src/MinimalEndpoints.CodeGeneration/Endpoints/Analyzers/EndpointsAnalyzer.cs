@@ -1,10 +1,12 @@
 using System.Collections.Immutable;
+using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using MinimalEndpoints.CodeGeneration.Endpoints.Models;
 using MinimalEndpoints.CodeGeneration.Groups.Models;
+using MinimalEndpoints.CodeGeneration.Models;
 
 namespace MinimalEndpoints.CodeGeneration.Endpoints.Analyzers;
 
@@ -16,7 +18,8 @@ public class EndpointsAnalyzer : DiagnosticAnalyzer
         Diagnostics.MissingEntryPoint,
         Diagnostics.MultipleAttributesDetected,
         Diagnostics.ServiceTypeMissingEntryPoint,
-        Diagnostics.InvalidGroupType
+        Diagnostics.InvalidGroupType,
+        Diagnostics.UnsupportedEndpointShape
     ];
 
     public override void Initialize(AnalysisContext context)
@@ -30,14 +33,24 @@ public class EndpointsAnalyzer : DiagnosticAnalyzer
     {
         var classDeclaration = (ClassDeclarationSyntax)context.Node;
 
-        // Skip abstract classes
-        if (classDeclaration.Modifiers.Any(SyntaxKind.AbstractKeyword))
+        // Early exit before binding the semantic model: a part with zero attribute lists can never
+        // carry a Map attribute (attributes live only on declarations), so it cannot be an endpoint.
+        // This skips the GetDeclaredSymbol bind for every attribute-less class in the compilation.
+        if (classDeclaration.AttributeLists.Count == 0)
         {
             return;
         }
 
         var classSymbol = ModelExtensions.GetDeclaredSymbol(context.SemanticModel, classDeclaration);
         if (classSymbol is not INamedTypeSymbol namedTypeSymbol)
+        {
+            return;
+        }
+
+        // Skip abstract classes at the symbol level (the merged symbol is authoritative — the old
+        // per-part syntax check missed `abstract` declared on another partial part). Abstract
+        // endpoints are a never-mapped base pattern, so no diagnostic is reported.
+        if (namedTypeSymbol.IsAbstract)
         {
             return;
         }
@@ -51,15 +64,46 @@ public class EndpointsAnalyzer : DiagnosticAnalyzer
             return;
         }
 
+        // The merged symbol's attributes are seen by EVERY partial part, so without this each
+        // diagnostic would be reported once per part (including parts carrying no Map attribute).
+        // Report only from the part(s) that actually declare a Map attribute.
+        if (!CurrentPartCarriesMapAttribute(classDeclaration, attributes, context.CancellationToken))
+        {
+            return;
+        }
+
         if (attributes.Length > 1)
         {
-            var multipleAttributesDiagnostic = Diagnostic.Create(
-                Diagnostics.MultipleAttributesDetected,
+            // The Map attributes may be split across parts; report MINEP002 exactly once, from the
+            // part holding the first Map attribute in deterministic source order.
+            if (CurrentPartHasFirstMapAttribute(classDeclaration, attributes, context.CancellationToken))
+            {
+                var multipleAttributesDiagnostic = Diagnostic.Create(
+                    Diagnostics.MultipleAttributesDetected,
+                    classDeclaration.Identifier.GetLocation(),
+                    namedTypeSymbol.Name
+                );
+
+                context.ReportDiagnostic(multipleAttributesDiagnostic);
+            }
+
+            return;
+        }
+
+        // The class is intended as a single endpoint but its shape may prevent the generator from
+        // referencing it (open generic, file-local, sub-internal). Report MINEP008 and stop — these
+        // are never mapped, so the entry-point / service-type / group checks below do not apply.
+        var shapeRejection = SymbolDefinitionFactory.ClassifyShape(namedTypeSymbol);
+        if (shapeRejection != ShapeRejection.None)
+        {
+            var unsupportedShapeDiagnostic = Diagnostic.Create(
+                Diagnostics.UnsupportedEndpointShape,
                 classDeclaration.Identifier.GetLocation(),
-                namedTypeSymbol.Name
+                namedTypeSymbol.Name,
+                SymbolDefinitionFactory.DescribeShapeRejection(shapeRejection)
             );
 
-            context.ReportDiagnostic(multipleAttributesDiagnostic);
+            context.ReportDiagnostic(unsupportedShapeDiagnostic);
             return;
         }
 
@@ -126,6 +170,56 @@ public class EndpointsAnalyzer : DiagnosticAnalyzer
         {
             ValidateGroupType(context, classDeclaration, namedTypeSymbol, groupTypeSymbol);
         }
+    }
+
+    /// <summary>
+    /// True when at least one of the symbol's Map attributes is declared on THIS partial part.
+    /// Used to report each diagnostic once (on a Map-attributed part) rather than once per part.
+    /// </summary>
+    private static bool CurrentPartCarriesMapAttribute(
+        ClassDeclarationSyntax declaration, AttributeData[] mapAttributes, CancellationToken cancellationToken)
+    {
+        foreach (var attribute in mapAttributes)
+        {
+            var syntax = attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken);
+            if (syntax != null && syntax.FirstAncestorOrSelf<ClassDeclarationSyntax>() == declaration)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// True when the FIRST Map attribute in deterministic source order is declared on THIS part.
+    /// Lets MINEP002 fire exactly once when the duplicate Map attributes are split across parts.
+    /// </summary>
+    private static bool CurrentPartHasFirstMapAttribute(
+        ClassDeclarationSyntax declaration, AttributeData[] mapAttributes, CancellationToken cancellationToken)
+    {
+        SyntaxNode firstSyntax = null;
+        foreach (var attribute in mapAttributes)
+        {
+            var syntax = attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken);
+            if (syntax == null)
+            {
+                continue;
+            }
+
+            if (firstSyntax == null || ComesBeforeInSource(syntax, firstSyntax))
+            {
+                firstSyntax = syntax;
+            }
+        }
+
+        return firstSyntax != null && firstSyntax.FirstAncestorOrSelf<ClassDeclarationSyntax>() == declaration;
+    }
+
+    private static bool ComesBeforeInSource(SyntaxNode left, SyntaxNode right)
+    {
+        var pathComparison = string.CompareOrdinal(left.SyntaxTree.FilePath, right.SyntaxTree.FilePath);
+        return pathComparison != 0 ? pathComparison < 0 : left.SpanStart < right.SpanStart;
     }
 
     private static void ValidateGroupType(

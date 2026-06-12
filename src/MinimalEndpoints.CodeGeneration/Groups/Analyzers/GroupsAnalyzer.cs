@@ -3,6 +3,7 @@ using System.Collections.Immutable;
 using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
+using MinimalEndpoints.CodeGeneration.Endpoints;
 using MinimalEndpoints.CodeGeneration.Endpoints.Models;
 using MinimalEndpoints.CodeGeneration.Groups.Models;
 using MinimalEndpoints.CodeGeneration.Models;
@@ -10,8 +11,9 @@ using MinimalEndpoints.CodeGeneration.Models;
 namespace MinimalEndpoints.CodeGeneration.Groups.Analyzers;
 
 /// <summary>
-/// Analyzer that detects ambiguous route patterns across endpoints.
-/// Reports MINEP004 when multiple endpoints have the same route pattern and HTTP method.
+/// Analyzer that detects ambiguous route patterns across endpoints (MINEP004), cyclic group
+/// hierarchies (MINEP006), endpoint+group classes (MINEP007), and unsupported group shapes
+/// (MINEP008). It runs over a single compilation, so it works with live symbols.
 /// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public class GroupsAnalyzer : DiagnosticAnalyzer
@@ -20,7 +22,8 @@ public class GroupsAnalyzer : DiagnosticAnalyzer
         [
             Diagnostics.AmbiguousRoutes,
             Diagnostics.CyclicGroupHierarchy,
-            Diagnostics.InvalidSymbolKind
+            Diagnostics.InvalidSymbolKind,
+            Diagnostics.UnsupportedEndpointShape
         ];
 
     public override void Initialize(AnalysisContext context)
@@ -32,12 +35,23 @@ public class GroupsAnalyzer : DiagnosticAnalyzer
 
     private static void AnalyzeCompilationStart(CompilationStartAnalysisContext context)
     {
-        // Collect all endpoints across the compilation
-        var definitions = new ConcurrentDictionary<INamedTypeSymbol, SymbolDefinition>(SymbolEqualityComparer.Default);
+        // Only the lightweight facts each diagnostic actually needs are collected — not full
+        // EndpointDefinitions (TypeDefinitions for every parameter/return, formatted attribute
+        // strings) which MINEP004/MINEP006 never read. Groups stay as EndpointGroupDefinition,
+        // which is already lightweight (name/prefix/parent strings only).
+        var endpointFacts = new ConcurrentDictionary<INamedTypeSymbol, EndpointRouteFacts>(SymbolEqualityComparer.Default);
+        var groups = new ConcurrentDictionary<INamedTypeSymbol, EndpointGroupDefinition>(SymbolEqualityComparer.Default);
 
         context.RegisterSymbolAction(symbolContext =>
         {
             if (symbolContext.Symbol is not INamedTypeSymbol namedTypeSymbol)
+            {
+                return;
+            }
+
+            // Cheap, non-allocating pre-check: bail out before the allocating Classify() for the
+            // overwhelming majority of types that carry no Map/Group attribute at all.
+            if (!HasMapOrGroupAttribute(namedTypeSymbol))
             {
                 return;
             }
@@ -47,8 +61,6 @@ public class GroupsAnalyzer : DiagnosticAnalyzer
             if (classification.IsEndpointAndGroup)
             {
                 // A class decorated with both an endpoint attribute and [MapGroup] is invalid.
-                // Report MINEP007 explicitly instead of relying on a thrown exception, and do not
-                // build a definition for it.
                 var invalidSymbolDiagnostic = Diagnostic.Create(
                     Diagnostics.InvalidSymbolKind,
                     namedTypeSymbol.Locations.FirstOrDefault(),
@@ -58,94 +70,161 @@ public class GroupsAnalyzer : DiagnosticAnalyzer
                 return;
             }
 
-            var definition = SymbolDefinitionFactory.TryCreateSymbol(namedTypeSymbol);
-
-            if (definition != null)
-            {
-                definitions.TryAdd(namedTypeSymbol, definition);
-            }
-
-        }, SymbolKind.NamedType);
-
-        context.RegisterCompilationEndAction(compilationContext =>
-        {
-            if (definitions.IsEmpty)
+            // Beyond this point only classes can be endpoints/groups (structs/interfaces/enums are
+            // never generated). MINEP007 above is preserved for any kind that carries both attributes.
+            if (namedTypeSymbol.TypeKind != TypeKind.Class)
             {
                 return;
             }
 
-            var endpoints = new List<EndpointDefinition>(definitions.Count);
-            var groupDefinitions = new List<EndpointGroupDefinition>(definitions.Count);
-            Dictionary<INamedTypeSymbol, EndpointGroupDefinition> groups;
+            var shape = SymbolDefinitionFactory.ClassifyShape(namedTypeSymbol);
 
-            foreach (var def in definitions.Values)
+            if (classification.EndpointAttributes.Length == 1 && classification.GroupAttributes.Length == 0)
             {
-                switch (def)
+                // Endpoint class. Unsupported non-abstract shapes are reported as MINEP008 by the
+                // EndpointsAnalyzer; skip them here to avoid a duplicate diagnostic.
+                if (shape != ShapeRejection.None)
                 {
-                    case EndpointDefinition endpoint:
-                        endpoints.Add(endpoint);
-                        break;
-                    case EndpointGroupDefinition group:
-                        groupDefinitions.Add(group);
-                        break;
+                    return;
                 }
+
+                var facts = TryGetEndpointRouteFacts(namedTypeSymbol, classification.EndpointAttributes[0]);
+                if (facts.HasValue)
+                {
+                    endpointFacts.TryAdd(namedTypeSymbol, facts.Value);
+                }
+
+                return;
             }
 
-            groups = groupDefinitions.Count > 0
-                ? groupDefinitions.FillHierarchyAndDetectCycles()
-                : new Dictionary<INamedTypeSymbol, EndpointGroupDefinition>(SymbolEqualityComparer.Default);
+            if (classification.GroupAttributes.Length == 1 && classification.EndpointAttributes.Length == 0)
+            {
+                // Group class. The EndpointsAnalyzer never looks at group classes, so MINEP008 for
+                // an unsupported (non-abstract) group shape is reported here. Abstract is skipped
+                // silently (legitimate base pattern).
+                if (shape == ShapeRejection.Abstract)
+                {
+                    return;
+                }
 
-            ReportAmbiguousRoutes(compilationContext, endpoints, groups);
-            ReportCyclicGroupHierarchies(compilationContext, [..groups.Values]);
+                if (shape != ShapeRejection.None)
+                {
+                    var unsupportedShapeDiagnostic = Diagnostic.Create(
+                        Diagnostics.UnsupportedEndpointShape,
+                        namedTypeSymbol.Locations.FirstOrDefault(),
+                        namedTypeSymbol.Name,
+                        SymbolDefinitionFactory.DescribeShapeRejection(shape)
+                    );
+                    symbolContext.ReportDiagnostic(unsupportedShapeDiagnostic);
+                    return;
+                }
+
+                var group = new EndpointGroupDefinition(namedTypeSymbol, classification.GroupAttributes[0]);
+                groups.TryAdd(namedTypeSymbol, group);
+            }
+
+            // Anything else (e.g. multiple endpoint attributes) is left to the EndpointsAnalyzer.
+        }, SymbolKind.NamedType);
+
+        context.RegisterCompilationEndAction(compilationContext =>
+        {
+            if (endpointFacts.IsEmpty && groups.IsEmpty)
+            {
+                return;
+            }
+
+            var groupDefinitions = new List<EndpointGroupDefinition>(groups.Count);
+            var groupSymbolsByName = new Dictionary<string, INamedTypeSymbol>();
+
+            foreach (var pair in groups)
+            {
+                groupDefinitions.Add(pair.Value);
+                groupSymbolsByName[pair.Value.ClassType.FullName] = pair.Key;
+            }
+
+            var hierarchy = GroupHierarchy.Build(groupDefinitions);
+
+            ReportAmbiguousRoutes(compilationContext, endpointFacts.Values, hierarchy);
+            ReportCyclicGroupHierarchies(compilationContext, hierarchy, groupSymbolsByName);
         });
+    }
+
+    private static bool HasMapOrGroupAttribute(INamedTypeSymbol symbol)
+    {
+        foreach (var attribute in symbol.GetAttributes())
+        {
+            if (EndpointDefinition.Factory.Predicate(attribute) || EndpointGroupDefinition.Factory.Predicate(attribute))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Extracts the route facts MINEP004 needs without building a full endpoint model. Returns
+    /// <c>null</c> for a malformed attribute or an endpoint with no valid entry point — preserving
+    /// the previous behaviour, where such endpoints were excluded from ambiguity analysis because
+    /// the full-model factory returned null.
+    /// </summary>
+    private static EndpointRouteFacts? TryGetEndpointRouteFacts(INamedTypeSymbol symbol, AttributeData endpointAttribute)
+    {
+        var mapDefinition = endpointAttribute.GetMapMethodAttributeDefinition();
+        if (mapDefinition == null)
+        {
+            return null;
+        }
+
+        if (symbol.FindEntryPointMethod(mapDefinition.EntryPoint) == null)
+        {
+            return null;
+        }
+
+        return new EndpointRouteFacts(symbol, mapDefinition.Pattern, mapDefinition.Methods, mapDefinition.GroupTypeName);
     }
 
     private static void ReportCyclicGroupHierarchies(
         CompilationAnalysisContext compilationContext,
-        ImmutableArray<EndpointGroupDefinition> groups
+        GroupHierarchy hierarchy,
+        Dictionary<string, INamedTypeSymbol> groupSymbolsByName
     )
     {
-        foreach (var group in groups)
+        foreach (var cycle in hierarchy.Cycles)
         {
-            if (group.Cycles.Count == 0)
-            {
-                continue;
-            }
+            var cycleString = string.Join(" -> ", cycle.Names);
+            groupSymbolsByName.TryGetValue(cycle.Group.ClassType.FullName, out var symbol);
 
-            foreach (var cycle in group.Cycles)
-            {
-                var cycleString = string.Join(" -> ", cycle.Select(g => g.Symbol.Name));
-                var diagnostic = Diagnostic.Create(
-                    Diagnostics.CyclicGroupHierarchy,
-                    group.Symbol.Locations.FirstOrDefault(),
-                    group.Symbol.Name,
-                    cycleString
-                );
+            var diagnostic = Diagnostic.Create(
+                Diagnostics.CyclicGroupHierarchy,
+                symbol?.Locations.FirstOrDefault(),
+                cycle.Group.Name,
+                cycleString
+            );
 
-                compilationContext.ReportDiagnostic(diagnostic);
-            }
+            compilationContext.ReportDiagnostic(diagnostic);
         }
     }
 
     private static void ReportAmbiguousRoutes(CompilationAnalysisContext compilationContext,
-        List<EndpointDefinition> endpoints, Dictionary<INamedTypeSymbol, EndpointGroupDefinition> groups)
+        IEnumerable<EndpointRouteFacts> endpoints, GroupHierarchy hierarchy)
     {
         var endpointsByPath = endpoints
             .Select(x =>
             {
-                var path = BuildFullPath(x, groups);
+                var path = BuildFullPath(x, hierarchy);
 
                 return new
                 {
-                    Endpoint = x,
+                    x.Symbol,
                     Path = path,
                     NormalizedPattern = NormalizeRoutePattern(path),
-                    HttpMethods = x.MapMethodsAttribute.Methods,
+                    HttpMethods = x.Methods,
                 };
             })
             .SelectMany(x => x.HttpMethods.Select(httpMethod => new
             {
-                HttpMethod = httpMethod, x.NormalizedPattern, x.Path, Endpoint = x.Endpoint,
+                HttpMethod = httpMethod, x.NormalizedPattern, x.Path, x.Symbol,
             }))
             .GroupBy(x => (x.NormalizedPattern, x.HttpMethod))
             .Where(x => x.Count() > 1)
@@ -167,10 +246,10 @@ public class GroupsAnalyzer : DiagnosticAnalyzer
 
                     var diagnostic = Diagnostic.Create(
                         Diagnostics.AmbiguousRoutes,
-                        first.Endpoint.Symbol.Locations.FirstOrDefault(),
-                        first.Endpoint.Symbol.Name,
+                        first.Symbol.Locations.FirstOrDefault(),
+                        first.Symbol.Name,
                         first.Path,
-                        second.Endpoint.Symbol.Name
+                        second.Symbol.Name
                     );
 
                     compilationContext.ReportDiagnostic(diagnostic);
@@ -179,18 +258,17 @@ public class GroupsAnalyzer : DiagnosticAnalyzer
         }
     }
 
-    private static string BuildFullPath(EndpointDefinition endpointDefinition,
-        Dictionary<INamedTypeSymbol, EndpointGroupDefinition> groups)
+    private static string BuildFullPath(EndpointRouteFacts facts, GroupHierarchy hierarchy)
     {
         if (
-            endpointDefinition.MapMethodsAttribute.GroupType == null
-            || !groups.TryGetValue(endpointDefinition.MapMethodsAttribute.GroupType, out var groupDefinition)
+            facts.GroupTypeName == null
+            || !hierarchy.TryGet(facts.GroupTypeName, out var groupDefinition)
         )
         {
-            return endpointDefinition.MapMethodsAttribute.Pattern ?? string.Empty;
+            return facts.Pattern ?? string.Empty;
         }
 
-        return groupDefinition.FullPrefix + endpointDefinition.MapMethodsAttribute.Pattern;
+        return hierarchy.FullPrefixOf(groupDefinition) + facts.Pattern;
     }
 
     private static string NormalizeRoutePattern(string pattern)
@@ -219,4 +297,28 @@ public class GroupsAnalyzer : DiagnosticAnalyzer
 
         return normalized;
     }
+}
+
+/// <summary>
+/// The minimal route information MINEP004 needs from an endpoint — extracted directly from the Map
+/// attribute without building a full endpoint model. The <see cref="Symbol"/> is the live symbol
+/// from the current compilation (used only for the diagnostic location and name).
+/// </summary>
+internal readonly struct EndpointRouteFacts
+{
+    public EndpointRouteFacts(INamedTypeSymbol symbol, string pattern, string[] methods, string groupTypeName)
+    {
+        Symbol = symbol;
+        Pattern = pattern;
+        Methods = methods;
+        GroupTypeName = groupTypeName;
+    }
+
+    public INamedTypeSymbol Symbol { get; }
+
+    public string Pattern { get; }
+
+    public string[] Methods { get; }
+
+    public string GroupTypeName { get; }
 }

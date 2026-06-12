@@ -666,8 +666,8 @@ public class TestEndpoint
 
         // Assert
         Assert.NotNull(result);
-        Assert.NotNull(result.GroupType);
-        Assert.Equal("TestNamespace.ApiV1Group", result.GroupType.ToDisplayString());
+        Assert.NotNull(result.GroupTypeName);
+        Assert.Equal("TestNamespace.ApiV1Group", result.GroupTypeName);
         Assert.Null(result.EntryPoint);
         Assert.Null(result.ServiceName);
     }

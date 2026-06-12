@@ -27,7 +27,7 @@ internal sealed class EndpointDefinition : SymbolDefinition
         }
     );
 
-    private EndpointDefinition(INamedTypeSymbol symbol) : base(symbol)
+    private EndpointDefinition()
     {
     }
 
@@ -68,7 +68,7 @@ internal sealed class EndpointDefinition : SymbolDefinition
         var isConfigurable = symbol.IsConfigurableEndpoint();
         var isConditionallyMapped = symbol.IsConditionallyMapped();
 
-        var definition = new EndpointDefinition(symbol)
+        var definition = new EndpointDefinition()
         {
             ClassType = new TypeDefinition(symbol),
             MapMethodsAttribute = mapMethodsAttribute,
@@ -86,8 +86,7 @@ internal sealed class EndpointDefinition : SymbolDefinition
                         .Select(AttributeDefinition.FromAttributeData)
                         .Where(attr => attr != null)
                         .ToList()
-                }).ToDictionary(x => x.Name),
-                IsAsync = entryPoint.IsAsync || entryPoint.ReturnType.Name.Contains("Task")
+                }).ToDictionary(x => x.Name)
             },
             IsConfigurable = isConfigurable,
             IsConditionallyMapped = isConditionallyMapped
@@ -114,8 +113,8 @@ internal sealed class EndpointDefinition : SymbolDefinition
         return
             $"{ClassType.FullName}|{attr.Pattern}|{attr.EndpointBuilderMethodName}|" +
             $"{(attr.Methods is null ? "" : string.Join(",", attr.Methods))}|{attr.Lifetime}|" +
-            $"{attr.EntryPoint}|{attr.ServiceName}|{attr.GroupType?.ToDisplayString()}|" +
-            $"{EntryPoint.Name}|{EntryPoint.ReturnType.FullName}|{EntryPoint.IsAsync}|" +
+            $"{attr.EntryPoint}|{attr.ServiceName}|{attr.GroupTypeName}|" +
+            $"{EntryPoint.Name}|{EntryPoint.ReturnType.FullName}|" +
             $"{parameters}|{IsConfigurable}|{IsConditionallyMapped}";
     }
 }

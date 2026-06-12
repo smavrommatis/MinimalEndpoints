@@ -9,6 +9,4 @@ internal sealed class MethodInfo
     public Dictionary<string, ParameterInfo> Parameters { get; set; } = [];
 
     public TypeDefinition ReturnType { get; set; }
-
-    public bool IsAsync { get; set; }
 }

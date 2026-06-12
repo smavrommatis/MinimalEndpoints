@@ -405,60 +405,6 @@ public class TestEndpoint
     }
 
     [Fact]
-    public void Create_WithAsyncMethod_SetsIsAsyncFlag()
-    {
-        // Arrange
-        var code = @"
-namespace TestApp;
-
-[MapGet(""/test"")]
-public class TestEndpoint
-{
-    public async Task<IResult> Handle()
-    {
-        await Task.Delay(1);
-        return Results.Ok();
-    }
-}";
-
-        var compilation = new CompilationBuilder(code).WithMvcReferences().Build();
-        var classSymbol = GetClassSymbol(compilation, "TestEndpoint");
-        var attribute = classSymbol.GetAttributes().First();
-
-        // Act
-        var result = EndpointDefinition.Factory.Create(classSymbol, attribute) as EndpointDefinition;
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.EntryPoint.IsAsync);
-    }
-
-    [Fact]
-    public void Create_WithTaskReturnType_SetsIsAsyncFlag()
-    {
-        // Arrange
-        var code = @"
-namespace TestApp;
-
-[MapGet(""/test"")]
-public class TestEndpoint
-{
-    public Task<IResult> Handle() => Task.FromResult(Results.Ok());
-}";
-
-        var compilation = new CompilationBuilder(code).WithMvcReferences().Build();
-        var classSymbol = GetClassSymbol(compilation, "TestEndpoint");
-        var attribute = classSymbol.GetAttributes().First();
-
-        // Act
-        var result = EndpointDefinition.Factory.Create(classSymbol, attribute) as EndpointDefinition;
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.True(result.EntryPoint.IsAsync);
-    }
-
-    [Fact]
     public void ClassType_ReturnsTypeDefinition()
     {
         // Arrange

@@ -25,6 +25,68 @@ public class TestEndpoint
 
     private const string UnrelatedSource = "public class Unrelated { }";
 
+    private const string GroupSource = @"
+namespace TestApp;
+
+[MapGroup(""/api"")]
+public class ApiGroup { }";
+
+    private const string GroupedEndpointSource = @"
+namespace TestApp;
+
+[MapGet(""/users"", Group = typeof(ApiGroup))]
+public class GetUsers
+{
+    public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok());
+}";
+
+    private const string EditedGroupedEndpointSource = @"
+namespace TestApp;
+
+[MapGet(""/people"", Group = typeof(ApiGroup))]
+public class GetUsers
+{
+    public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok());
+}";
+
+    [Fact]
+    public void SecondRun_AfterEditToGroupedEndpointTree_KeepsGroupRouting()
+    {
+        // Regression: editing ONLY the endpoint's own tree re-transforms it against the new
+        // compilation, while the group's definition is served from cache (built against the
+        // previous compilation). With the old symbol-keyed group lookup, SymbolEqualityComparer
+        // never matched across compilations, so the endpoint silently lost its group prefix and
+        // was emitted ungrouped — no diagnostic. Resolving the link by fully-qualified-name string
+        // makes the cached group resolvable across compilations.
+        var compilation = new CompilationBuilder(GroupSource)
+            .WithAdditionalSource(GroupedEndpointSource)
+            .WithMvcReferences()
+            .Build(validateCompilation: false);
+
+        var driver = CreateTrackingDriver();
+
+        driver = driver.RunGenerators(compilation);
+        var firstText = GetGeneratedText(driver);
+
+        // Sanity: the endpoint is grouped on the first run.
+        Assert.Contains("builder.Map__TestApp_GetUsers(app, group_TestApp_ApiGroup);", firstText);
+
+        // Edit ONLY the endpoint tree (changing its route changes its cache key, forcing the
+        // output to recompute) while keeping its Group reference; the group tree is untouched.
+        var endpointTree = compilation.SyntaxTrees.Single(t => t.ToString().Contains("class GetUsers"));
+        var editedCompilation = compilation.ReplaceSyntaxTree(
+            endpointTree,
+            CSharpSyntaxTree.ParseText(EditedGroupedEndpointSource));
+
+        driver = driver.RunGenerators(editedCompilation);
+        var secondText = GetGeneratedText(driver);
+
+        // The endpoint must still be routed through its group after the incremental edit.
+        Assert.Contains("var group_TestApp_ApiGroup = builder.MapGroup__TestApp_ApiGroup(app);", secondText);
+        Assert.Contains("builder.Map__TestApp_GetUsers(app, group_TestApp_ApiGroup);", secondText);
+        Assert.DoesNotContain("builder.Map__TestApp_GetUsers(app);", secondText);
+    }
+
     [Fact]
     public void SecondRun_AfterEditToUnrelatedTree_ReportsCachedOutputs()
     {

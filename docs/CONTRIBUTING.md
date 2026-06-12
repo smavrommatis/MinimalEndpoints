@@ -111,6 +111,25 @@ dotnet run
 
 Visit `https://localhost:5001` to see the sample API in action.
 
+### Debugging the generator
+
+Source generators run inside the compiler, so `Console`/`Trace` output is unreliable during a build. Use these instead:
+
+- **See what was generated.** In a consuming project, dump the generated files to disk:
+
+  ```xml
+  <PropertyGroup>
+    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+    <CompilerGeneratedFilesOutputPath>$(BaseIntermediateOutputPath)Generated</CompilerGeneratedFilesOutputPath>
+  </PropertyGroup>
+  ```
+
+  The generated `MinimalEndpointExtensions.g.cs` is written under `obj/.../Generated/` for inspection.
+
+- **Build-time errors are surfaced as diagnostics.** Diagnostics are the generator's logging channel: user-facing problems are reported as `MINEP001`–`MINEP008`, and an unexpected generator failure is reported as **[MINEP999](diagnostics/MINEP999.md)** (with the exception type and message) instead of an opaque `CS8785`.
+
+- **Step through the generator.** Add `System.Diagnostics.Debugger.Launch();` at the top of `MinimalEndpointsGenerator.Initialize` (temporarily, for local debugging only) and build the consuming project to attach a debugger.
+
 ---
 
 ## Pull Request Process

@@ -12,54 +12,59 @@ internal class EndpointGroupDefinition : SymbolDefinition
                                     attributeData.AttributeClass.IsMapGroupAttribute(),
         create: (symbol, attributeData) => new EndpointGroupDefinition(symbol, attributeData));
 
-    private bool? _hierarchyConditionallyMapped = null;
     private readonly string _equalityKey;
 
-    public EndpointGroupDefinition(INamedTypeSymbol symbol, AttributeData attributeData) : base(symbol)
+    public EndpointGroupDefinition(INamedTypeSymbol symbol, AttributeData attributeData)
     {
-        AttributeData = attributeData;
+        Name = symbol.Name;
         ClassType = new TypeDefinition(symbol);
         IsConditionallyMapped = symbol.IsConditionallyMapped();
         IsConfigurable = symbol.IsConfigurableGroupEndpoint();
         Prefix = attributeData.ConstructorArguments.FirstOrDefault().Value as string ?? "/";
 
-        // Captured eagerly from transform-time data so the later hierarchy mutation
-        // (ParentGroup) cannot corrupt the cache key. The parent is keyed by its type name,
-        // matching how FillHierarchyAndDetectCycles resolves it from the same named argument.
+        // Capture the parent reference as a fully-qualified-name string at transform time. It is
+        // keyed identically to a group's own ClassType.FullName so the hierarchy resolves by name
+        // (no Roslyn symbol retained on the cached model, and the link survives across incremental
+        // compilations). The hierarchy itself is computed in a transient structure during output.
+        ParentGroupName = ResolveParentGroupName(attributeData);
+
         _equalityKey =
-            $"{ClassType.FullName}|{Prefix}|{IsConfigurable}|{IsConditionallyMapped}|" +
-            ResolveParentGroupTypeName(attributeData);
+            $"{ClassType.FullName}|{Prefix}|{IsConfigurable}|{IsConditionallyMapped}|{ParentGroupName}";
     }
 
     protected override string EqualityKey => _equalityKey;
 
-    private static string ResolveParentGroupTypeName(AttributeData attributeData)
+    private static string ResolveParentGroupName(AttributeData attributeData)
     {
         foreach (var namedArgument in attributeData.NamedArguments)
         {
             if (namedArgument.Key == "ParentGroup" &&
                 namedArgument.Value.Value is INamedTypeSymbol parentGroupSymbol)
             {
-                return parentGroupSymbol.ToDisplayString();
+                return new TypeDefinition(parentGroupSymbol).FullName;
             }
         }
 
         return null;
     }
 
-    public AttributeData AttributeData { get; }
+    /// <summary>The group type's simple (unqualified) name, e.g. <c>ApiGroup</c>.</summary>
+    public string Name { get; }
 
     public string Prefix { get; }
 
-    public TypeDefinition ClassType { get; set; }
+    public TypeDefinition ClassType { get; }
 
-    public EndpointGroupDefinition ParentGroup { get; set; }
+    /// <summary>
+    /// The fully-qualified name of this group's parent group (the <c>ParentGroup = typeof(...)</c>
+    /// argument), or <c>null</c>. Resolved against other groups by name in
+    /// <see cref="MinimalEndpoints.CodeGeneration.Groups.GroupHierarchy"/>.
+    /// </summary>
+    public string ParentGroupName { get; }
 
-    public bool IsConfigurable { get; set; }
+    public bool IsConfigurable { get; }
 
-    public bool IsConditionallyMapped { get; set; }
-
-    public List<List<CycleNode>> Cycles { get; } = [];
+    public bool IsConditionallyMapped { get; }
 
     public string VariableName
     {
@@ -99,44 +104,5 @@ internal class EndpointGroupDefinition : SymbolDefinition
 
             return field;
         }
-    }
-
-    public int Depth
-    {
-        get
-        {
-            if (field == 0)
-            {
-                var parentDepth = ParentGroup?.Depth ?? 0;
-                field = parentDepth + 1;
-            }
-
-            return field;
-        }
-    }
-
-    public bool HierarchyConditionallyMapped
-    {
-        get
-        {
-            _hierarchyConditionallyMapped ??= IsConditionallyMapped || (ParentGroup?.HierarchyConditionallyMapped ?? false);
-            return _hierarchyConditionallyMapped.Value;
-        }
-    }
-
-    public string FullPrefix
-    {
-        get
-        {
-            field ??= (ParentGroup?.FullPrefix ?? "") + Prefix;
-            return field;
-        }
-    }
-
-    internal struct CycleNode
-    {
-        public int Index { get; set; }
-
-        public INamedTypeSymbol Symbol { get; set; }
     }
 }

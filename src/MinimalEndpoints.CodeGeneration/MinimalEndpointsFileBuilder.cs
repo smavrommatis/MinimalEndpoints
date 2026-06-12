@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using MinimalEndpoints.CodeGeneration.Endpoints.Models;
+using MinimalEndpoints.CodeGeneration.Groups;
 using MinimalEndpoints.CodeGeneration.Groups.Models;
 using MinimalEndpoints.CodeGeneration.Models;
 
@@ -13,30 +14,34 @@ internal static class MinimalEndpointsFileBuilder
         string namespaceName,
         string className,
         List<EndpointDefinition> endpoints,
-        Dictionary<INamedTypeSymbol, EndpointGroupDefinition> groups
+        GroupHierarchy hierarchy
     )
     {
-        if (!endpoints.Any() && !groups.Any())
+        if (!endpoints.Any() && hierarchy.Count == 0)
         {
             return null;
         }
 
         var fileScope = CreateFileScope(namespaceName, className);
 
-        fileScope.AddMinimalEndpointsRegistrationMethod(endpoints, [..groups.Values]);
+        // Resolve method/variable names up front, disambiguating any sanitized-name collisions so
+        // the declaration and every call site use the same (unique) identifier.
+        var names = GeneratedNames.Build(endpoints, hierarchy.Groups);
+
+        fileScope.AddMinimalEndpointsRegistrationMethod(endpoints, [..hierarchy.Groups]);
 
         // Add group mapping methods
-        foreach (var group in groups.Values)
+        foreach (var group in hierarchy.Groups)
         {
-            fileScope.AddGroupMapMethod(group);
+            fileScope.AddGroupMapMethod(group, hierarchy, names);
         }
 
         foreach (var endpoint in endpoints)
         {
-            fileScope.AddMinimalEndpointMapMethod(endpoint, groups);
+            fileScope.AddMinimalEndpointMapMethod(endpoint, hierarchy, names);
         }
 
-        fileScope.AddMinimalEndpointsMapAllMethods(endpoints, groups);
+        fileScope.AddMinimalEndpointsMapAllMethods(endpoints, hierarchy, names);
 
         return fileScope;
     }
@@ -118,19 +123,21 @@ internal static class MinimalEndpointsFileBuilder
     }
 
     private static CSharpFileScope AddGroupMapMethod(this CSharpFileScope fileScope,
-        EndpointGroupDefinition groupDefinition)
+        EndpointGroupDefinition groupDefinition, GroupHierarchy hierarchy, GeneratedNames names)
     {
         var usings = fileScope.GetAvailableUsings();
 
+        var hasParent = hierarchy.Parent(groupDefinition) != null;
+
         // Determine parameters: if it has parent, need parent group parameter
-        var parameters = groupDefinition.ParentGroup != null
+        var parameters = hasParent
             ? "this IEndpointRouteBuilder builder, IApplicationBuilder app, RouteGroupBuilder parentGroup"
             : "this IEndpointRouteBuilder builder, IApplicationBuilder app";
 
         var method = fileScope.AddMethod(
             modifiers: "private static",
             returnType: groupDefinition.IsConditionallyMapped ? "RouteGroupBuilder?" : "RouteGroupBuilder",
-            methodName: groupDefinition.MappingGroupMethodName,
+            methodName: names.MethodName(groupDefinition),
             parameters: parameters
         );
 
@@ -144,7 +151,7 @@ internal static class MinimalEndpointsFileBuilder
         }
 
         // Map to parent group or main builder
-        var builderExpression = groupDefinition.ParentGroup != null ? "parentGroup" : "builder";
+        var builderExpression = hasParent ? "parentGroup" : "builder";
 
         method.AddLine($"var group = {builderExpression}.MapGroup(\"{groupDefinition.Prefix}\");");
 
@@ -163,13 +170,14 @@ internal static class MinimalEndpointsFileBuilder
     private static CSharpFileScope AddMinimalEndpointMapMethod(
         this CSharpFileScope fileScope,
         EndpointDefinition endpoint,
-        Dictionary<INamedTypeSymbol, EndpointGroupDefinition> allGroups
+        GroupHierarchy hierarchy,
+        GeneratedNames names
     )
     {
         const string instanceParameterBaseName = "endpointInstance";
 
-        var hasGroup = endpoint.MapMethodsAttribute.GroupType != null
-                       && allGroups.ContainsKey(endpoint.MapMethodsAttribute.GroupType);
+        var hasGroup = endpoint.MapMethodsAttribute.GroupTypeName != null
+                       && hierarchy.TryGet(endpoint.MapMethodsAttribute.GroupTypeName, out _);
         // Determine parameters: if endpoint has a group, include it
         var methodParameters = hasGroup
             ? "this IEndpointRouteBuilder builder, IApplicationBuilder app, RouteGroupBuilder group"
@@ -178,7 +186,7 @@ internal static class MinimalEndpointsFileBuilder
         var method = fileScope.AddMethod(
             modifiers: "private static",
             returnType: endpoint.IsConditionallyMapped ? "IEndpointRouteBuilder?" : "IEndpointRouteBuilder",
-            methodName: endpoint.MappingEndpointMethodName,
+            methodName: names.MethodName(endpoint),
             parameters: methodParameters
         );
 
@@ -259,7 +267,8 @@ internal static class MinimalEndpointsFileBuilder
 
     private static void AddMinimalEndpointsMapAllMethods(this CSharpFileScope fileScope,
         List<EndpointDefinition> endpoints,
-        Dictionary<INamedTypeSymbol, EndpointGroupDefinition> groups
+        GroupHierarchy hierarchy,
+        GeneratedNames names
     )
     {
         var method = fileScope.AddMethod(
@@ -272,25 +281,29 @@ internal static class MinimalEndpointsFileBuilder
         method.AddLine(
             "var builder = app as IEndpointRouteBuilder ?? throw new ArgumentException(\"IApplicationBuilder is not an IEndpointRouteBuilder\");");
 
-        if (groups.Count > 0)
+        if (hierarchy.Count > 0)
         {
             method.AddEmptyLine();
             method.AddLine("// Create and configure groups in hierarchy order");
 
             // Sort groups by hierarchy: parents before children
-            var sortedGroups = groups.Values.OrderBy(x => x.Depth);
+            var sortedGroups = hierarchy.Groups.OrderBy(hierarchy.DepthOf);
 
             foreach (var group in sortedGroups)
             {
-                if (group.ParentGroup is not null)
+                var variableName = names.VariableName(group);
+                var methodName = names.MethodName(group);
+                var parent = hierarchy.Parent(group);
+                if (parent is not null)
                 {
-                    method.AddLine(group.HierarchyConditionallyMapped
-                        ? $"var {group.VariableName} = {group.ParentGroup.VariableName} is null ? null : builder.{group.MappingGroupMethodName}(app, {group.ParentGroup.VariableName});"
-                        : $"var {group.VariableName} = builder.{group.MappingGroupMethodName}(app, {group.ParentGroup.VariableName});");
+                    var parentVariableName = names.VariableName(parent);
+                    method.AddLine(hierarchy.HierarchyConditionallyMappedOf(group)
+                        ? $"var {variableName} = {parentVariableName} is null ? null : builder.{methodName}(app, {parentVariableName});"
+                        : $"var {variableName} = builder.{methodName}(app, {parentVariableName});");
                 }
                 else
                 {
-                    method.AddLine($"var {group.VariableName} = builder.{group.MappingGroupMethodName}(app);");
+                    method.AddLine($"var {variableName} = builder.{methodName}(app);");
                 }
             }
 
@@ -303,30 +316,29 @@ internal static class MinimalEndpointsFileBuilder
 
         foreach (var endpoint in endpointsWithoutGroups)
         {
-            method.AddLine($"builder.{endpoint.MappingEndpointMethodName}(app);");
+            method.AddLine($"builder.{names.MethodName(endpoint)}(app);");
         }
 
         foreach (var pair in endpointsWithGroups)
         {
-            var symbol = pair.Key;
-
-            if (groups.TryGetValue(symbol, out var group))
+            if (hierarchy.TryGet(pair.Key, out var group))
             {
+                var variableName = names.VariableName(group);
                 var indentationLevel = 0;
-                if (group.HierarchyConditionallyMapped)
+                if (hierarchy.HierarchyConditionallyMappedOf(group))
                 {
-                    method.AddLine($"if ({group.VariableName} is not null)");
+                    method.AddLine($"if ({variableName} is not null)");
                     method.AddLine("{");
                     indentationLevel = 1;
                 }
 
                 foreach (var endpoint in pair.Value)
                 {
-                    var mapEndpointLine = $"builder.{endpoint.MappingEndpointMethodName}(app, {group.VariableName});";
+                    var mapEndpointLine = $"builder.{names.MethodName(endpoint)}(app, {variableName});";
                     method.AddLine(mapEndpointLine, indentationLevel);
                 }
 
-                if (group.HierarchyConditionallyMapped)
+                if (hierarchy.HierarchyConditionallyMappedOf(group))
                 {
                     method.AddLine("}");
                 }
@@ -335,7 +347,7 @@ internal static class MinimalEndpointsFileBuilder
             {
                 foreach (var endpoint in pair.Value)
                 {
-                    method.AddLine($"builder.{endpoint.MappingEndpointMethodName}(app);");
+                    method.AddLine($"builder.{names.MethodName(endpoint)}(app);");
                 }
             }
         }
@@ -343,22 +355,22 @@ internal static class MinimalEndpointsFileBuilder
         method.AddLine("return app;");
     }
 
-    private static (List<EndpointDefinition> endpointsWithoutGroups, Dictionary<INamedTypeSymbol, List<EndpointDefinition>> endpointsWithGroups) GroupEndpointsByGroup(List<EndpointDefinition> endpoints)
+    private static (List<EndpointDefinition> endpointsWithoutGroups, Dictionary<string, List<EndpointDefinition>> endpointsWithGroups) GroupEndpointsByGroup(List<EndpointDefinition> endpoints)
     {
         var endpointsWithoutGroups = new List<EndpointDefinition>();
-        var endpointsWithGroups = new Dictionary<INamedTypeSymbol, List<EndpointDefinition>>(SymbolEqualityComparer.Default);
+        var endpointsWithGroups = new Dictionary<string, List<EndpointDefinition>>();
 
         foreach (var endpoint in endpoints)
         {
-            if (endpoint.MapMethodsAttribute.GroupType == null)
+            if (endpoint.MapMethodsAttribute.GroupTypeName == null)
             {
                 endpointsWithoutGroups.Add(endpoint);
             }
             else
             {
-                if (!endpointsWithGroups.TryGetValue(endpoint.MapMethodsAttribute.GroupType, out var list))
+                if (!endpointsWithGroups.TryGetValue(endpoint.MapMethodsAttribute.GroupTypeName, out var list))
                 {
-                    endpointsWithGroups[endpoint.MapMethodsAttribute.GroupType] = list = [];
+                    endpointsWithGroups[endpoint.MapMethodsAttribute.GroupTypeName] = list = [];
                 }
 
                 list.Add(endpoint);
