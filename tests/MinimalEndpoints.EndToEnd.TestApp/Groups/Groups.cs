@@ -21,3 +21,21 @@ public class ApiV1Group : IConfigurableGroup
             return await next(context);
         });
 }
+
+/// <summary>
+/// Group whose prefix carries a route token (<c>/store/v{version}</c>). Verifies that a group-level
+/// route parameter flows into endpoint handler parameters by name with NO generator change: the
+/// prefix is emitted verbatim into <c>MapGroup(...)</c> and handler parameters are forwarded as
+/// declared, so an endpoint that declares <c>string version</c> binds the segment.
+/// </summary>
+[MapGroup("/store/v{version}")]
+public class VersionedStoreGroup;
+
+/// <summary>
+/// Nested group adding a CONSTRAINED token (<c>p{page:int}</c>) beneath <see cref="VersionedStoreGroup"/>
+/// (composed prefix <c>/store/v{version}/p{page:int}</c>). Verifies that parent and child prefix tokens
+/// compose and that a route constraint passes through verbatim, so an endpoint binds both
+/// <c>version</c> and <c>page</c>.
+/// </summary>
+[MapGroup("/p{page:int}", ParentGroup = typeof(VersionedStoreGroup))]
+public class VersionedStorePageGroup;

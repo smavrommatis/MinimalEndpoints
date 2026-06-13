@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+- Documented that **route parameters in a group prefix** — e.g. `[MapGroup("/v{version}")]`, including
+  constraints (`{version:int}`) and tokens inherited from parent groups — bind into endpoint handler
+  parameters by name, with no `[FromRoute]` attribute or generator change required. Added end-to-end
+  tests covering single-level, hierarchical, and constrained prefix tokens.
+
 ## [1.1.0] - 2026-06-13
 
 A large correctness, reliability, and packaging release. The source generator no longer crashes on

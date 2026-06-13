@@ -36,6 +36,8 @@ public sealed class MapGroupAttribute : Attribute
     /// <remarks>
     /// The prefix is prepended to all endpoint routes in this group.
     /// Leading and trailing slashes are handled automatically.
+    /// The prefix may contain route parameters (e.g. <c>"/v{version}"</c> or <c>"/v{version:int}"</c>);
+    /// endpoints in the group bind them by declaring a handler parameter of the same name.
     /// </remarks>
     public string Prefix { get; }
 

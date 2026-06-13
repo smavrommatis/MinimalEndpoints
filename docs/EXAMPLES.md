@@ -13,7 +13,8 @@
 10. [Complex Types](#complex-types)
 11. [Endpoint Groups](#endpoint-groups)
 12. [Hierarchical Groups](#hierarchical-groups)
-13. [Conditional Mapping](#conditional-mapping)
+13. [Route Parameters in Group Prefixes](#route-parameters-in-group-prefixes)
+14. [Conditional Mapping](#conditional-mapping)
 
 ---
 
@@ -1607,6 +1608,64 @@ ApiGroup (/api)                          [OpenAPI]
   └─ V2Group (/api/v2)                   [OpenAPI + AdminAuth]
       └─ ProductsGroup (/api/v2/products)[OpenAPI + AdminAuth + Cache]
 ```
+
+---
+
+## Route Parameters in Group Prefixes
+
+A group prefix is emitted verbatim into `MapGroup(...)`, so it can contain **route parameters** just like any endpoint pattern. Endpoints in the group consume them by declaring a handler parameter of the **same name** — ASP.NET Core binds route values to parameters by name, so no `[FromRoute]` attribute and no extra configuration are required.
+
+### Token in a group prefix
+
+```csharp
+using MinimalEndpoints.Annotations;
+
+[MapGroup("/api/v{version}")]
+public class VersionedApiGroup { }
+
+[MapGet("/products", Group = typeof(VersionedApiGroup))]
+public class ListProductsEndpoint
+{
+    // {version} comes from the group prefix and binds to this parameter by name.
+    public Task<IResult> HandleAsync(string version) =>
+        Task.FromResult(Results.Ok(new { version }));
+}
+
+// GET /api/v2/products  ->  200  { "version": "2" }
+```
+
+### Route constraints and parent-group tokens
+
+Constraints (`{version:int}`) pass through verbatim, and a token declared on a **parent** group flows into every descendant — both bind together:
+
+```csharp
+using MinimalEndpoints.Annotations;
+
+// Parent group contributes the {tenant} token.
+[MapGroup("/tenants/{tenant}")]
+public class TenantGroup { }
+
+// Child group adds a constrained {version:int} token on top.
+[MapGroup("/v{version:int}", ParentGroup = typeof(TenantGroup))]
+public class TenantApiGroup { }
+
+[MapGet("/orders", Group = typeof(TenantApiGroup))]
+public class ListTenantOrdersEndpoint
+{
+    public Task<IResult> HandleAsync(string tenant, int version) =>
+        Task.FromResult(Results.Ok(new { tenant, version }));
+}
+
+// GET /tenants/acme/v3/orders  ->  200  { "tenant": "acme", "version": 3 }
+// GET /tenants/acme/vX/orders  ->  404 (the :int constraint rejects "X")
+```
+
+### Notes
+
+- **Binding is by name** (case-insensitive). If the handler parameter name does not match the token name, it is **not** bound from the route — it falls back to query-string binding, so a required parameter returns `400`. `[FromRoute] string version` is allowed and behaves identically.
+- **A prefix token is a required segment.** `GET /api/products` does not match `/api/v{version}/products` — the `v{version}` segment must be present.
+- **Constraints, optional tokens (`{id?}`), and catch-all tokens** behave exactly as in a hand-written `MapGroup` prefix; the generator does not interpret them.
+- **No runtime reflection** is introduced — this is stock ASP.NET Core routing, so it stays AOT-friendly.
 
 ---
 

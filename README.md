@@ -28,6 +28,7 @@ MinimalEndpoints brings the benefits of class-based organization to ASP.NET Core
   - [Service Lifetime](#service-lifetime)
   - [Endpoint Groups](#endpoint-groups)
   - [Hierarchical Groups](#hierarchical-groups)
+  - [Route Parameters in Group Prefixes](#route-parameters-in-group-prefixes)
   - [Service Interface](#service-interface)
   - [Advanced Configuration](#advanced-configuration)
 - [Integration with ASP.NET Core](#-integration-with-aspnet-core)
@@ -310,6 +311,54 @@ public class ListAdminUsersEndpoint
 - **API Versioning**: Organize by version hierarchies
 - **Feature Modules**: Group by business domains
 - **Compile-Time Validation**: Cycle detection prevents circular hierarchies (MINEP006)
+
+#### Route Parameters in Group Prefixes
+
+A group prefix can contain route parameters. Any endpoint in the group binds them by declaring a
+handler parameter of the same name — no `[FromRoute]` and no generator configuration required. The
+prefix is emitted verbatim into `MapGroup(...)`, so ASP.NET Core binds the route values to handler
+parameters by name:
+
+```csharp
+[MapGroup("/api/v{version}")]
+public class VersionedApiGroup { }
+
+[MapGet("/products", Group = typeof(VersionedApiGroup))]
+public class ListProductsEndpoint
+{
+    // The {version} token from the group prefix binds here by name.
+    public Task<IResult> HandleAsync(string version) => ...;
+}
+// GET /api/v2/products  ->  version == "2"
+```
+
+Route constraints and tokens inherited from parent groups behave the same way:
+
+```csharp
+[MapGroup("/tenants/{tenant}")]
+public class TenantGroup { }
+
+// Adds a constrained token; the parent's {tenant} token still flows through.
+[MapGroup("/v{version:int}", ParentGroup = typeof(TenantGroup))]
+public class TenantApiGroup { }
+
+[MapGet("/orders", Group = typeof(TenantApiGroup))]
+public class ListOrdersEndpoint
+{
+    public Task<IResult> HandleAsync(string tenant, int version) => ...;
+}
+// GET /tenants/acme/v3/orders  ->  tenant == "acme", version == 3
+// GET /tenants/acme/vX/orders  ->  404 (the :int constraint rejects "X")
+```
+
+**Notes:**
+- **Bind by name**: the handler parameter name must match the token name (case-insensitive). A
+  mismatch is not bound from the route — it falls back to query-string binding, so a required
+  parameter returns `400`. `[FromRoute]` is optional and behaves identically.
+- **Constraints & composition**: route constraints (`{version:int}`), optional tokens, and tokens
+  inherited from parent groups all behave exactly as in a hand-written `MapGroup` prefix.
+- **No reflection**: this is standard ASP.NET Core route binding — AOT-friendly, with no runtime
+  reflection added by the generator.
 
 
 ### Service Interface
