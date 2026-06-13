@@ -464,9 +464,9 @@ The type or namespace name 'Generated' does not exist in the namespace 'MinimalE
    dotnet build
    ```
 
-3. **Check if endpoints are public:**
+3. **Check the endpoint is referenceable from generated code:**
    ```csharp
-   public class TestEndpoint  // Must be public, not internal
+   public class TestEndpoint  // public or internal are both fine; private/protected nesting is not
    ```
 
 ---

@@ -5,7 +5,7 @@
 [![NuGet](https://img.shields.io/nuget/v/Blackeye.MinimalEndpoints)](https://www.nuget.org/packages/Blackeye.MinimalEndpoints)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/smavrommatis/MinimalEndpoints)
 [![License: BSD-2-Clause](https://img.shields.io/badge/License-BSD--2--Clause-blue.svg)](https://opensource.org/licenses/BSD-2-Clause)
-[![Code Coverage](https://img.shields.io/badge/coverage-95%25-brightgreen)](https://github.com/smavrommatis/MinimalEndpoints)
+[![Code Coverage](https://img.shields.io/badge/coverage%20gate-60%25%20line%2Fbranch%2Fmethod-brightgreen)](https://github.com/smavrommatis/MinimalEndpoints)
 
 MinimalEndpoints brings the benefits of class-based organization to ASP.NET Core Minimal APIs while maintaining their simplicity and performance. Using **source generators** and **Roslyn analyzers**, it provides compile-time code generation with zero runtime overhead.
 
@@ -15,6 +15,7 @@ MinimalEndpoints brings the benefits of class-based organization to ASP.NET Core
 
 - [Features](#-features)
 - [Installation](#-installation)
+- [Requirements](#-requirements)
 - [Quick Start](#-quick-start)
 - [Core Concepts](#-core-concepts)
   - [Endpoint Classes](#endpoint-classes)
@@ -71,6 +72,15 @@ Or via Package Manager:
 ```powershell
 Install-Package Blackeye.MinimalEndpoints
 ```
+
+---
+
+## ✅ Requirements
+
+- **.NET 8, 9, or 10** — the package multi-targets `net8.0;net9.0;net10.0`.
+- **C# 11 or later** — the group/endpoint configuration interfaces
+  (`IConfigurableGroup.ConfigureGroup`, `IConditionallyMapped.ShouldMap`) use
+  static abstract interface members, a C# 11 / .NET 7+ language feature.
 
 ---
 
@@ -475,10 +485,11 @@ You can annotate request types with standard DataAnnotations attributes, but be
 aware that **ASP.NET Core minimal APIs do NOT run DataAnnotations validation
 automatically**. Annotated payloads reach your handler unvalidated unless you
 either enable the .NET 10 validation source generator with
-`builder.Services.AddValidation()` (and `endpoint.WithValidation()` /
-`.AddEndpointFilter`) or validate explicitly inside the handler. On net8.0/net9.0,
-`AddValidation()` is unavailable, so validate manually or use a library such as
-FluentValidation.
+`builder.Services.AddValidation()` (MinimalEndpoints itself exposes no
+`WithValidation()` helper — apply any extra filters through
+`IConfigurableEndpoint.Configure`, e.g. `endpoint.AddEndpointFilter(...)`) or
+validate explicitly inside the handler. On net8.0/net9.0, `AddValidation()` is
+unavailable, so validate manually or use a library such as FluentValidation.
 
 ```csharp
 using System.ComponentModel.DataAnnotations;
@@ -567,7 +578,8 @@ internal static partial class MinimalEndpointExtensions
 
     public static IApplicationBuilder UseMinimalEndpoints(this IApplicationBuilder app)
     {
-        var builder = app as IEndpointRouteBuilder ?? throw new InvalidOperationException();
+        var builder = app as IEndpointRouteBuilder
+            ?? throw new ArgumentException("IApplicationBuilder is not an IEndpointRouteBuilder");
         builder.Map__Api_GetUserEndpoint(app);
         // ... other endpoints
         return app;
@@ -685,8 +697,8 @@ public class GetUserEndpoint
 **Solutions**:
 1. Clean and rebuild: `dotnet clean && dotnet build`
 2. Restart IDE (Visual Studio / Rider / VS Code)
-3. Check `.csproj` has `<OutputType>Exe</OutputType>` or `<OutputType>Library</OutputType>`
-4. Ensure you have the correct NuGet package version
+3. Confirm the analyzer reference is present (Dependencies → Analyzers → `MinimalEndpoints.CodeGeneration`)
+4. Ensure you have the correct NuGet package version and a supported .NET SDK (8.0+)
 
 ### Analyzer Errors
 

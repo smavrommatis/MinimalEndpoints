@@ -5,6 +5,12 @@ namespace MinimalEndpoints;
 /// <summary>
 /// Define a contract for endpoints and/or groups that support conditional mapping.
 /// </summary>
+/// <remarks>
+/// <see cref="ShouldMap"/> is <see langword="static"/> — like
+/// <see cref="IConfigurableEndpoint.Configure"/> and <see cref="IConfigurableGroup.ConfigureGroup"/> —
+/// so the generated code invokes it without registering or resolving an instance. Static abstract
+/// interface members require C# 11 / .NET 7 or later.
+/// </remarks>
 public interface IConditionallyMapped
 {
     /// <summary>

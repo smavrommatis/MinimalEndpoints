@@ -115,7 +115,7 @@ Works seamlessly with all built-in ASP.NET Core features:
 
 ### 🧪 Testing
 
-- 95%+ code coverage
+- CI-enforced coverage gate: 60% minimum on line, branch, and method coverage
 - 240+ unit tests
 - Integration test suite
 - Benchmark suite for performance validation

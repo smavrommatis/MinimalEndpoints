@@ -374,13 +374,13 @@ public class TypeDefinitionTests
 
 ### Test Coverage
 
-- Coverage is collected and **enforced automatically on `dotnet test`** for the unit and
-  integration test projects (via `coverlet.msbuild`; `CollectCoverage` is set in each
-  `.csproj`). The build fails if line, branch, or method coverage of the generator/analyzer
-  code under test drops below the `Threshold` declared in that project's `.csproj`.
-- That threshold is a **ratchet** pinned just below current coverage; raise it as coverage
-  improves. The long-term aim is **80%+**.
-- Coverage reports are written to each project's `TestResults/` (cobertura, opencover, lcov).
+- Coverage is measured and **enforced only in CI** (`.github/workflows/ci.yml`), which fails the
+  build if line, branch, or method coverage drops below **60%** (`ThresholdType=line,branch,method`).
+  Coverage is supplied on the CI `dotnet test` command line — the test `.csproj` files do **not**
+  collect coverage on a plain local `dotnet test`, so a local run is ungated.
+- The 60% gate is a **floor**; raise it as coverage improves. The long-term aim is **80%+**.
+- To reproduce the CI numbers locally, pass the coverage settings to `dotnet test` explicitly
+  (e.g. `/p:CollectCoverage=true`); reports are then written under each project's `TestResults/`.
 - **Test edge cases** (null, empty, boundary values)
 - **Test error conditions**
 - **Test happy paths**
