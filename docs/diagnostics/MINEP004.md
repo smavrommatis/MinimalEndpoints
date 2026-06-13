@@ -10,6 +10,7 @@ Warning
 
 ## Version History
 
+- **v1.1.0 (2026-06-13)**: Improved route comparison. Nested group prefixes lacking a leading slash now join correctly to the parent route; a duplicated verb in a single `[MapMethods]` no longer reports a route as conflicting with itself; and a trailing optional parameter (e.g. `/users/{id?}`) is now detected as overlapping the bare path (`/users`).
 - **v1.0.0 (2025-12-20)**: Initial implementation. Route parameters are normalized to `{param}` regardless of name or constraints. This means `/users/{id:int}` and `/users/{userId:int}` are both treated as `/users/{param}` and flagged as ambiguous.
 
 > **Note**: If this behavior causes issues in your scenario, please [report it](https://github.com/smavrommatis/MinimalEndpoints/issues/new?labels=analyzer,MINEP004) so we can improve the analyzer. See the [When to Suppress](#when-to-suppress) section for workarounds.

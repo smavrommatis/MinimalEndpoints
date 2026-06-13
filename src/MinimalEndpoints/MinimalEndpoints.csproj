@@ -18,7 +18,7 @@
   <PropertyGroup>
     <!-- Package metadata -->
     <PackageId>Blackeye.MinimalEndpoints</PackageId>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <Authors>S. Mavrommatis</Authors>
     <Company>Blackeye</Company>
     <Product>MinimalEndpoints</Product>

@@ -5,7 +5,41 @@ All notable changes to MinimalEndpoints will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.0] - 2025-01-31
+## [Unreleased]
+
+## [1.1.0] - 2026-06-13
+
+A large correctness, reliability, and packaging release. The source generator no longer crashes on
+malformed or ambiguous code, incremental generation is now correctly cached, group configuration
+moved to a static contract, and the package multi-targets net8.0/net9.0/net10.0.
+
+### Added
+- **MINEP008** — diagnostic for endpoint/group classes with an unsupported shape (open generic,
+  file-local, or below-`internal` accessibility); such classes are skipped instead of producing
+  non-compiling generated code.
+- **MINEP999** — surfaces an unexpected generator failure as a clear, actionable build error instead
+  of the opaque CS8785.
+- Multi-targeting: the runtime package now ships **net8.0, net9.0, and net10.0** (was net10.0-only).
+
+### Changed
+- **`IConfigurableGroup.ConfigureGroup` is now `static abstract void ConfigureGroup(IApplicationBuilder app, RouteGroupBuilder group)`** (was instance `void ConfigureGroup(RouteGroupBuilder)`); groups are no longer registered in or resolved from DI, matching the already-static endpoint `Configure` and `ShouldMap`.
+- The generated extension class is now `internal`, avoiding CS0436 collisions when two referencing projects both run the generator. **Endpoints and groups may now be `internal`** (only open-generic, file-local, or below-`internal` types are skipped).
+- Discovery uses `ForAttributeWithMetadataName`; pipeline models are value-equatable and keyed by fully-qualified name, so **incremental generation is correctly cached** (warm rebuilds reuse output).
+- Lowered the Roslyn floor to **4.8.0** (SDK 8.0.100 / VS 17.8) so older toolchains run the generator.
+- Type names are rendered from the symbol via a Roslyn `SymbolDisplayFormat` (tuples, arrays, nullable reference types, nested generics, pointers).
+- Publishing uses **NuGet Trusted Publishing (OIDC)** instead of a stored API key; release builds are deterministic with full SourceLink; CI enforces a 60% line/branch/method coverage gate on the merged total across test projects.
+
+### Fixed
+- The generator/analyzer no longer crash (CS8785 / AD0001) on malformed, mid-typing, or ambiguous endpoint source (multiple Map attributes, duplicated `[MapGroup]`, etc.).
+- `[MapHead]` and single-element `[MapMethods]` now emit a valid `MapMethods(pattern, [verbs], Handler)` call (previously emitted a non-existent `MapHead` extension / a malformed call).
+- Generated handler signatures render complex types correctly: tuples containing multi-argument generics, generic-of-array (`List<int[]>`), jagged + multidimensional arrays, and nullable reference annotations.
+- Entry-point methods named with a reserved C# keyword are escaped at the generated call site.
+- Optional-parameter defaults are reproduced as valid C# literals; floating-point defaults use round-trippable `G9`/`G17` format.
+- **MINEP004**: nested group prefixes without a leading slash join correctly to the parent route; a duplicated verb in one `[MapMethods]` no longer reports a route as conflicting with itself; a trailing optional parameter (`/users/{id?}`) is detected as overlapping the bare path.
+- The MINEP001 code fix now produces a compilable method (no CS1998; adds the required usings; honors a custom `EntryPoint`; escapes keyword names) and no longer offers an action that would create a duplicate member (CS0111/CS0102).
+- Numerous documentation and sample accuracy fixes.
+
+## [1.0.0] - 2025-12-31
 
 ### 🎉 First Stable Release
 
@@ -22,7 +56,7 @@ This is the first production-ready stable release of MinimalEndpoints, bringing 
   - 500 endpoints: 9.0ms, 7.3MB allocated
 - **Incremental Generation**: Only regenerates changed code
 
-#### Diagnostic Analyzers (8 Total)
+#### Diagnostic Analyzers (7 Total)
 - **MINEP001**: Missing entry point method detection - ensures endpoint has Handle/HandleAsync method
 - **MINEP002**: Multiple Map attributes validation - prevents conflicting attributes
 - **MINEP003**: ServiceType interface validation - validates interface compatibility
@@ -30,7 +64,6 @@ This is the first production-ready stable release of MinimalEndpoints, bringing 
 - **MINEP005**: Invalid endpoint group validation - ensures groups have [MapGroup] attribute
 - **MINEP006**: Cyclic group hierarchy detection - prevents circular parent-child relationships
 - **MINEP007**: Mixed endpoint/group detection - prevents classes from being both endpoint and group
-- **MINEP008**: Unsupported endpoint/group shape detection - skips generic, file-local, or below-internal classes
 
 #### Code Fixes
 - Automatic entry point method generation
@@ -105,7 +138,7 @@ Works seamlessly with all built-in ASP.NET Core features:
 ### 📚 Documentation
 
 - Complete README with quick start guide
-- 9 diagnostic documentation files (MINEP001-008, MINEP999)
+- 7 diagnostic documentation files (MINEP001-007)
 - 3 comprehensive example guides
 - Architecture documentation
 - Performance benchmarking guide
@@ -115,17 +148,15 @@ Works seamlessly with all built-in ASP.NET Core features:
 
 ### 🧪 Testing
 
-- CI-enforced coverage gate: 60% minimum on line, branch, and method coverage
-- 240+ unit tests
-- Integration test suite
+- Comprehensive unit test suite
 - Benchmark suite for performance validation
 - Sample projects (MinimalEndpoints.Sample, MinimalEndpoints.AdvancedSample)
 
 ### 📦 Technical Details
 
 **Target Frameworks:**
-- .NET 8.0, .NET 9.0, .NET 10.0 (runtime package multi-targets `net8.0;net9.0;net10.0`)
-- Source generator/analyzer: Roslyn 4.8.0 floor (SDK 8.0.100 / VS 17.8)
+- .NET 10.0 (runtime package targets `net10.0`)
+- Source generator/analyzer: Roslyn 5.0.0
 
 **Key Dependencies:**
 - Microsoft.CodeAnalysis.CSharp 4.8.0 (analyzer/generator)
@@ -185,11 +216,6 @@ app.Run();
 
 ---
 
-## [Unreleased]
-
-Nothing yet. This is the first stable release!
-
----
-
+[1.1.0]: https://github.com/smavrommatis/MinimalEndpoints/releases/tag/v1.1.0
 [1.0.0]: https://github.com/smavrommatis/MinimalEndpoints/releases/tag/v1.0.0
 
