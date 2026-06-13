@@ -27,24 +27,51 @@ jobs:
       - name: Build
         run: dotnet build MinimalEndpoints.slnx --configuration Release --no-restore
 
-      # The >= 60% coverage gate lives here, not in the test csprojs. coverlet.msbuild instruments
-      # during this build, so the test step intentionally does NOT pass --no-build. The threshold
-      # and exclusions (runtime library + test-helper assembly) are supplied on the command line so
-      # the gate is owned by CI and local `dotnet test` stays ungated. Commas in multi-value props
-      # are %2C-escaped: a literal comma is split by the dotnet CLI argument parser (MSB1006), and
-      # MSBuild un-escapes %2C back to a comma in the property value.
-      - name: Test with coverage gate
-        run: >
-          dotnet test MinimalEndpoints.slnx
-          --configuration Release
-          --no-restore
-          -p:CollectCoverage=true
-          -p:CoverletOutputFormat=cobertura
-          -p:Threshold=60
-          -p:ThresholdType=line%2Cbranch%2Cmethod
-          -p:ThresholdStat=total
-          -p:ExcludeByFile="**/obj/**/*.*%2C**/bin/**/*.*"
-          -p:Exclude="[MinimalEndpoints]*%2C[MinimalEndpoints.Tests.Common]*"
+      # The >= 60% coverage gate lives here, not in the test csprojs, so the gate is owned by CI and a
+      # local `dotnet test` stays ungated. It is checked ONCE on the MERGED total across all test
+      # projects, never per-project: the integration tests drive the generator while the unit tests
+      # drive the analyzers, so neither alone covers 60% of the whole assembly, but their union far
+      # exceeds it. Each project accumulates coverage into one file via coverlet's MergeWith, and the
+      # threshold is enforced only on the final run against that union. coverlet.msbuild instruments
+      # during this build, so we intentionally do NOT pass --no-build. The exclusions drop the runtime
+      # library and the test-helper assembly. Commas in multi-value props are %2C-escaped: a literal
+      # comma is split by the dotnet CLI argument parser (MSB1006), and MSBuild un-escapes %2C back.
+      - name: Test with merged coverage gate
+        run: |
+          set -euo pipefail
+          dir="$PWD/artifacts/coverage"
+          mkdir -p "$dir"
+          projects=(
+            tests/MinimalEndpoints.CodeGeneration.Tests/MinimalEndpoints.CodeGeneration.Tests.csproj
+            tests/MinimalEndpoints.CodeGeneration.IntegrationTests/MinimalEndpoints.CodeGeneration.IntegrationTests.csproj
+            tests/MinimalEndpoints.CodeFixes.Tests/MinimalEndpoints.CodeFixes.Tests.csproj
+            tests/MinimalEndpoints.EndToEnd.Tests/MinimalEndpoints.EndToEnd.Tests.csproj
+          )
+          last=$(( ${#projects[@]} - 1 ))
+          for i in "${!projects[@]}"; do
+            args=(
+              test "${projects[$i]}" --configuration Release --no-restore
+              -p:CollectCoverage=true
+              "-p:CoverletOutput=$dir/"
+              -p:ExcludeByFile="**/obj/**/*.*%2C**/bin/**/*.*"
+              -p:Exclude="[MinimalEndpoints]*%2C[MinimalEndpoints.Tests.Common]*"
+            )
+            if [ "$i" -ne 0 ]; then
+              args+=( "-p:MergeWith=$dir/coverage.json" )
+            fi
+            if [ "$i" -eq "$last" ]; then
+              # Final run: emit the merged cobertura and enforce the gate on the union.
+              args+=(
+                -p:CoverletOutputFormat="json%2Ccobertura"
+                -p:Threshold=60
+                -p:ThresholdType=line%2Cbranch%2Cmethod
+                -p:ThresholdStat=total
+              )
+            else
+              args+=( -p:CoverletOutputFormat=json )
+            fi
+            dotnet "${args[@]}"
+          done
 
       # Pack only the runtime package (the Roslyn/sample/benchmark/test projects are IsPackable=false),
       # with deterministic ContinuousIntegrationBuild so SourceLink/snupkg are meaningful.
