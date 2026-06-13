@@ -31,6 +31,32 @@ public class TestEndpoint
     }
 
     [Fact]
+    public void TryCreateSymbol_WithDuplicateParameterName_DoesNotThrow()
+    {
+        // A transient mid-edit state (duplicating a parameter while refactoring the Handle
+        // signature; the file already has CS0100) used to throw ArgumentException from
+        // .ToDictionary(x => x.Name) inside the transform — surfacing as AD0001 and dropping
+        // generation for EVERY endpoint in the compilation. Discovery must never throw.
+        var code = @"
+namespace TestApp;
+
+[MapGet(""/test"")]
+public class TestEndpoint
+{
+    public IResult Handle(int id, int id) => Results.Ok();
+}";
+
+        var compilation = new CompilationBuilder(code).WithMvcReferences().Build(validateCompilation: false);
+        var classSymbol = GetClassSymbol(compilation, "TestEndpoint");
+
+        // Act — must not throw.
+        var exception = Record.Exception(() => SymbolDefinitionFactory.TryCreateSymbol(classSymbol));
+
+        // Assert
+        Assert.Null(exception);
+    }
+
+    [Fact]
     public void TryCreateSymbol_WithMultipleEndpointAttributes_DoesNotThrow()
     {
         // Two endpoint attributes on one class is ambiguous. Discovery must return null (no throw);

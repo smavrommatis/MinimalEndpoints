@@ -142,14 +142,11 @@ public class EndpointsAnalyzer : DiagnosticAnalyzer
             var serviceTypeSymbol = GetServiceTypeSymbol(attributes[0]);
             if (serviceTypeSymbol != null)
             {
-                // Include inherited interface members: an entry point declared on a base interface
-                // is a valid match, so search the service type AND every interface it extends.
-                var interfaceHasMethod = serviceTypeSymbol.GetMembers()
-                    .Concat(serviceTypeSymbol.AllInterfaces.SelectMany(i => i.GetMembers()))
-                    .OfType<IMethodSymbol>()
-                    .Any(m => m.Name == entryPoint.Name &&
-                              !m.IsStatic &&
-                              m.DeclaredAccessibility == Accessibility.Public);
+                // The generator types the resolved instance as the ServiceType and calls
+                // instance.{EntryPoint}(args). For that call to bind, the ServiceType must expose a
+                // method with the entry point's NAME and a COMPATIBLE signature — matching by name
+                // alone let an incompatible overload pass analysis yet miscompile the generated call.
+                var interfaceHasMethod = ServiceTypeHasCompatibleEntryPoint(serviceTypeSymbol, entryPoint);
 
                 if (!interfaceHasMethod)
                 {
@@ -266,6 +263,73 @@ public class EndpointsAnalyzer : DiagnosticAnalyzer
         }
 
         return $"[{name}]";
+    }
+
+    /// <summary>
+    /// True when <paramref name="serviceType"/> (its own members, its base-class chain, or any
+    /// interface it implements/extends) exposes a public, non-static method whose name AND parameter
+    /// signature are compatible with <paramref name="entryPoint"/> — i.e. the generated
+    /// <c>instance.{EntryPoint}(args)</c> call would bind.
+    /// </summary>
+    private static bool ServiceTypeHasCompatibleEntryPoint(INamedTypeSymbol serviceType, IMethodSymbol entryPoint)
+    {
+        foreach (var candidate in EnumerateCandidateMethods(serviceType))
+        {
+            if (candidate.Name == entryPoint.Name &&
+                !candidate.IsStatic &&
+                candidate.DeclaredAccessibility == Accessibility.Public &&
+                ParametersMatch(candidate, entryPoint))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Yields every method visible on the service type: its own members, those of its base-class
+    /// chain (so a class ServiceType with an inherited entry point is not a false positive), and
+    /// those of every interface it implements or extends (AllInterfaces is transitive).
+    /// </summary>
+    private static IEnumerable<IMethodSymbol> EnumerateCandidateMethods(INamedTypeSymbol serviceType)
+    {
+        for (INamedTypeSymbol current = serviceType; current != null; current = current.BaseType)
+        {
+            foreach (var method in current.GetMembers().OfType<IMethodSymbol>())
+            {
+                yield return method;
+            }
+        }
+
+        foreach (var @interface in serviceType.AllInterfaces)
+        {
+            foreach (var method in @interface.GetMembers().OfType<IMethodSymbol>())
+            {
+                yield return method;
+            }
+        }
+    }
+
+    private static bool ParametersMatch(IMethodSymbol candidate, IMethodSymbol entryPoint)
+    {
+        if (candidate.Parameters.Length != entryPoint.Parameters.Length)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < candidate.Parameters.Length; i++)
+        {
+            // Compare by type identity (nullability-agnostic): the generated positional call binds
+            // regardless of reference-nullability annotations, but not across distinct types.
+            if (!SymbolEqualityComparer.Default.Equals(
+                    candidate.Parameters[i].Type, entryPoint.Parameters[i].Type))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static INamedTypeSymbol GetServiceTypeSymbol(AttributeData attributeData)

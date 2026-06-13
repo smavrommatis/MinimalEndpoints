@@ -1,3 +1,4 @@
+using Microsoft.CodeAnalysis;
 using MinimalEndpoints.CodeGeneration.Endpoints;
 using MinimalEndpoints.CodeGeneration.Utilities;
 
@@ -321,4 +322,57 @@ public class TestEndpoint
         // Assert
         Assert.Null(result);
     }
+
+    #region FormatDefaultValueLiteral - non-finite floating point
+
+    [Theory]
+    [InlineData("float", "float.NaN", "float.NaN")]
+    [InlineData("float", "float.PositiveInfinity", "float.PositiveInfinity")]
+    [InlineData("float", "float.NegativeInfinity", "float.NegativeInfinity")]
+    [InlineData("double", "double.NaN", "double.NaN")]
+    [InlineData("double", "double.PositiveInfinity", "double.PositiveInfinity")]
+    [InlineData("double", "double.NegativeInfinity", "double.NegativeInfinity")]
+    public void FormatDefaultValueLiteral_NonFiniteDefault_EmitsValidConstant(
+        string type, string defaultExpression, string expected)
+    {
+        // A non-finite default like 'float x = float.NaN' must not render as the bare identifier
+        // "NaNf"/"Infinityd" (CS0103) — it has to emit the named constant so the generated handler
+        // signature compiles.
+        var parameter = GetFirstParameter($@"
+namespace TestNamespace;
+
+public class TestClass
+{{
+    public void Method({type} value = {defaultExpression}) {{ }}
+}}");
+
+        Assert.Equal(expected, parameter.FormatDefaultValueLiteral());
+    }
+
+    [Theory]
+    [InlineData("float", "1.5", "1.5f")]
+    [InlineData("double", "1.5", "1.5d")]
+    public void FormatDefaultValueLiteral_FiniteFloatingDefault_EmitsRoundTrippableLiteralWithSuffix(
+        string type, string literal, string expected)
+    {
+        var parameter = GetFirstParameter($@"
+namespace TestNamespace;
+
+public class TestClass
+{{
+    public void Method({type} value = {literal}{(type == "float" ? "f" : "d")}) {{ }}
+}}");
+
+        Assert.Equal(expected, parameter.FormatDefaultValueLiteral());
+    }
+
+    private static IParameterSymbol GetFirstParameter(string code)
+    {
+        var compilation = new CompilationBuilder(code).Build();
+        var type = compilation.GetTypeByMetadataName("TestNamespace.TestClass");
+        var method = type!.GetMembers("Method").OfType<IMethodSymbol>().First();
+        return method.Parameters.First();
+    }
+
+    #endregion
 }

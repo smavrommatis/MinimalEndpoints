@@ -302,6 +302,48 @@ public class TestClass
         Assert.Contains("99.9", displayString);
     }
 
+    [Fact]
+    public void AttributeDefinition_FloatNaNArgument_EmitsNamedConstant()
+    {
+        // float.NaN as an attribute argument must not render as the bare identifier "NaNf" (CS0103);
+        // it has to emit the named constant so the generated parameter attribute compiles.
+        var code = @"
+public class FloatAttr : System.Attribute { public FloatAttr(float value) { } }
+
+public class TestClass
+{
+    public void Method([FloatAttr(float.NaN)] int parameter) { }
+}";
+        var compilation = new CompilationBuilder(code).Build();
+        var attributeData = GetParameterAttribute(compilation, "TestClass", "Method", "parameter");
+
+        var attrDef = AttributeDefinition.FromAttributeData(attributeData);
+        var displayString = attrDef.ToDisplayString(new HashSet<string>());
+
+        Assert.Contains("float.NaN", displayString);
+        Assert.DoesNotContain("NaNf", displayString);
+    }
+
+    [Fact]
+    public void AttributeDefinition_DoubleInfinityArgument_EmitsNamedConstant()
+    {
+        var code = @"
+public class DoubleAttr : System.Attribute { public DoubleAttr(double value) { } }
+
+public class TestClass
+{
+    public void Method([DoubleAttr(double.PositiveInfinity)] int parameter) { }
+}";
+        var compilation = new CompilationBuilder(code).Build();
+        var attributeData = GetParameterAttribute(compilation, "TestClass", "Method", "parameter");
+
+        var attrDef = AttributeDefinition.FromAttributeData(attributeData);
+        var displayString = attrDef.ToDisplayString(new HashSet<string>());
+
+        Assert.Contains("double.PositiveInfinity", displayString);
+        Assert.DoesNotContain("Infinityd", displayString);
+    }
+
     private static AttributeData GetParameterAttribute(CSharpCompilation compilation, string typeName, string methodName, string parameterName)
     {
         var type = compilation.GetTypeByMetadataName(typeName);

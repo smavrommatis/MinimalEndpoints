@@ -159,3 +159,11 @@ ANALYSIS_REPORT.md
 
 #BenchmarkDotNet Artifacts
 BenchmarkDotNet.Artifacts/
+
+# Code coverage
+# coverlet.msbuild writes these into the project directory (not TestResults/, which is ignored above)
+coverage.json
+coverage*.xml
+*.cobertura.xml
+*.opencover.xml
+coverage.info

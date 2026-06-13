@@ -808,6 +808,79 @@ namespace MyNs
         Assert.Equal("MyNs.Outer.Inner<int>", typeDef.FullName);
     }
 
+    [Fact]
+    public void ToDisplayString_NestedTypeOnClosedGeneric_RendersValidName_WhenNamespaceInUsings()
+    {
+        // Regression: SimplifyGenericType assumed the closing '>' was the final character, so a
+        // nested type on a CLOSED generic outer (Outer<int>.Inner) sliced past the matching '>'
+        // and emitted invalid C# ("Outer<int>.Inne>"). The simplified name must stay valid.
+        var code = @"
+namespace MyNs
+{
+    public class Outer<T>
+    {
+        public class Inner { }
+    }
+
+    public class Test
+    {
+        public Outer<int>.Inner Prop { get; set; }
+    }
+}";
+        var typeSymbol = GetPropertyType(code, "MyNs.Test", "Prop");
+        var typeDef = new TypeDefinition(typeSymbol);
+        var usings = new HashSet<string> { "MyNs" };
+
+        Assert.Equal("Outer<int>.Inner", typeDef.ToDisplayString(usings));
+    }
+
+    [Fact]
+    public void ToDisplayString_NestedTypeOnClosedGeneric_KeepsFullName_WhenNamespaceNotInUsings()
+    {
+        var code = @"
+namespace MyNs
+{
+    public class Outer<T>
+    {
+        public class Inner { }
+    }
+
+    public class Test
+    {
+        public Outer<int>.Inner Prop { get; set; }
+    }
+}";
+        var typeSymbol = GetPropertyType(code, "MyNs.Test", "Prop");
+        var typeDef = new TypeDefinition(typeSymbol);
+
+        Assert.Equal("MyNs.Outer<int>.Inner", typeDef.ToDisplayString(new HashSet<string>()));
+    }
+
+    [Fact]
+    public void ToDisplayString_GenericNestedTypeOnClosedGeneric_RendersValidName()
+    {
+        // The trailing nested segment itself carries generic arguments (Inner<string>); both the
+        // outer closed generic and the nested generic must survive simplification.
+        var code = @"
+namespace MyNs
+{
+    public class Outer<T>
+    {
+        public class Inner<U> { }
+    }
+
+    public class Test
+    {
+        public Outer<int>.Inner<string> Prop { get; set; }
+    }
+}";
+        var typeSymbol = GetPropertyType(code, "MyNs.Test", "Prop");
+        var typeDef = new TypeDefinition(typeSymbol);
+        var usings = new HashSet<string> { "MyNs" };
+
+        Assert.Equal("Outer<int>.Inner<string>", typeDef.ToDisplayString(usings));
+    }
+
     private static ITypeSymbol GetTypeSymbol(string code, string typeName)
     {
         var compilation = new CompilationBuilder(code).Build();

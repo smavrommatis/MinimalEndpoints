@@ -345,7 +345,7 @@ public class TestEndpoint
 
         // Assert
         Assert.NotNull(result);
-        var parameter = result.EntryPoint.Parameters["name"];
+        var parameter = result.EntryPoint.Parameters.Single(p => p.Name == "name");
         Assert.NotEmpty(parameter.Attributes);
     }
 
@@ -373,7 +373,7 @@ public class TestEndpoint
 
         // Assert
         Assert.NotNull(result);
-        var parameter = result.EntryPoint.Parameters["name"];
+        var parameter = result.EntryPoint.Parameters.Single(p => p.Name == "name");
         Assert.True(parameter.Nullable);
     }
 
@@ -399,7 +399,7 @@ public class TestEndpoint
 
         // Assert
         Assert.NotNull(result);
-        var parameter = result.EntryPoint.Parameters["count"];
+        var parameter = result.EntryPoint.Parameters.Single(p => p.Name == "count");
         Assert.NotNull(parameter.DefaultValue);
         Assert.Equal("10", parameter.DefaultValue);
     }

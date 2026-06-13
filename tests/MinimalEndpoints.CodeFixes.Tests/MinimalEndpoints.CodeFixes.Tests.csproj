@@ -2,10 +2,23 @@
 
   <PropertyGroup>
     <IsPackable>false</IsPackable>
+
+    <!-- Scope this project's coverage gate to the CodeFixes assembly. coverlet.msbuild (below) lets
+         the CI gate instrument and enforce the 60% threshold here, but without this Include it would
+         also instrument the large CodeGeneration assembly (which these tests barely exercise) and
+         drag the combined number below the threshold. The CI command sets only -p:Exclude, not
+         -p:Include, so this project-level Include is not overridden. -->
+    <Include>[MinimalEndpoints.CodeFixes]*</Include>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.4"/>
+    <!-- Drives the CI coverage gate for the CodeFixes assembly (see the Include above). Without it
+         the gate's MSBuild props were no-ops here, leaving EntryPointCodeFixProvider ungated. -->
+    <PackageReference Include="coverlet.msbuild" Version="6.0.4">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.CodeFix.Testing" Version="1.1.3"/>
     <!-- Pin the Roslyn workspace to match the analyzer/code-fix projects (5.0.0) so the
          testing package's older transitive Roslyn does not win and cause NU1605. -->

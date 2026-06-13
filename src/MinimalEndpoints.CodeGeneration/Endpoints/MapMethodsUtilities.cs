@@ -128,7 +128,9 @@ internal static class MapMethodsUtilities
                     entryPoint = entry;
                     break;
                 case "ServiceType" when namedArg.Value.Value is INamedTypeSymbol serviceType:
-                    serviceName = serviceType.ToDisplayString();
+                    // Render via the same TypeDefinition path every other emitted type uses (keyword
+                    // aliases, nested/generic handling), so type rendering has one audited policy.
+                    serviceName = new TypeDefinition(serviceType).FullName;
                     break;
                 // Capture the group reference as a fully-qualified-name string (via the same
                 // TypeDefinition path the group uses for its own identity), not the symbol — the

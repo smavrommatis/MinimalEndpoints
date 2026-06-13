@@ -42,30 +42,40 @@ public class EntryPointCodeFixProvider : CodeFixProvider
         // Generate methods with that name so applying the fix actually resolves MINEP001; otherwise fall
         // back to the conventional Handle/HandleAsync names.
         diagnostic.Properties.TryGetValue("EntryPoint", out var entryPoint);
+
+        // A custom EntryPoint that is not a usable C# identifier cannot be emitted as a method name
+        // (it would produce uncompilable code that never resolves MINEP001). Ignore it and fall back
+        // to the conventional names. Reserved keywords ARE valid identifiers here — they are emitted
+        // verbatim (e.g. "@class") at generation time.
+        if (!string.IsNullOrEmpty(entryPoint) && !SyntaxFacts.IsValidIdentifier(entryPoint))
+        {
+            entryPoint = null;
+        }
+
         var syncName = string.IsNullOrEmpty(entryPoint) ? "Handle" : entryPoint;
         var asyncName = string.IsNullOrEmpty(entryPoint) ? "HandleAsync" : entryPoint;
 
         context.RegisterCodeFix(
             CodeAction.Create(
                 title: $"Add {syncName} method",
-                createChangedDocument: c => AddHandleMethodAsync(context.Document, classDeclaration, syncName, c),
+                createChangedDocument: _ => AddHandleMethod(context.Document, root, classDeclaration, syncName),
                 equivalenceKey: "AddHandleMethod"),
             diagnostic);
 
         context.RegisterCodeFix(
             CodeAction.Create(
                 title: $"Add {asyncName} method (async)",
-                createChangedDocument: c => AddHandleAsyncMethodAsync(context.Document, classDeclaration, asyncName, c),
+                createChangedDocument: _ => AddHandleAsyncMethod(context.Document, root, classDeclaration, asyncName),
                 equivalenceKey: "AddHandleAsyncMethod"),
             diagnostic);
     }
 
-    private static async Task<Document> AddHandleMethodAsync(Document document, ClassDeclarationSyntax classDeclaration,
-        string methodName, CancellationToken cancellationToken)
+    private static Task<Document> AddHandleMethod(Document document, SyntaxNode root,
+        ClassDeclarationSyntax classDeclaration, string methodName)
     {
         var handleMethod = SyntaxFactory.MethodDeclaration(
                 SyntaxFactory.IdentifierName("IResult"),
-                methodName)
+                MethodIdentifier(methodName))
             .AddModifiers(SyntaxFactory.Token(SyntaxKind.PublicKeyword))
             .WithBody(SyntaxFactory.Block(
                 SyntaxFactory.ReturnStatement(
@@ -73,23 +83,24 @@ public class EntryPointCodeFixProvider : CodeFixProvider
             .WithAdditionalAnnotations(Formatter.Annotation);
 
         var newClass = classDeclaration.AddMembers(handleMethod);
-        var root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
+        // Reuse the root already fetched and null-checked in RegisterCodeFixesAsync instead of
+        // re-fetching and dereferencing it unchecked.
         var newRoot = root.ReplaceNode(classDeclaration, newClass);
 
         newRoot = EnsureUsingDirectives(newRoot, "Microsoft.AspNetCore.Http");
 
-        return document.WithSyntaxRoot(newRoot);
+        return Task.FromResult(document.WithSyntaxRoot(newRoot));
     }
 
-    private static async Task<Document> AddHandleAsyncMethodAsync(Document document,
-        ClassDeclarationSyntax classDeclaration, string methodName, CancellationToken cancellationToken)
+    private static Task<Document> AddHandleAsyncMethod(Document document, SyntaxNode root,
+        ClassDeclarationSyntax classDeclaration, string methodName)
     {
         // Emit a non-async method returning Task.FromResult(...) rather than `async` with no `await`,
         // which would warn CS1998 in the user's code.
         var handleMethod = SyntaxFactory.MethodDeclaration(
                 SyntaxFactory.GenericName("Task")
                     .AddTypeArgumentListArguments(SyntaxFactory.IdentifierName("IResult")),
-                methodName)
+                MethodIdentifier(methodName))
             .AddModifiers(SyntaxFactory.Token(SyntaxKind.PublicKeyword))
             .WithBody(SyntaxFactory.Block(
                 SyntaxFactory.ReturnStatement(
@@ -97,15 +108,26 @@ public class EntryPointCodeFixProvider : CodeFixProvider
             .WithAdditionalAnnotations(Formatter.Annotation);
 
         var newClass = classDeclaration.AddMembers(handleMethod);
-        var root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
         var newRoot = root.ReplaceNode(classDeclaration, newClass);
 
         // Task<IResult> requires System.Threading.Tasks in addition to the Microsoft.AspNetCore.Http
         // namespace that provides IResult/Results.
         newRoot = EnsureUsingDirectives(newRoot, "Microsoft.AspNetCore.Http", "System.Threading.Tasks");
 
-        return document.WithSyntaxRoot(newRoot);
+        return Task.FromResult(document.WithSyntaxRoot(newRoot));
     }
+
+    /// <summary>
+    /// Builds the method-name identifier, prefixing <c>@</c> when the name is a reserved C# keyword
+    /// (e.g. a custom <c>EntryPoint = "class"</c> emits <c>@class</c>) so the generated method is a
+    /// valid identifier and the analyzer still matches it by name. The verbatim token is produced via
+    /// the lexer (ParseToken) so its ValueText is the unescaped name ("class"), matching the token a
+    /// reparse of the emitted text would yield.
+    /// </summary>
+    private static SyntaxToken MethodIdentifier(string name) =>
+        SyntaxFacts.GetKeywordKind(name) != SyntaxKind.None
+            ? SyntaxFactory.ParseToken("@" + name)
+            : SyntaxFactory.Identifier(name);
 
     private static SyntaxNode EnsureUsingDirectives(SyntaxNode root, params string[] requiredUsings)
     {
@@ -114,8 +136,13 @@ public class EntryPointCodeFixProvider : CodeFixProvider
             return root;
         }
 
+        // Skip directives with a null Name: since C# 12 a using can alias a NON-name type (tuple,
+        // array, pointer), whose Name is null because the type lives on NamespaceOrType. Dereferencing
+        // it (even with the null-forgiving operator) threw an NRE, silently failing the fix.
         var existingUsings = new HashSet<string>(
-            compilationUnit.Usings.Select(u => u.Name!.ToString()));
+            compilationUnit.Usings
+                .Select(u => u.Name?.ToString())
+                .Where(name => name != null));
 
         // Accumulate on the evolving compilation unit (and dedupe) so that every missing using is added,
         // in the order given — not just the last one.

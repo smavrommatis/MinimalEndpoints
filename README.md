@@ -586,6 +586,7 @@ While you type, Roslyn analyzers check for common mistakes:
 - ✅ **MINEP005**: Validates group types have `[MapGroup]` attribute
 - ✅ **MINEP006**: Detects cyclic group hierarchies
 - ✅ **MINEP007**: Prevents classes from being both endpoint and group
+- ✅ **MINEP008**: Flags endpoint/group classes with an unsupported shape (open generic, file-local, or below `internal`)
 
 All validation happens at design-time with helpful error messages and quick fixes.
 
@@ -759,8 +760,8 @@ public class GetUsersEndpoint
 
 [Learn more →](docs/diagnostics/MINEP001.md)
 
-### MINEP002: Multiple MapMethods Attributes
-Prevents multiple mapping attributes on the same class.
+### MINEP002: Multiple Map Attributes
+Prevents multiple `Map*` attributes on the same class. To handle several HTTP methods on one route, use a single `[MapMethods("/route", new[] { "GET", "POST" })]`.
 
 ```csharp
 // ❌ Error: Multiple attributes
@@ -841,6 +842,20 @@ public class InvalidClass { }
 
 [Learn more →](docs/diagnostics/MINEP007.md)
 
+### MINEP008: Unsupported Endpoint or Group Shape
+Warns (does not error) when an endpoint or group class cannot be mapped because of its shape — an open generic type, a file-local type, or a type whose effective accessibility is below `internal`. The generator skips such classes, so this surfaces *why* nothing was generated for them.
+
+```csharp
+// ⚠️ Warning: open generic types cannot be referenced from generated code
+[MapGet("/items")]
+public class GetItemsEndpoint<T>
+{
+    public IResult Handle() => Results.Ok();
+}
+```
+
+[Learn more →](docs/diagnostics/MINEP008.md)
+
 ---
 
 ## 📚 Examples & Samples
@@ -849,8 +864,8 @@ public class InvalidClass { }
 
 Explore complete working examples in the `samples/` directory:
 
-- **[Basic Sample](samples/MinimalEndpoints.Sample/)** - Simple CRUD operations
-- **[Advanced Sample](samples/MinimalEndpoints.AdvancedSample/)** - IConfigurableEndpoint, validation, OpenAPI
+- **[Basic Sample](samples/MinimalEndpoints.Sample/)** - Minimal GET/POST endpoints with dependency injection
+- **[Advanced Sample](samples/MinimalEndpoints.AdvancedSample/)** - CRUD with groups, IConfigurableEndpoint, validation, OpenAPI
 
 ### Quick Examples
 

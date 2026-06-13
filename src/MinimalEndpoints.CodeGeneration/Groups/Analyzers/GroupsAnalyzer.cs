@@ -221,23 +221,24 @@ public class GroupsAnalyzer : DiagnosticAnalyzer
                     HttpMethods = x.Methods,
                 };
             })
-            .SelectMany(x => x.HttpMethods.Select(httpMethod => new
+            .SelectMany(x => NormalizeVerbs(x.HttpMethods).Select(httpMethod => new
             {
-                // Normalize verb casing to match the generator (which uppercases each verb), so e.g.
-                // [MapMethods("/a", new[] { "get" })] and [MapGet("/a")] are recognized as the same
-                // method and their route conflict is detected.
-                HttpMethod = (httpMethod ?? string.Empty).ToUpperInvariant(), x.NormalizedPattern, x.Path, x.Symbol,
+                HttpMethod = httpMethod, x.NormalizedPattern, x.Path, x.Symbol,
             }))
             .GroupBy(x => (x.NormalizedPattern, x.HttpMethod))
             .Where(x => x.Count() > 1)
             .ToList();
 
-        // Report diagnostics for ambiguous routes
+        // A given pair of endpoints can only collide on one normalized pattern (each endpoint has a
+        // single pattern), so two endpoints overlapping on several verbs would otherwise be reported
+        // once per shared verb — visually identical duplicate warnings. Collapse to one diagnostic
+        // per unordered endpoint pair.
+        var reportedPairs = new HashSet<(string, string)>();
+
         foreach (var group in endpointsByPath)
         {
             var endpointList = group.ToList();
 
-            // Report for all but skip reporting the same pair multiple times
             for (var i = 0; i < endpointList.Count; i++)
             {
                 for (var j = i + 1; j < endpointList.Count; j++)
@@ -245,6 +246,16 @@ public class GroupsAnalyzer : DiagnosticAnalyzer
                     var first = endpointList[i];
                     var second = endpointList[j];
 
+                    var firstName = first.Symbol.ToDisplayString();
+                    var secondName = second.Symbol.ToDisplayString();
+                    var pairKey = string.CompareOrdinal(firstName, secondName) <= 0
+                        ? (firstName, secondName)
+                        : (secondName, firstName);
+
+                    if (!reportedPairs.Add(pairKey))
+                    {
+                        continue;
+                    }
 
                     var diagnostic = Diagnostic.Create(
                         Diagnostics.AmbiguousRoutes,
@@ -258,6 +269,23 @@ public class GroupsAnalyzer : DiagnosticAnalyzer
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Normalizes an endpoint's HTTP verbs for conflict comparison. Verb casing is upper-cased to
+    /// match the generator (so <c>[MapMethods("/a", new[]{"get"})]</c> and <c>[MapGet("/a")]</c>
+    /// compare equal). An endpoint with no resolved verbs (an empty or all-null methods array) still
+    /// occupies its path, so it is represented by a single unspecified-verb sentinel rather than
+    /// being dropped from analysis — letting two such endpoints on one path still surface a conflict.
+    /// </summary>
+    private static IEnumerable<string> NormalizeVerbs(string[] methods)
+    {
+        if (methods == null || methods.Length == 0)
+        {
+            return new[] { string.Empty };
+        }
+
+        return methods.Select(method => (method ?? string.Empty).ToUpperInvariant());
     }
 
     private static string BuildFullPath(EndpointRouteFacts facts, GroupHierarchy hierarchy)
@@ -308,16 +336,20 @@ public class GroupsAnalyzer : DiagnosticAnalyzer
         // a prefix/pattern boundary does not mask an otherwise-identical route.
         normalized = Regex.Replace(normalized, "/{2,}", "/");
 
-        // Replace ALL route parameters with a generic placeholder
-        // This correctly identifies ambiguous routes:
+        // Replace ALL route parameters with a generic placeholder. This correctly identifies
+        // ambiguous routes:
         // - /{id:int} and /{userId:int} both become /{param}
         // - /{id} and /{name} both become /{param}
         // - /users/{id}/posts/{postId} becomes /users/{param}/posts/{param}
+        //
+        // The token body allows the doubled braces ASP.NET uses to escape a literal brace or a
+        // regex constraint's own quantifier braces (e.g. "{id:regex(^\d{{3}}$)}"). The previous
+        // "\{[^}]+\}" stopped at the first '}', so a doubled '}}' leaked and left "{param}}$)}",
+        // hiding a real conflict with a plain "{id}" route.
         normalized = Regex.Replace(
             normalized,
-            @"\{[^}]+\}", // Match any {parameter}, {parameter:constraint}, or {**catchall}
-            "{param}" // Replace with generic placeholder
-        );
+            @"\{(?:[^{}]|\{\{|\}\})*\}", // {parameter}, {parameter:constraint}, {**catchall}, with {{ }} escapes
+            "{param}");
 
         return normalized;
     }

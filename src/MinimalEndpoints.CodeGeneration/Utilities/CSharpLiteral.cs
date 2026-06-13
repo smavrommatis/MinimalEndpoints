@@ -36,6 +36,33 @@ internal static class CSharpLiteral
     /// </summary>
     public static string EscapeCharContent(char value) => Escape(value, isCharLiteral: true);
 
+    /// <summary>
+    /// Renders a <see cref="float"/> as valid C# literal text. Non-finite values (NaN, ±Infinity)
+    /// have no literal form — their <c>ToString</c> yields the bare words "NaN"/"Infinity", which
+    /// with the <c>f</c> suffix produce uncompilable identifiers (CS0103) — so they are emitted as
+    /// the named <c>float</c> constants instead. Finite values use the round-trippable "R" specifier
+    /// so the emitted literal re-parses to the exact same value on every host runtime.
+    /// </summary>
+    public static string FormatSingle(float value)
+    {
+        if (float.IsNaN(value)) return "float.NaN";
+        if (float.IsPositiveInfinity(value)) return "float.PositiveInfinity";
+        if (float.IsNegativeInfinity(value)) return "float.NegativeInfinity";
+        return value.ToString("R", CultureInfo.InvariantCulture) + "f";
+    }
+
+    /// <summary>
+    /// Renders a <see cref="double"/> as valid C# literal text. See <see cref="FormatSingle"/> for
+    /// the non-finite and round-trip rationale.
+    /// </summary>
+    public static string FormatDouble(double value)
+    {
+        if (double.IsNaN(value)) return "double.NaN";
+        if (double.IsPositiveInfinity(value)) return "double.PositiveInfinity";
+        if (double.IsNegativeInfinity(value)) return "double.NegativeInfinity";
+        return value.ToString("R", CultureInfo.InvariantCulture) + "d";
+    }
+
     private static string Escape(char c, bool isCharLiteral)
     {
         switch (c)

@@ -38,14 +38,25 @@ internal class SymbolDefinitionFactory
         // duplicated group attribute, or no recognized attribute — is left for the analyzers to
         // diagnose. Discovery must never throw here, or it crashes the whole generator (CS8785)
         // and drops every generated mapping, not just the offending class.
-        if (classification.EndpointAttributes.Length == 1 && classification.GroupAttributes.Length == 0)
+        try
         {
-            return EndpointDefinition.Factory.Create(symbol, classification.EndpointAttributes[0]);
-        }
+            if (classification.EndpointAttributes.Length == 1 && classification.GroupAttributes.Length == 0)
+            {
+                return EndpointDefinition.Factory.Create(symbol, classification.EndpointAttributes[0]);
+            }
 
-        if (classification.GroupAttributes.Length == 1 && classification.EndpointAttributes.Length == 0)
+            if (classification.GroupAttributes.Length == 1 && classification.EndpointAttributes.Length == 0)
+            {
+                return EndpointGroupDefinition.Factory.Create(symbol, classification.GroupAttributes[0]);
+            }
+        }
+        catch
         {
-            return EndpointGroupDefinition.Factory.Create(symbol, classification.GroupAttributes[0]);
+            // Defense in depth: discovery must never throw. The known mid-edit/error-state shapes
+            // are guarded individually, but an unanticipated exception here would surface as
+            // CS8785/AD0001 and drop generation for the ENTIRE compilation — not just this symbol.
+            // Skipping the symbol degrades gracefully instead.
+            return null;
         }
 
         return null;

@@ -768,9 +768,12 @@ public class TestEndpoint
     #region MINEP003 - Additional Edge Cases
 
     [Fact]
-    public void ServiceTypeValidation_ParameterTypeMismatch_InterfaceStillValidated()
+    public void ServiceTypeValidation_ParameterTypeMismatch_ReportsError()
     {
-        // Arrange
+        // The interface declares HandleAsync(string) but the endpoint's selected entry point is
+        // HandleAsync(int). The generator types the resolved instance as the ServiceType and calls
+        // instance.HandleAsync(int), which would NOT bind against HandleAsync(string) — so MINEP003
+        // must fire. Matching by name alone (ignoring the signature) let this miscompile through.
         var code = @"
 namespace TestApp;
 
@@ -780,14 +783,9 @@ public interface ITestEndpoint
 }
 
 [MapGet(""/test"", ServiceType = typeof(ITestEndpoint))]
-public class TestEndpoint : ITestEndpoint
+public class TestEndpoint
 {
-    public Task<IResult> HandleAsync(int id) // int parameter - mismatch
-    {
-        return Task.FromResult(Results.Ok());
-    }
-
-    public Task<IResult> HandleAsync(string id)
+    public Task<IResult> HandleAsync(int id) // int parameter - incompatible with the interface
     {
         return Task.FromResult(Results.Ok());
     }
@@ -797,7 +795,65 @@ public class TestEndpoint : ITestEndpoint
         var diagnostics = GetDiagnostics(code);
 
         // Assert
-        // Interface has the method HandleAsync, so no MINEP003 error
+        var error = Assert.Single(diagnostics, d => d.Id == "MINEP003");
+        Assert.Equal(DiagnosticSeverity.Error, error.Severity);
+        Assert.Contains("HandleAsync", error.GetMessage());
+    }
+
+    [Fact]
+    public void ServiceTypeValidation_CompatibleOverloadAmongSeveral_NoError()
+    {
+        // The interface offers two overloads; the endpoint's selected entry point matches one of
+        // them exactly. Signature-aware validation must accept it (no MINEP003).
+        var code = @"
+namespace TestApp;
+
+public interface ITestEndpoint
+{
+    Task<IResult> HandleAsync(string id);
+    Task<IResult> HandleAsync(int id);
+}
+
+[MapGet(""/test"", ServiceType = typeof(ITestEndpoint))]
+public class TestEndpoint : ITestEndpoint
+{
+    public Task<IResult> HandleAsync(string id) => Task.FromResult(Results.Ok());
+    public Task<IResult> HandleAsync(int id) => Task.FromResult(Results.Ok());
+}";
+
+        // Act
+        var diagnostics = GetDiagnostics(code);
+
+        // Assert
+        Assert.DoesNotContain(diagnostics, d => d.Id == "MINEP003");
+    }
+
+    [Fact]
+    public void ServiceTypeValidation_EntryPointOnBaseClass_NoError()
+    {
+        // ServiceType is a CLASS whose entry point is inherited from a base class. Searching only
+        // the type's own members (and interfaces) but not its base chain raised a false MINEP003.
+        // (Analyzer-focused: DI assignability is validated elsewhere.)
+        var code = @"
+namespace TestApp;
+
+public abstract class BaseService
+{
+    public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok());
+}
+
+public class ConcreteService : BaseService { }
+
+[MapGet(""/test"", ServiceType = typeof(ConcreteService))]
+public class TestEndpoint
+{
+    public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok());
+}";
+
+        // Act
+        var diagnostics = GetDiagnostics(code);
+
+        // Assert
         Assert.DoesNotContain(diagnostics, d => d.Id == "MINEP003");
     }
 

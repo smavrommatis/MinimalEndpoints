@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
+using System.IO;
 using System.Reflection;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -82,22 +83,36 @@ public class CompilationBuilder
     }
 
     /// <summary>
-    /// Adds references for all System.* assemblies from the current AppDomain.
-    /// Use this when you need broad System library support.
+    /// Adds references for the broad set of System.* (and netstandard) platform assemblies.
     /// </summary>
+    /// <remarks>
+    /// Resolved deterministically from TRUSTED_PLATFORM_ASSEMBLIES — the fixed set of platform
+    /// assemblies the host runtime was launched with — rather than AppDomain.CurrentDomain
+    /// .GetAssemblies(), whose contents depend on what has been loaded/JITted so far (test execution
+    /// order, the runner) and could non-deterministically include or miss a System.* type. The TPA
+    /// set is a superset of the loaded set, so this only adds references, never removes them.
+    /// </remarks>
     private CompilationBuilder WithSystemAssemblies()
     {
-        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+        if (AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") is not string trustedPlatformAssemblies ||
+            trustedPlatformAssemblies.Length == 0)
         {
-            if (!assembly.IsDynamic && !string.IsNullOrEmpty(assembly.Location))
+            return this;
+        }
+
+        foreach (var path in trustedPlatformAssemblies.Split(Path.PathSeparator))
+        {
+            if (string.IsNullOrEmpty(path))
             {
-                var name = assembly.GetName().Name;
-                if (name == "System.Runtime" ||
-                    name == "netstandard" ||
-                    name?.StartsWith("System.") == true)
-                {
-                    AddReferenceIfNotExists(assembly);
-                }
+                continue;
+            }
+
+            var name = Path.GetFileNameWithoutExtension(path);
+            if (name == "System.Runtime" ||
+                name == "netstandard" ||
+                name.StartsWith("System.", StringComparison.Ordinal))
+            {
+                AddReferenceIfNotExists(path);
             }
         }
 
@@ -175,7 +190,16 @@ public class CompilationBuilder
             return;
         }
 
-        var location = assembly.Location;
+        AddReferenceIfNotExists(assembly.Location);
+    }
+
+    private void AddReferenceIfNotExists(string location)
+    {
+        if (string.IsNullOrEmpty(location))
+        {
+            return;
+        }
+
         if (_addedAssemblies.Add(location))
         {
             _references.Add(MetadataReference.CreateFromFile(location));

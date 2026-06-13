@@ -189,14 +189,15 @@ internal static class MinimalEndpointsFileBuilder
         var classTypeName = endpoint.ClassType.ToDisplayString(usings);
         var serviceName = endpoint.MapMethodsAttribute.ServiceName ?? classTypeName;
         var parameterList = BuildParameterList(endpoint, usings);
-        var methodArguments = endpoint.EntryPoint.Parameters.Count > 0
-            ? string.Join(", ", endpoint.EntryPoint.Parameters.Select(p => p.Key.EscapeIdentifier()))
+        var methodArguments = endpoint.EntryPoint.Parameters.Length > 0
+            ? string.Join(", ", endpoint.EntryPoint.Parameters.Select(p => p.Name.EscapeIdentifier()))
             : "";
 
+        var parameterNames = new HashSet<string>(endpoint.EntryPoint.Parameters.Select(p => p.Name));
         var instanceParameterName = "endpointInstance";
         var index = 0;
 
-        while (endpoint.EntryPoint.Parameters.ContainsKey(instanceParameterName))
+        while (parameterNames.Contains(instanceParameterName))
         {
             instanceParameterName = GetUniqueIndexedName(instanceParameterBaseName, ++index);
         }
@@ -383,13 +384,13 @@ internal static class MinimalEndpointsFileBuilder
     {
         return endpoint.EntryPoint.Parameters.Select(p =>
             {
-                var attributesString = BuildParameterAttributes(p.Value, usings);
-                var typeName = p.Value.Type.ToDisplayString(usings);
-                var nullableSign = p.Value.Nullable && !typeName.EndsWith("?") ? "?" : "";
+                var attributesString = BuildParameterAttributes(p, usings);
+                var typeName = p.Type.ToDisplayString(usings);
+                var nullableSign = p.Nullable && !typeName.EndsWith("?") ? "?" : "";
                 // Reproduce the optional default so ASP.NET Core keeps treating the parameter as
                 // optional; without it a missing query value yields HTTP 400 instead of the default.
-                var defaultValue = p.Value.DefaultValue != null ? $" = {p.Value.DefaultValue}" : "";
-                return $"{attributesString}{typeName}{nullableSign} {p.Value.Name.EscapeIdentifier()}{defaultValue}";
+                var defaultValue = p.DefaultValue != null ? $" = {p.DefaultValue}" : "";
+                return $"{attributesString}{typeName}{nullableSign} {p.Name.EscapeIdentifier()}{defaultValue}";
             })
             .ToList();
     }

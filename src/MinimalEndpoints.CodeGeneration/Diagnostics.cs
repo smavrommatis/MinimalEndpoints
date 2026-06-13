@@ -134,6 +134,10 @@ internal static class Diagnostics
     /// silently producing no output. Because it is generator-reported and not in any analyzer's
     /// SupportedDiagnostics, it is intentionally not part of analyzer release tracking.
     /// </summary>
+    // RS2000 flags rules missing from analyzer release tracking. MINEP999 is generator-reported and
+    // intentionally NOT in any analyzer's SupportedDiagnostics (see remarks above), so adding it to
+    // AnalyzerReleases.*.md would be incorrect — suppress the rule locally for this one descriptor.
+#pragma warning disable RS2000
     public static readonly DiagnosticDescriptor GeneratorFailure = new DiagnosticDescriptor(
         id: "MINEP999",
         title: "MinimalEndpoints source generator failed",
@@ -147,4 +151,5 @@ internal static class Diagnostics
         "diagnostic instead of the opaque CS8785, so the failure is visible and actionable at build time.",
         helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/blob/main/docs/diagnostics/MINEP999.md"
     );
+#pragma warning restore RS2000
 }

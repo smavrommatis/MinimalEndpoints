@@ -702,5 +702,90 @@ public class GetUserByUserNameEndpoint
         var warning = Assert.Single(diagnostics, d => d.Id == "MINEP004");
         Assert.Equal(DiagnosticSeverity.Warning, warning.Severity);
     }
+
+    [Fact]
+    public void MultiVerbEndpointsOverlappingOnMultipleVerbs_ReportsConflictOncePerPair()
+    {
+        // Two endpoints that both declare GET and POST on the same route overlap on BOTH verbs.
+        // The identical pair must be reported once — not once per shared verb, which produced two
+        // visually identical warnings that read as an analyzer bug.
+        var code = @"
+namespace TestApp;
+
+[MapMethods(""/a"", new[] { ""GET"", ""POST"" })]
+public class FirstEndpoint
+{
+    public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok());
+}
+
+[MapMethods(""/a"", new[] { ""GET"", ""POST"" })]
+public class SecondEndpoint
+{
+    public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok());
+}";
+
+        // Act
+        var diagnostics = GetDiagnostics(code);
+
+        // Assert
+        Assert.Single(diagnostics, d => d.Id == "MINEP004");
+    }
+
+    [Fact]
+    public void EmptyMethodsArrayOnSamePath_DetectsConflict()
+    {
+        // An endpoint whose methods array is empty/all-null contributes no (pattern, verb) rows, so
+        // it was silently dropped from conflict detection. Two such endpoints on the same path must
+        // still surface as a conflict (treated as an unspecified-verb sentinel).
+        var code = @"
+namespace TestApp;
+
+[MapMethods(""/x"", new string[] { })]
+public class FirstEndpoint
+{
+    public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok());
+}
+
+[MapMethods(""/x"", new string[] { })]
+public class SecondEndpoint
+{
+    public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok());
+}";
+
+        // Act
+        var diagnostics = GetDiagnostics(code);
+
+        // Assert
+        Assert.Single(diagnostics, d => d.Id == "MINEP004");
+    }
+
+    [Fact]
+    public void RegexConstraintWithEscapedBraces_ConflictsWithSimpleParamRoute()
+    {
+        // A regex route constraint escapes its quantifier braces by doubling them ({{3}}). Route
+        // normalization must treat the whole {id:regex(...)} as a single parameter so it collapses
+        // to the same shape as a simple {other} route; the doubled '}' previously leaked and hid
+        // the conflict.
+        var code = @"
+namespace TestApp;
+
+[MapGet(@""/items/{id:regex(^\d{{3}}$)}"")]
+public class RegexEndpoint
+{
+    public Task<IResult> HandleAsync(string id) => Task.FromResult(Results.Ok());
+}
+
+[MapGet(""/items/{other}"")]
+public class SimpleEndpoint
+{
+    public Task<IResult> HandleAsync(string other) => Task.FromResult(Results.Ok());
+}";
+
+        // Act
+        var diagnostics = GetDiagnostics(code);
+
+        // Assert
+        Assert.Single(diagnostics, d => d.Id == "MINEP004");
+    }
 }
 

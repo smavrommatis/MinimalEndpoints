@@ -266,8 +266,19 @@ internal class TypeDefinition
     private static string SimplifyGenericType(string genericTypeName, HashSet<string> availableUsings)
     {
         var openBracket = genericTypeName.IndexOf('<');
+
+        // Find the '>' that MATCHES the first '<' by depth-tracking, rather than assuming it is the
+        // final character. The latter corrupts a nested type on a CLOSED generic outer (e.g.
+        // "Outer<int>.Inner" or "Dictionary<string, int>.Enumerator"), whose '>' is followed by a
+        // ".Nested" suffix — slicing to the end re-parsed that suffix as part of the type arguments
+        // and emitted invalid C# ("Outer<int>.Inne>").
+        var closeBracket = FindMatchingCloseBracket(genericTypeName, openBracket);
+
         var basePart = genericTypeName.Substring(0, openBracket);
-        var genericPart = genericTypeName.Substring(openBracket + 1, genericTypeName.Length - openBracket - 2);
+        var genericPart = genericTypeName.Substring(openBracket + 1, closeBracket - openBracket - 1);
+        var suffix = closeBracket + 1 < genericTypeName.Length
+            ? genericTypeName.Substring(closeBracket + 1)
+            : string.Empty;
 
         // Simplify the base type
         var simplifiedBase = SimplifyRegularType(basePart, availableUsings);
@@ -276,7 +287,40 @@ internal class TypeDefinition
         var typeArgs = ParseGenericArguments(genericPart);
         var simplifiedArgs = typeArgs.Select(arg => SimplifyTypeName(arg.Trim(), availableUsings)).ToList();
 
-        return $"{simplifiedBase}<{string.Join(", ", simplifiedArgs)}>";
+        // Recurse into any trailing nested-type segment (".Inner", ".Inner<U>", …) so it is simplified
+        // with the same rules; the leading '.' is preserved verbatim.
+        var simplifiedSuffix = suffix.Length > 0 && suffix[0] == '.'
+            ? "." + SimplifyTypeName(suffix.Substring(1), availableUsings)
+            : suffix;
+
+        return $"{simplifiedBase}<{string.Join(", ", simplifiedArgs)}>{simplifiedSuffix}";
+    }
+
+    /// <summary>
+    /// Returns the index of the <c>&gt;</c> that closes the <c>&lt;</c> at <paramref name="openIndex"/>,
+    /// accounting for nested generics. Falls back to the last character for malformed input (the
+    /// previous always-last-char assumption), so a well-formed open generic is unaffected.
+    /// </summary>
+    private static int FindMatchingCloseBracket(string text, int openIndex)
+    {
+        var depth = 0;
+        for (var i = openIndex; i < text.Length; i++)
+        {
+            if (text[i] == '<')
+            {
+                depth++;
+            }
+            else if (text[i] == '>')
+            {
+                depth--;
+                if (depth == 0)
+                {
+                    return i;
+                }
+            }
+        }
+
+        return text.Length - 1;
     }
 
     private static string SimplifyRegularType(string typeName, HashSet<string> availableUsings)

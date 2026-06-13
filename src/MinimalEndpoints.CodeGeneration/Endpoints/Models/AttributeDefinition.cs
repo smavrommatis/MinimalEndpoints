@@ -141,22 +141,14 @@ internal sealed class AttributeDefinition
 
     private static string FormatFloat(object value)
     {
-        if (value == null)
-        {
-            return "null";
-        }
-
-        return ((float)value).ToString("G", CultureInfo.InvariantCulture) + "f";
+        // Share the round-trippable, non-finite-aware formatter with the parameter-default path so
+        // attribute float arguments never drift in precision or emit a bare "NaNf"/"Infinityf".
+        return value == null ? "null" : CSharpLiteral.FormatSingle((float)value);
     }
 
     private static string FormatDouble(object value)
     {
-        if (value == null)
-        {
-            return "null";
-        }
-
-        return ((double)value).ToString("G", CultureInfo.InvariantCulture) + "d";
+        return value == null ? "null" : CSharpLiteral.FormatDouble((double)value);
     }
 
     private static string FormatDecimal(object value)

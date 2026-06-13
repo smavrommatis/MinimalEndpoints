@@ -12,6 +12,13 @@ namespace MinimalEndpoints.CodeGeneration;
 [Generator]
 public class MinimalEndpointsGenerator : IIncrementalGenerator
 {
+    /// <summary>
+    /// Tracking name of the merged-definitions provider (the input to the single source-output step).
+    /// Exposed so the caching tests can assert this intermediate step is served from cache and
+    /// localize a regression to it, rather than only observing the final generated text.
+    /// </summary>
+    internal const string MergedProviderTrackingName = "MinimalEndpointsMergedDefinitions";
+
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         // Register one ForAttributeWithMetadataName provider per mapping attribute. FAWMN
@@ -31,7 +38,8 @@ public class MinimalEndpointsGenerator : IIncrementalGenerator
                 .Where(static def => def is not null)
                 .Collect())
             .Aggregate((accumulated, next) =>
-                accumulated.Combine(next).Select(static (pair, _) => pair.Left.AddRange(pair.Right)));
+                accumulated.Combine(next).Select(static (pair, _) => pair.Left.AddRange(pair.Right)))
+            .WithTrackingName(MergedProviderTrackingName);
 
         context.RegisterSourceOutput(
             merged,

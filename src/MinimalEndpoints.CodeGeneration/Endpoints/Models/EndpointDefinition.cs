@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using MinimalEndpoints.CodeGeneration.Models;
@@ -86,7 +87,7 @@ internal sealed class EndpointDefinition : SymbolDefinition
                         .Select(AttributeDefinition.FromAttributeData)
                         .Where(attr => attr != null)
                         .ToList()
-                }).ToDictionary(x => x.Name)
+                }).ToImmutableArray()
             },
             IsConfigurable = isConfigurable,
             IsConditionallyMapped = isConditionallyMapped
@@ -106,7 +107,7 @@ internal sealed class EndpointDefinition : SymbolDefinition
     {
         var attr = MapMethodsAttribute;
 
-        var parameters = string.Join(";", EntryPoint.Parameters.Values.Select(p =>
+        var parameters = string.Join(";", EntryPoint.Parameters.Select(p =>
             $"{p.Name}:{p.Type.FullName}:{p.Nullable}:{p.DefaultValue}:" +
             string.Join("+", p.Attributes.Select(a => a.ToDisplayString(s_emptyUsings)))));
 

@@ -296,4 +296,85 @@ public class EntryPointCodeFixProviderTests
             CodeActionEquivalenceKey = "AddHandleMethod",
         }.RunAsync();
     }
+
+    [Fact] // Was bug (#7): EnsureUsingDirectives dereferenced UsingDirective.Name with the
+           // null-forgiving operator, but a C# 12 alias to a non-name type (tuple/array) has a null
+           // Name — so the fix threw an NRE and silently failed to apply on any file with such an alias.
+    public async Task AddHandle_AliasToTupleUsingPresent_FixStillApplies()
+    {
+        const string test = """
+            using MinimalEndpoints.Annotations;
+            using Coord = (int X, int Y);
+
+            namespace TestApp;
+
+            [MapGet("/test")]
+            public class {|MINEP001:TestEndpoint|}
+            {
+            }
+            """;
+
+        const string fixedCode = """
+            using MinimalEndpoints.Annotations;
+            using Coord = (int X, int Y);
+            using Microsoft.AspNetCore.Http;
+
+            namespace TestApp;
+
+            [MapGet("/test")]
+            public class TestEndpoint
+            {
+                public IResult Handle()
+                {
+                    return Results.Ok();
+                }
+            }
+            """;
+
+        await new MinEndpointsCodeFixTest
+        {
+            TestCode = test.ReplaceLineEndings(),
+            FixedCode = fixedCode.ReplaceLineEndings(),
+            CodeActionEquivalenceKey = "AddHandleMethod",
+        }.RunAsync();
+    }
+
+    [Fact] // Was bug (#10): a custom EntryPoint that is a C# keyword was emitted verbatim as a method
+           // identifier, producing uncompilable code that never resolved MINEP001.
+    public async Task CustomEntryPoint_Keyword_EmitsVerbatimIdentifier_ResolvesMinep001()
+    {
+        const string test = """
+            using MinimalEndpoints.Annotations;
+
+            namespace TestApp;
+
+            [MapGet("/test", EntryPoint = "class")]
+            public class {|MINEP001:TestEndpoint|}
+            {
+            }
+            """;
+
+        const string fixedCode = """
+            using MinimalEndpoints.Annotations;
+            using Microsoft.AspNetCore.Http;
+
+            namespace TestApp;
+
+            [MapGet("/test", EntryPoint = "class")]
+            public class TestEndpoint
+            {
+                public IResult @class()
+                {
+                    return Results.Ok();
+                }
+            }
+            """;
+
+        await new MinEndpointsCodeFixTest
+        {
+            TestCode = test.ReplaceLineEndings(),
+            FixedCode = fixedCode.ReplaceLineEndings(),
+            CodeActionEquivalenceKey = "AddHandleMethod",
+        }.RunAsync();
+    }
 }
