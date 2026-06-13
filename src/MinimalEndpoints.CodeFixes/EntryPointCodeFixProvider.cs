@@ -55,19 +55,58 @@ public class EntryPointCodeFixProvider : CodeFixProvider
         var syncName = string.IsNullOrEmpty(entryPoint) ? "Handle" : entryPoint;
         var asyncName = string.IsNullOrEmpty(entryPoint) ? "HandleAsync" : entryPoint;
 
-        context.RegisterCodeFix(
-            CodeAction.Create(
-                title: $"Add {syncName} method",
-                createChangedDocument: _ => AddHandleMethod(context.Document, root, classDeclaration, syncName),
-                equivalenceKey: "AddHandleMethod"),
-            diagnostic);
+        // Only offer an action whose method name does not already collide with a member the class
+        // declares. MINEP001 fires precisely when there is no VALID entry point, which commonly means
+        // an existing non-public/static Handle (or HandleAsync). Adding a same-named zero-arg method
+        // there would emit uncompilable code (CS0111 duplicate member, or CS0102 against a field/
+        // property), so the colliding action is suppressed; the non-colliding alternative remains.
+        if (!ClassAlreadyDeclaresMember(classDeclaration, syncName))
+        {
+            context.RegisterCodeFix(
+                CodeAction.Create(
+                    title: $"Add {syncName} method",
+                    createChangedDocument: _ => AddHandleMethod(context.Document, root, classDeclaration, syncName),
+                    equivalenceKey: "AddHandleMethod"),
+                diagnostic);
+        }
 
-        context.RegisterCodeFix(
-            CodeAction.Create(
-                title: $"Add {asyncName} method (async)",
-                createChangedDocument: _ => AddHandleAsyncMethod(context.Document, root, classDeclaration, asyncName),
-                equivalenceKey: "AddHandleAsyncMethod"),
-            diagnostic);
+        if (!ClassAlreadyDeclaresMember(classDeclaration, asyncName))
+        {
+            context.RegisterCodeFix(
+                CodeAction.Create(
+                    title: $"Add {asyncName} method (returns Task)",
+                    createChangedDocument: _ => AddHandleAsyncMethod(context.Document, root, classDeclaration, asyncName),
+                    equivalenceKey: "AddHandleAsyncMethod"),
+                diagnostic);
+        }
+    }
+
+    /// <summary>
+    /// True when <paramref name="classDeclaration"/> already declares a member that the generated
+    /// zero-parameter method would collide with: a zero-parameter method of the same name (CS0111),
+    /// or a property/event/field declaring that name (CS0102). Such a member is exactly the
+    /// non-viable entry point that triggered MINEP001, so re-adding it cannot resolve the diagnostic.
+    /// </summary>
+    private static bool ClassAlreadyDeclaresMember(ClassDeclarationSyntax classDeclaration, string name)
+    {
+        foreach (var member in classDeclaration.Members)
+        {
+            switch (member)
+            {
+                case MethodDeclarationSyntax method
+                    when method.Identifier.ValueText == name && method.ParameterList.Parameters.Count == 0:
+                    return true;
+                case PropertyDeclarationSyntax property when property.Identifier.ValueText == name:
+                    return true;
+                case EventDeclarationSyntax @event when @event.Identifier.ValueText == name:
+                    return true;
+                case BaseFieldDeclarationSyntax field
+                    when field.Declaration.Variables.Any(v => v.Identifier.ValueText == name):
+                    return true;
+            }
+        }
+
+        return false;
     }
 
     private static Task<Document> AddHandleMethod(Document document, SyntaxNode root,

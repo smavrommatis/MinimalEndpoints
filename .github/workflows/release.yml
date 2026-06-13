@@ -27,8 +27,12 @@ jobs:
       - name: Restore
         run: dotnet restore MinimalEndpoints.slnx
 
+      # ContinuousIntegrationBuild must be set on the COMPILE step: it normalizes source paths and
+      # drives SourceLink/deterministic output at compile time. The Pack step runs --no-build (it
+      # reuses these binaries), so setting the flag only on Pack would be a no-op and ship
+      # non-deterministic DLLs/PDBs. Setting it here makes every reused binary deterministic.
       - name: Build
-        run: dotnet build MinimalEndpoints.slnx --configuration Release --no-restore
+        run: dotnet build MinimalEndpoints.slnx --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
 
       # A release must never ship untested.
       - name: Test
