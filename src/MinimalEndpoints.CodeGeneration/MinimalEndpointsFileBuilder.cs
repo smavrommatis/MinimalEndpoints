@@ -219,7 +219,7 @@ internal static class MinimalEndpointsFileBuilder
             $"static {returnTypeName} Handler({string.Join(", ", parameterList)})"
         );
         method.AddLine("{");
-        method.AddLine($"return {instanceParameterName}.{endpoint.EntryPoint.Name}({methodArguments});",
+        method.AddLine($"return {instanceParameterName}.{endpoint.EntryPoint.Name.EscapeIdentifier()}({methodArguments});",
             additionalIndentation: 1);
         method.AddLine("}");
 
