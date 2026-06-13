@@ -13,6 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      id-token: write   # required for NuGet Trusted Publishing (OIDC token exchange)
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -59,8 +60,17 @@ jobs:
           done
           echo "Package validated."
 
+      # Trusted Publishing (OIDC): exchange the GitHub Actions OIDC token for a short-lived nuget.org
+      # API key — no long-lived secret to store or rotate. Requires a matching trusted-publishing
+      # policy on nuget.org (repo smavrommatis/MinimalEndpoints, workflow release.yml) and the
+      # `id-token: write` permission above. The NUGET_USER repo variable is the nuget.org account
+      # username that owns the policy.
+      - name: Authenticate to NuGet (Trusted Publishing)
+        id: nuget-login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ vars.NUGET_USER }}
+
       # --skip-duplicate makes re-runs safe; the matching .snupkg is pushed alongside the .nupkg.
       - name: Push to NuGet
-        env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
-        run: dotnet nuget push "artifacts/*.nupkg" --source https://api.nuget.org/v3/index.json --api-key "$NUGET_API_KEY" --skip-duplicate
+        run: dotnet nuget push "artifacts/*.nupkg" --source https://api.nuget.org/v3/index.json --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" --skip-duplicate
