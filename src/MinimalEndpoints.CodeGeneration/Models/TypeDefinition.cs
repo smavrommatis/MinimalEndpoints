@@ -42,125 +42,24 @@ internal class TypeDefinition
     /// </summary>
     public override string ToString() => _fullName;
 
-    private static string BuildFullTypeName(ITypeSymbol symbol)
-    {
-        // Handle special/built-in types that have a C# keyword alias (or DateTime).
-        if (symbol.SpecialType != SpecialType.None)
-        {
-            var specialName = GetSpecialTypeName(symbol.SpecialType);
-            if (specialName != null)
-            {
-                return specialName;
-            }
-            // Other special types (IDisposable, non-generic IEnumerable, IntPtr, Enum, Array, …)
-            // have no keyword: fall through to normal qualified-name rendering instead of
-            // collapsing to "object", which produced non-compiling handler signatures.
-        }
+    /// <summary>
+    /// The format used to render the fully-qualified name at construction time, while the
+    /// <see cref="ITypeSymbol"/> is still available. Roslyn's own renderer is authoritative for
+    /// arrays (rank order), tuples (named and unnamed), pointers, nullable reference and value
+    /// types, and nested generics — eliminating the class of bugs that came from hand-building the
+    /// name string. <c>UseSpecialTypes</c> yields C# keyword aliases (int, string, object, …);
+    /// <c>IncludeNullableReferenceTypeModifier</c> preserves the <c>?</c> on nullable reference
+    /// types (which the namespace-simplification step below relies on but never produces itself).
+    /// </summary>
+    private static readonly SymbolDisplayFormat FullyQualifiedFormat = new SymbolDisplayFormat(
+        globalNamespaceStyle: SymbolDisplayGlobalNamespaceStyle.Omitted,
+        typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
+        genericsOptions: SymbolDisplayGenericsOptions.IncludeTypeParameters,
+        miscellaneousOptions:
+            SymbolDisplayMiscellaneousOptions.UseSpecialTypes |
+            SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
 
-        // Handle tuple types
-        if (symbol is INamedTypeSymbol { IsTupleType: true } tupleType)
-        {
-            return BuildTupleTypeName(tupleType);
-        }
-
-        // Handle array types
-        if (symbol is IArrayTypeSymbol arrayType)
-        {
-            var elementTypeName = BuildFullTypeName(arrayType.ElementType);
-            var rankSpecifier = new string(',', arrayType.Rank - 1);
-            return $"{elementTypeName}[{rankSpecifier}]";
-        }
-
-        // Handle nullable value types (e.g., int?)
-        if (symbol.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T &&
-            symbol is INamedTypeSymbol nullableType)
-        {
-            var underlyingTypeName = BuildFullTypeName(nullableType.TypeArguments[0]);
-            return $"{underlyingTypeName}?";
-        }
-
-        // Handle all named types (generic or not, nested or not) including the full
-        // containing-type chain so nested types like Outer<T>.Inner<U> render correctly.
-        if (symbol is INamedTypeSymbol namedType)
-        {
-            return BuildNamedTypeName(namedType);
-        }
-
-        // Fallback for type parameters and any other symbol kind.
-        return symbol.Name;
-    }
-
-    private static string BuildTupleTypeName(INamedTypeSymbol tupleType)
-    {
-        var elements = tupleType.TupleElements;
-        if (elements.IsDefaultOrEmpty)
-        {
-            // Fallback to regular named-type representation
-            return BuildNamedTypeName(tupleType);
-        }
-
-        var elementTypes = elements
-            .Select(e =>
-            {
-                var typeName = BuildFullTypeName(e.Type);
-                // Include element name if it has one (e.g., (int id, string name))
-                return string.IsNullOrEmpty(e.Name) || e.Name.StartsWith("Item")
-                    ? typeName
-                    : $"{typeName} {e.Name}";
-            })
-            .ToList();
-
-        return $"({string.Join(", ", elementTypes)})";
-    }
-
-    private static string BuildNamedTypeName(INamedTypeSymbol named)
-    {
-        // Qualifier: the containing type (recursively, preserving ITS own generic arguments) when
-        // this is a nested type, otherwise the namespace. Walking ContainingType is what makes
-        // Outer<T>.Inner<U> render in full instead of losing the container.
-        string qualifier;
-        if (named.ContainingType != null)
-        {
-            qualifier = BuildFullTypeName(named.ContainingType);
-        }
-        else
-        {
-            var namespaceName = named.ContainingNamespace?.ToDisplayString();
-            qualifier = string.IsNullOrEmpty(namespaceName) || namespaceName == "<global namespace>"
-                ? null
-                : namespaceName;
-        }
-
-        var typeArgs = named.TypeArguments;
-        var self = typeArgs.Length == 0
-            ? named.Name
-            : $"{named.Name}<{string.Join(", ", typeArgs.Select(BuildFullTypeName))}>";
-
-        return qualifier == null ? self : $"{qualifier}.{self}";
-    }
-
-    private static string GetSpecialTypeName(SpecialType specialType) => specialType switch
-    {
-        SpecialType.System_Object => "object",
-        SpecialType.System_Void => "void",
-        SpecialType.System_Boolean => "bool",
-        SpecialType.System_Char => "char",
-        SpecialType.System_SByte => "sbyte",
-        SpecialType.System_Byte => "byte",
-        SpecialType.System_Int16 => "short",
-        SpecialType.System_UInt16 => "ushort",
-        SpecialType.System_Int32 => "int",
-        SpecialType.System_UInt32 => "uint",
-        SpecialType.System_Int64 => "long",
-        SpecialType.System_UInt64 => "ulong",
-        SpecialType.System_Decimal => "decimal",
-        SpecialType.System_Single => "float",
-        SpecialType.System_Double => "double",
-        SpecialType.System_String => "string",
-        SpecialType.System_DateTime => "System.DateTime",
-        // No C# keyword: return null so the caller renders the fully-qualified name instead of "object".
-        _ => null
-    };
+    private static string BuildFullTypeName(ITypeSymbol symbol) => symbol.ToDisplayString(FullyQualifiedFormat);
 
     private static string SimplifyTypeName(string fullTypeName, HashSet<string> availableUsings)
     {
@@ -170,26 +69,32 @@ internal class TypeDefinition
             return SimplifyTupleType(fullTypeName, availableUsings);
         }
 
-        // Handle nullable types
+        // Handle nullable types (value or reference): peel the trailing '?' and recurse.
         if (fullTypeName.EndsWith("?"))
         {
             var underlyingType = fullTypeName.Substring(0, fullTypeName.Length - 1);
             return SimplifyTypeName(underlyingType, availableUsings) + "?";
         }
 
-        // Handle array types
-        if (fullTypeName.Contains("["))
+        var angleIndex = fullTypeName.IndexOf('<');
+        var bracketIndex = fullTypeName.IndexOf('[');
+
+        // A generic type's '<' always precedes any top-level array '[' suffix, so when both are
+        // present and '<' comes first this is a generic. SimplifyGenericType depth-tracks the
+        // matching '>' and recurses into both the type arguments and any trailing array suffix —
+        // testing '[' first sliced into an interior array argument like List<int[,]> (emitting
+        // invalid C# such as "List<in>[,]>").
+        if (angleIndex >= 0 && (bracketIndex < 0 || angleIndex < bracketIndex))
         {
-            var bracketIndex = fullTypeName.IndexOf('[');
+            return SimplifyGenericType(fullTypeName, availableUsings);
+        }
+
+        // Handle array types (the '[' is the start of the array-rank suffix on a non-generic element)
+        if (bracketIndex >= 0)
+        {
             var elementType = fullTypeName.Substring(0, bracketIndex);
             var arrayPart = fullTypeName.Substring(bracketIndex);
             return SimplifyTypeName(elementType, availableUsings) + arrayPart;
-        }
-
-        // Handle generic types
-        if (fullTypeName.Contains("<"))
-        {
-            return SimplifyGenericType(fullTypeName, availableUsings);
         }
 
         // Handle regular types (try to remove namespace if it's in usings)
@@ -201,57 +106,92 @@ internal class TypeDefinition
         // Remove outer parentheses
         var innerContent = tupleTypeName.Substring(1, tupleTypeName.Length - 2);
 
-        // Parse tuple elements (considering nested tuples and generics)
+        // Parse tuple elements (considering nested tuples, generics, and arrays)
         var elements = ParseTupleElements(innerContent);
 
         // Simplify each element
         var simplifiedElements = elements.Select(element =>
         {
-            // Check if element has a name (e.g., "int id" or "string name")
-            var parts = element.Trim().Split(new[] { ' ' }, 2);
-            if (parts.Length == 2)
+            var trimmed = element.Trim();
+
+            // A tuple element is "Type" or "Type name". The element NAME (if any) is a trailing
+            // identifier separated from the type by a space at bracket-depth 0 — the only such space
+            // in a well-formed element. Splitting on the FIRST space instead landed inside a
+            // multi-argument generic's "<a, b>" and corrupted both named and unnamed elements.
+            var nameSeparator = IndexOfTopLevelSpace(trimmed);
+            if (nameSeparator > 0)
             {
-                // Has name: "Type name"
-                var simplifiedType = SimplifyTypeName(parts[0], availableUsings);
-                return $"{simplifiedType} {parts[1]}";
+                var simplifiedType = SimplifyTypeName(trimmed.Substring(0, nameSeparator), availableUsings);
+                return $"{simplifiedType} {trimmed.Substring(nameSeparator + 1)}";
             }
-            else
-            {
-                // No name: just "Type"
-                return SimplifyTypeName(element.Trim(), availableUsings);
-            }
+
+            // No name: just "Type"
+            return SimplifyTypeName(trimmed, availableUsings);
         }).ToList();
 
         return $"({string.Join(", ", simplifiedElements)})";
+    }
+
+    /// <summary>
+    /// Index of the first space at bracket-depth 0 (outside <c>&lt;&gt;</c>, <c>()</c>, and
+    /// <c>[]</c>), or -1. A tuple element's only top-level space separates its type from its
+    /// optional name; spaces inside a generic argument list or a nested tuple are nested and ignored.
+    /// </summary>
+    private static int IndexOfTopLevelSpace(string text)
+    {
+        var depth = 0;
+        for (var i = 0; i < text.Length; i++)
+        {
+            switch (text[i])
+            {
+                case '<':
+                case '(':
+                case '[':
+                    depth++;
+                    break;
+                case '>':
+                case ')':
+                case ']':
+                    depth--;
+                    break;
+                case ' ' when depth == 0:
+                    return i;
+            }
+        }
+
+        return -1;
     }
 
     private static List<string> ParseTupleElements(string tupleContent)
     {
         var result = new List<string>();
         var current = new StringBuilder();
-        var depth = 0; // Track nesting depth (parentheses and angle brackets)
+        var depth = 0; // Track nesting depth (parentheses, angle brackets, and square brackets)
 
         foreach (var ch in tupleContent)
         {
-            if (ch == '(' || ch == '<')
+            switch (ch)
             {
-                depth++;
-                current.Append(ch);
-            }
-            else if (ch == ')' || ch == '>')
-            {
-                depth--;
-                current.Append(ch);
-            }
-            else if (ch == ',' && depth == 0)
-            {
-                // Top-level comma - split here
-                result.Add(current.ToString());
-                current.Clear();
-            }
-            else
-            {
-                current.Append(ch);
+                case '(':
+                case '<':
+                case '[':
+                    depth++;
+                    current.Append(ch);
+                    break;
+                case ')':
+                case '>':
+                case ']':
+                    depth--;
+                    current.Append(ch);
+                    break;
+                case ',' when depth == 0:
+                    // Top-level comma - split here
+                    result.Add(current.ToString());
+                    current.Clear();
+                    break;
+                default:
+                    current.Append(ch);
+                    break;
             }
         }
 
@@ -288,7 +228,7 @@ internal class TypeDefinition
         var simplifiedArgs = typeArgs.Select(arg => SimplifyTypeName(arg.Trim(), availableUsings)).ToList();
 
         // Recurse into any trailing nested-type segment (".Inner", ".Inner<U>", …) so it is simplified
-        // with the same rules; the leading '.' is preserved verbatim.
+        // with the same rules; an array-rank suffix ("[]", "[,]") is preserved verbatim.
         var simplifiedSuffix = suffix.Length > 0 && suffix[0] == '.'
             ? "." + SimplifyTypeName(suffix.Substring(1), availableUsings)
             : suffix;
@@ -353,28 +293,31 @@ internal class TypeDefinition
     {
         var result = new List<string>();
         var current = new StringBuilder();
-        var depth = 0;
+        var depth = 0; // Track nesting depth (angle brackets, parentheses, and square brackets)
 
         foreach (var ch in genericArgs)
         {
-            if (ch == '<')
+            switch (ch)
             {
-                depth++;
-                current.Append(ch);
-            }
-            else if (ch == '>')
-            {
-                depth--;
-                current.Append(ch);
-            }
-            else if (ch == ',' && depth == 0)
-            {
-                result.Add(current.ToString());
-                current.Clear();
-            }
-            else
-            {
-                current.Append(ch);
+                case '<':
+                case '(':
+                case '[':
+                    depth++;
+                    current.Append(ch);
+                    break;
+                case '>':
+                case ')':
+                case ']':
+                    depth--;
+                    current.Append(ch);
+                    break;
+                case ',' when depth == 0:
+                    result.Add(current.ToString());
+                    current.Clear();
+                    break;
+                default:
+                    current.Append(ch);
+                    break;
             }
         }
 

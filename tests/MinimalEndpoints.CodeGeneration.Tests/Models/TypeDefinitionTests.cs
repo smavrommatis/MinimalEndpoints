@@ -881,6 +881,122 @@ namespace MyNs
         Assert.Equal("Outer<int>.Inner<string>", typeDef.ToDisplayString(usings));
     }
 
+    [Fact]
+    public void ToDisplayString_UnnamedTupleWithMultiArgGenericElement_RendersValidName()
+    {
+        // Regression: SimplifyTupleType split each element on its FIRST space to detect an element
+        // name. For a tuple element whose type is a multi-arg generic, that first space is the one
+        // inside "<string, int>", so the type was mangled into "(Dictionary<string> int>, int)".
+        var code = @"
+using System.Collections.Generic;
+
+public class Test
+{
+    public (Dictionary<string, int>, int) Prop { get; set; }
+}";
+        var typeSymbol = GetPropertyType(code, "Test", "Prop");
+        var typeDef = new TypeDefinition(typeSymbol);
+
+        Assert.Equal("(System.Collections.Generic.Dictionary<string, int>, int)", typeDef.FullName);
+        Assert.Equal(
+            "(Dictionary<string, int>, int)",
+            typeDef.ToDisplayString(new HashSet<string> { "System.Collections.Generic" }));
+    }
+
+    [Fact]
+    public void ToDisplayString_NamedTupleWithMultiArgGenericElement_RendersValidName()
+    {
+        var code = @"
+using System.Collections.Generic;
+
+public class Test
+{
+    public (Dictionary<string, int> map, int n) Prop { get; set; }
+}";
+        var typeSymbol = GetPropertyType(code, "Test", "Prop");
+        var typeDef = new TypeDefinition(typeSymbol);
+
+        Assert.Equal("(System.Collections.Generic.Dictionary<string, int> map, int n)", typeDef.FullName);
+        Assert.Equal(
+            "(Dictionary<string, int> map, int n)",
+            typeDef.ToDisplayString(new HashSet<string> { "System.Collections.Generic" }));
+    }
+
+    [Fact]
+    public void ToDisplayString_GenericOfMultidimArray_RendersValidName()
+    {
+        // Regression: SimplifyTypeName tested the array branch (Contains '[') BEFORE the generic
+        // branch (Contains '<'), so List<int[,]> sliced at the interior '[' and emitted invalid C#.
+        var code = @"
+using System.Collections.Generic;
+
+public class Test
+{
+    public List<int[,]> Prop { get; set; }
+}";
+        var typeSymbol = GetPropertyType(code, "Test", "Prop");
+        var typeDef = new TypeDefinition(typeSymbol);
+
+        Assert.Equal("System.Collections.Generic.List<int[,]>", typeDef.FullName);
+        Assert.Equal(
+            "List<int[,]>",
+            typeDef.ToDisplayString(new HashSet<string> { "System.Collections.Generic" }));
+    }
+
+    [Fact]
+    public void BuildFullTypeName_JaggedMultidimArray_PreservesRankOrder()
+    {
+        // Regression: building the name element-first reversed the rank order to "int[,][]", which is
+        // a DIFFERENT CLR type than the user's "int[][,]" and would not compile against their method.
+        var code = @"
+public class Test
+{
+    public int[][,] Prop { get; set; }
+}";
+        var typeSymbol = GetPropertyType(code, "Test", "Prop");
+        var typeDef = new TypeDefinition(typeSymbol);
+
+        Assert.Equal("int[][,]", typeDef.FullName);
+    }
+
+    [Fact]
+    public void BuildFullTypeName_TopLevelNullableReferenceType_PreservesAnnotation()
+    {
+        // Regression: BuildFullTypeName only honored System.Nullable<T> (value types); the nullable
+        // annotation on a reference type was dropped, so a "string?" return type rendered as "string"
+        // and emitted a nullability-mismatched handler under #nullable enable.
+        var code = @"
+#nullable enable
+public class Test
+{
+    public string? Prop { get; set; }
+}";
+        var typeSymbol = GetPropertyType(code, "Test", "Prop");
+        var typeDef = new TypeDefinition(typeSymbol);
+
+        Assert.Equal("string?", typeDef.FullName);
+    }
+
+    [Fact]
+    public void BuildFullTypeName_NestedNullableReferenceType_PreservesAnnotation()
+    {
+        var code = @"
+#nullable enable
+using System.Collections.Generic;
+
+public class Test
+{
+    public List<string?> Prop { get; set; }
+}";
+        var typeSymbol = GetPropertyType(code, "Test", "Prop");
+        var typeDef = new TypeDefinition(typeSymbol);
+
+        Assert.Equal("System.Collections.Generic.List<string?>", typeDef.FullName);
+        Assert.Equal(
+            "List<string?>",
+            typeDef.ToDisplayString(new HashSet<string> { "System.Collections.Generic" }));
+    }
+
     private static ITypeSymbol GetTypeSymbol(string code, string typeName)
     {
         var compilation = new CompilationBuilder(code).Build();
