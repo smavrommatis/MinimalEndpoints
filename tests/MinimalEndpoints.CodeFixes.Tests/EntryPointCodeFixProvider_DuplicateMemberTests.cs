@@ -75,7 +75,7 @@ public class EntryPointCodeFixProvider_DuplicateMemberTests
         Assert.Contains("AddHandleMethod", keys);
     }
 
-    private static async Task<IReadOnlyList<string>> GetOfferedEquivalenceKeysAsync(string code)
+    private static async Task<IReadOnlyList<string?>> GetOfferedEquivalenceKeysAsync(string code)
     {
         using var workspace = new AdhocWorkspace();
         var projectId = ProjectId.CreateNewId();
