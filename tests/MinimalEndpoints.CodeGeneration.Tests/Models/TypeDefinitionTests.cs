@@ -997,6 +997,43 @@ public class Test
             typeDef.ToDisplayString(new HashSet<string> { "System.Collections.Generic" }));
     }
 
+    [Fact]
+    public void ToDisplayString_MultidimensionalArray_Simplifies()
+    {
+        var code = @"
+public class Test
+{
+    public int[,] Grid { get; set; }
+}";
+        var typeSymbol = GetPropertyType(code, "Test", "Grid");
+        var typeDef = new TypeDefinition(typeSymbol);
+
+        Assert.Equal("int[,]", typeDef.FullName);
+        Assert.Equal("int[,]", typeDef.ToDisplayString(new HashSet<string>()));
+    }
+
+    [Fact]
+    public void ToDisplayString_NestedTypeOnClosedGenericWithGenericArgs_Simplifies()
+    {
+        // The nested-type-on-closed-generic suffix path: Dictionary<string, int>.Enumerator. The
+        // matching '>' is mid-string (before ".Enumerator"), and the suffix must be simplified, not
+        // re-parsed as type arguments.
+        var code = @"
+using System.Collections.Generic;
+
+public class Test
+{
+    public Dictionary<string, int>.Enumerator E { get; set; }
+}";
+        var typeSymbol = GetPropertyType(code, "Test", "E");
+        var typeDef = new TypeDefinition(typeSymbol);
+
+        Assert.Equal("System.Collections.Generic.Dictionary<string, int>.Enumerator", typeDef.FullName);
+        Assert.Equal(
+            "Dictionary<string, int>.Enumerator",
+            typeDef.ToDisplayString(new HashSet<string> { "System.Collections.Generic" }));
+    }
+
     private static ITypeSymbol GetTypeSymbol(string code, string typeName)
     {
         var compilation = new CompilationBuilder(code).Build();

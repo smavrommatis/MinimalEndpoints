@@ -295,6 +295,84 @@ public class BodyEndpoint
         Assert.Equal(firstText, secondText);
     }
 
+    [Fact]
+    public void SecondRun_AfterModelRelevantEdit_FlipsMergedStepToModified()
+    {
+        // Negative control for the caching tests: a model-RELEVANT edit (changing the route pattern,
+        // which IS part of BuildEqualityKey) must flip the merged-definitions step to Modified. Without
+        // this, the positive caching tests could pass trivially if the harness reported every step
+        // Cached regardless of input — this proves the harness can actually observe a change.
+        var compilation = new CompilationBuilder(EndpointSource)
+            .WithMvcReferences()
+            .Build(validateCompilation: false);
+
+        var driver = CreateTrackingDriver();
+        driver = driver.RunGenerators(compilation);
+
+        var endpointTree = compilation.SyntaxTrees.Single(t => t.ToString().Contains("class TestEndpoint"));
+        var editedCompilation = compilation.ReplaceSyntaxTree(
+            endpointTree,
+            CSharpSyntaxTree.ParseText(EndpointSource.Replace("/test", "/changed")));
+
+        driver = driver.RunGenerators(editedCompilation);
+
+        var result = driver.GetRunResult().Results[0];
+        Assert.True(
+            result.TrackedSteps.TryGetValue(MinimalEndpointsGenerator.MergedProviderTrackingName, out var mergedRuns),
+            $"Expected a tracked step named '{MinimalEndpointsGenerator.MergedProviderTrackingName}'.");
+
+        var reasons = mergedRuns.SelectMany(run => run.Outputs).Select(o => o.Reason).ToList();
+        Assert.Contains(IncrementalStepRunReason.Modified, reasons);
+    }
+
+    private const string AttributedParamSource = @"
+namespace TestApp.Endpoints;
+
+[MapGet(""/items"")]
+public class AttributedParamEndpoint
+{
+    public Task<IResult> HandleAsync([FromQuery] int page) => Task.FromResult(Results.Ok());
+}";
+
+    private const string AttributedParamEditedBodySource = @"
+namespace TestApp.Endpoints;
+
+[MapGet(""/items"")]
+public class AttributedParamEndpoint
+{
+    public Task<IResult> HandleAsync([FromQuery] int page)
+    {
+        var result = Results.Ok();
+        return Task.FromResult(result);
+    }
+}";
+
+    [Fact]
+    public void SecondRun_AttributedParameter_ModelInvariantEdit_ReportsCachedOutputs()
+    {
+        // Exercises the List<AttributeDefinition> equality path (a parameter carrying [FromQuery]):
+        // its attributes are folded into the string equality key at construction, so a body-only edit
+        // must still serve the merged step and the output from cache.
+        var compilation = new CompilationBuilder(AttributedParamSource)
+            .WithMvcReferences()
+            .Build(validateCompilation: false);
+
+        var driver = CreateTrackingDriver();
+        driver = driver.RunGenerators(compilation);
+        var firstText = GetGeneratedText(driver);
+
+        var endpointTree = compilation.SyntaxTrees.Single(t => t.ToString().Contains("class AttributedParamEndpoint"));
+        var editedCompilation = compilation.ReplaceSyntaxTree(
+            endpointTree,
+            CSharpSyntaxTree.ParseText(AttributedParamEditedBodySource));
+
+        driver = driver.RunGenerators(editedCompilation);
+        var secondText = GetGeneratedText(driver);
+
+        AssertAllOutputsCached(driver);
+        Assert.Equal(firstText, secondText);
+    }
+
     private static GeneratorDriver CreateTrackingDriver() =>
         CSharpGeneratorDriver.Create(
             generators: new[] { new MinimalEndpointsGenerator().AsSourceGenerator() },
