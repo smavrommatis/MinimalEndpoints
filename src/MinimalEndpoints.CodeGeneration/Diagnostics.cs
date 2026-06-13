@@ -13,8 +13,8 @@ internal static class Diagnostics
         category: "MinimalEndpoints",
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
-        description: "Endpoints must have a valid entry point method to handle requests." +
-        "The method should be public, non-static, and return a value." +
+        description: "Endpoints must have a valid entry point method to handle requests. " +
+        "The method should be public, non-static, and return a value. " +
         "Example: public async Task<IResult> HandleAsync() { return Results.Ok(); }.",
         helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/blob/main/docs/diagnostics/MINEP001.md"
     );
@@ -42,8 +42,8 @@ internal static class Diagnostics
         category: "MinimalEndpoints",
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
-        description: "When ServiceType is specified, the interface must contain the entry point method that will be called." +
-        "The interface method should match the signature of the endpoint's entry point." +
+        description: "When ServiceType is specified, the interface must contain the entry point method that will be called. " +
+        "The interface method should match the signature of the endpoint's entry point. " +
         "Example: public interface IMyEndpoint { Task<IResult> HandleAsync(); }.",
         helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/blob/main/docs/diagnostics/MINEP003.md"
     );
@@ -75,7 +75,7 @@ internal static class Diagnostics
         category: "MinimalEndpoints",
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
-        description: "Endpoint groups must decorated with MapGroupAttribute." +
+        description: "Endpoint groups must be decorated with MapGroupAttribute. " +
         "Example: [MapGroup(\"/api/v1\")] public class ApiV1Group { }.",
         helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/blob/main/docs/diagnostics/MINEP005.md"
     );

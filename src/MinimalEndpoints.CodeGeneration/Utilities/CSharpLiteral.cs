@@ -40,27 +40,29 @@ internal static class CSharpLiteral
     /// Renders a <see cref="float"/> as valid C# literal text. Non-finite values (NaN, ±Infinity)
     /// have no literal form — their <c>ToString</c> yields the bare words "NaN"/"Infinity", which
     /// with the <c>f</c> suffix produce uncompilable identifiers (CS0103) — so they are emitted as
-    /// the named <c>float</c> constants instead. Finite values use the round-trippable "R" specifier
-    /// so the emitted literal re-parses to the exact same value on every host runtime.
+    /// the named <c>float</c> constants instead. Finite values use the "G9" specifier, the shortest
+    /// guaranteed round-trippable form for <see cref="float"/> on every host runtime (the "R"
+    /// specifier is documented as NOT reliably round-trippable for <see cref="float"/> on .NET
+    /// Framework, where the generator runs inside the VS compiler).
     /// </summary>
     public static string FormatSingle(float value)
     {
         if (float.IsNaN(value)) return "float.NaN";
         if (float.IsPositiveInfinity(value)) return "float.PositiveInfinity";
         if (float.IsNegativeInfinity(value)) return "float.NegativeInfinity";
-        return value.ToString("R", CultureInfo.InvariantCulture) + "f";
+        return value.ToString("G9", CultureInfo.InvariantCulture) + "f";
     }
 
     /// <summary>
     /// Renders a <see cref="double"/> as valid C# literal text. See <see cref="FormatSingle"/> for
-    /// the non-finite and round-trip rationale.
+    /// the non-finite rationale; "G17" is the round-trippable specifier for <see cref="double"/>.
     /// </summary>
     public static string FormatDouble(double value)
     {
         if (double.IsNaN(value)) return "double.NaN";
         if (double.IsPositiveInfinity(value)) return "double.PositiveInfinity";
         if (double.IsNegativeInfinity(value)) return "double.NegativeInfinity";
-        return value.ToString("R", CultureInfo.InvariantCulture) + "d";
+        return value.ToString("G17", CultureInfo.InvariantCulture) + "d";
     }
 
     private static string Escape(char c, bool isCharLiteral)

@@ -25,6 +25,15 @@ public class GroupsAnalyzer : DiagnosticAnalyzer
             Diagnostics.InvalidSymbolKind,
             Diagnostics.UnsupportedEndpointShape);
 
+    // Compiled once and reused rather than re-parsed on every Regex.Replace call. Collapses runs of
+    // interior slashes ("a//b" -> "a/b").
+    private static readonly Regex DuplicateSlashRegex = new("/{2,}", RegexOptions.Compiled);
+
+    // Replaces a route parameter token — {parameter}, {parameter:constraint}, {**catchall}, with
+    // {{ }} brace escapes — with a generic placeholder so routes that differ only by parameter
+    // name/constraint compare equal.
+    private static readonly Regex RouteParameterRegex = new(@"\{(?:[^{}]|\{\{|\}\})*\}", RegexOptions.Compiled);
+
     public override void Initialize(AnalysisContext context)
     {
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
@@ -209,22 +218,18 @@ public class GroupsAnalyzer : DiagnosticAnalyzer
         IEnumerable<EndpointRouteFacts> endpoints, GroupHierarchy hierarchy)
     {
         var endpointsByPath = endpoints
-            .Select(x =>
+            .SelectMany(x =>
             {
                 var path = BuildFullPath(x, hierarchy);
 
-                return new
-                {
-                    x.Symbol,
-                    Path = path,
-                    NormalizedPattern = NormalizeRoutePattern(path),
-                    HttpMethods = x.Methods,
-                };
+                // An endpoint can occupy more than one normalized pattern (a trailing optional
+                // parameter also matches the bare path), and is matched once per HTTP verb.
+                return EffectiveNormalizedPatterns(path)
+                    .SelectMany(pattern => NormalizeVerbs(x.Methods).Select(httpMethod => new
+                    {
+                        HttpMethod = httpMethod, NormalizedPattern = pattern, Path = path, x.Symbol,
+                    }));
             })
-            .SelectMany(x => NormalizeVerbs(x.HttpMethods).Select(httpMethod => new
-            {
-                HttpMethod = httpMethod, x.NormalizedPattern, x.Path, x.Symbol,
-            }))
             .GroupBy(x => (x.NormalizedPattern, x.HttpMethod))
             .Where(x => x.Count() > 1)
             .ToList();
@@ -245,6 +250,14 @@ public class GroupsAnalyzer : DiagnosticAnalyzer
                 {
                     var first = endpointList[i];
                     var second = endpointList[j];
+
+                    // An endpoint can land in the same (pattern, verb) bucket more than once — a
+                    // duplicated verb in one [MapMethods] array, or its own optional/bare-path
+                    // expansion. Never pair an endpoint with itself ("X conflicts with X").
+                    if (SymbolEqualityComparer.Default.Equals(first.Symbol, second.Symbol))
+                    {
+                        continue;
+                    }
 
                     var firstName = first.Symbol.ToDisplayString();
                     var secondName = second.Symbol.ToDisplayString();
@@ -319,6 +332,52 @@ public class GroupsAnalyzer : DiagnosticAnalyzer
         return right[0] == '/' ? left + right : left + "/" + right;
     }
 
+    /// <summary>
+    /// The normalized route pattern(s) an endpoint occupies for conflict comparison. Usually one,
+    /// but a trailing optional parameter ("/users/{id?}" or a defaulted "/users/{id=5}") also
+    /// matches the path with that segment absent, so the endpoint additionally occupies the bare
+    /// path and can collide with a separate endpoint mapped there.
+    /// </summary>
+    private static IEnumerable<string> EffectiveNormalizedPatterns(string path)
+    {
+        yield return NormalizeRoutePattern(path);
+
+        if (TryStripTrailingOptionalSegment(path, out var barePath))
+        {
+            yield return NormalizeRoutePattern(barePath);
+        }
+    }
+
+    /// <summary>
+    /// When <paramref name="path"/> ends with an OPTIONAL route parameter — "{name?}" or a defaulted
+    /// "{name=value}" — yields the path with that final segment removed (the route the endpoint also
+    /// matches). A required "{name}" or a literal segment is not omittable and yields nothing.
+    /// </summary>
+    private static bool TryStripTrailingOptionalSegment(string path, out string barePath)
+    {
+        barePath = null;
+        if (string.IsNullOrEmpty(path))
+        {
+            return false;
+        }
+
+        var trimmed = path.TrimEnd('/');
+        var lastSlash = trimmed.LastIndexOf('/');
+        var lastSegment = lastSlash >= 0 ? trimmed.Substring(lastSlash + 1) : trimmed;
+
+        var isOptional = lastSegment.Length > 2 &&
+                         lastSegment[0] == '{' &&
+                         lastSegment[lastSegment.Length - 1] == '}' &&
+                         (lastSegment[lastSegment.Length - 2] == '?' || lastSegment.Contains("="));
+        if (!isOptional)
+        {
+            return false;
+        }
+
+        barePath = lastSlash >= 0 ? trimmed.Substring(0, lastSlash) : string.Empty;
+        return true;
+    }
+
     private static string NormalizeRoutePattern(string pattern)
     {
         if (string.IsNullOrEmpty(pattern))
@@ -334,7 +393,7 @@ public class GroupsAnalyzer : DiagnosticAnalyzer
 
         // Collapse interior duplicate slashes ("a//b" -> "a/b") so a stray slash in a pattern or at
         // a prefix/pattern boundary does not mask an otherwise-identical route.
-        normalized = Regex.Replace(normalized, "/{2,}", "/");
+        normalized = DuplicateSlashRegex.Replace(normalized, "/");
 
         // Replace ALL route parameters with a generic placeholder. This correctly identifies
         // ambiguous routes:
@@ -346,10 +405,7 @@ public class GroupsAnalyzer : DiagnosticAnalyzer
         // regex constraint's own quantifier braces (e.g. "{id:regex(^\d{{3}}$)}"). The previous
         // "\{[^}]+\}" stopped at the first '}', so a doubled '}}' leaked and left "{param}}$)}",
         // hiding a real conflict with a plain "{id}" route.
-        normalized = Regex.Replace(
-            normalized,
-            @"\{(?:[^{}]|\{\{|\}\})*\}", // {parameter}, {parameter:constraint}, {**catchall}, with {{ }} escapes
-            "{param}");
+        normalized = RouteParameterRegex.Replace(normalized, "{param}");
 
         return normalized;
     }

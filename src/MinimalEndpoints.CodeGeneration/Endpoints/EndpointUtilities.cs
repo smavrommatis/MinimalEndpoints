@@ -82,8 +82,7 @@ internal static class EndpointUtilities
         {
             publicMethods = publicMethods
                 .Where(x => x.Name is DefaultEntryPointMethodName or DefaultAsyncMethodName)
-                .OrderByDescending(x => x.Name == DefaultAsyncMethodName) // Prefer async method if both exist
-                .ThenByDescending(x => x.Name.EndsWith("Async"));
+                .OrderByDescending(x => x.Name == DefaultAsyncMethodName); // Prefer HandleAsync if both exist
         }
         else
         {

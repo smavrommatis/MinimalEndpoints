@@ -64,6 +64,11 @@
   </PropertyGroup>
 
   <Target Name="_ValidateAnalyzerOutputs" BeforeTargets="Pack">
+    <!-- The analyzer DLL paths above are resolved from $(Configuration); a Debug pack would ship
+         Debug-compiled (non-deterministic, unoptimized) analyzers and an unsuffixed 1.0.0 package.
+         Require Release so an accidental `dotnet pack` cannot publish a Debug build. -->
+    <Error Condition="'$(Configuration)' != 'Release'"
+           Text="Packing MinimalEndpoints requires the Release configuration (got '$(Configuration)'); a Debug pack would ship Debug-compiled analyzer assemblies. Re-run with -c Release." />
     <Error Condition="!Exists('$(_CodeGenerationAnalyzer)')"
            Text="Analyzer assembly not found at '$(_CodeGenerationAnalyzer)'. Build the solution in $(Configuration) before packing so the generator ships in the package." />
     <Error Condition="!Exists('$(_CodeFixesAnalyzer)')"

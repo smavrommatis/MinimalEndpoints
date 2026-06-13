@@ -168,9 +168,31 @@ internal sealed class GroupHierarchy
         }
 
         var parent = _parent[fqn];
-        prefix = (parent == null ? "" : ComputeFullPrefix(parent)) + _byName[fqn].Prefix;
+        var ownPrefix = _byName[fqn].Prefix;
+        prefix = parent == null ? ownPrefix : JoinPrefix(ComputeFullPrefix(parent), ownPrefix);
         _fullPrefix[fqn] = prefix;
         return prefix;
+    }
+
+    /// <summary>
+    /// Joins a parent group's full prefix to a child's own prefix with exactly one separating slash,
+    /// matching how ASP.NET combines nested <c>MapGroup</c> prefixes at runtime. A direct
+    /// concatenation turned a child prefix lacking a leading slash ("v1") plus its parent ("/api")
+    /// into "/apiv1", desyncing the analyzer's computed full route from the real "/api/v1" route and
+    /// hiding genuine MINEP004 conflicts. (Any residual doubled slash is collapsed downstream by the
+    /// route normalizer, so only the MISSING-slash case needs handling here.)
+    /// </summary>
+    private static string JoinPrefix(string parentPrefix, string ownPrefix)
+    {
+        var left = (parentPrefix ?? string.Empty).TrimEnd('/');
+        var right = ownPrefix ?? string.Empty;
+
+        if (right.Length == 0)
+        {
+            return left;
+        }
+
+        return right[0] == '/' ? left + right : left + "/" + right;
     }
 
     private bool ComputeHierarchyConditional(string fqn)
