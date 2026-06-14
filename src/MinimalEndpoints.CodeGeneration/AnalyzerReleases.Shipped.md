@@ -15,3 +15,11 @@ MINEP005 | MinimalEndpoints | Error | EndpointsAnalyzer
 MINEP006 | MinimalEndpoints | Error | GroupsAnalyzer
 MINEP007 | MinimalEndpoints | Error | GroupsAnalyzer
 MINEP008 | MinimalEndpoints | Warning | EndpointsAnalyzer, GroupsAnalyzer
+
+## Release 1.2.0
+
+### New Rules
+
+Rule ID | Category | Severity | Notes
+--------|----------|----------|-------
+MINEP009 | MinimalEndpoints | Warning | EndpointsAnalyzer, GroupsAnalyzer
