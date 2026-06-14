@@ -20,6 +20,8 @@ internal static class WellKnownTypes
 
         public const string MapGroupAttributeName = "MapGroupAttribute";
 
+        public const string ScanReferencedEndpointsAttributeName = "ScanReferencedEndpointsAttribute";
+
         // Fully-qualified metadata names for ForAttributeWithMetadataName, which pre-indexes
         // attribute names per compilation. One provider is registered per name in the generator.
         public const string MapMethodsAttributeFullName = Namespace + "." + MapMethodsAttributeName;
@@ -30,6 +32,14 @@ internal static class WellKnownTypes
         public const string MapPatchAttributeFullName = Namespace + "." + MapPatchAttributeName;
         public const string MapHeadAttributeFullName = Namespace + "." + MapHeadAttributeName;
         public const string MapGroupAttributeFullName = Namespace + "." + MapGroupAttributeName;
+
+        /// <summary>
+        /// The host-assembly opt-in marker for cross-assembly endpoint/group discovery. Read from the
+        /// compilation's assembly attributes (NOT via ForAttributeWithMetadataName), so it is
+        /// intentionally absent from <see cref="AllMapAttributeMetadataNames"/>.
+        /// </summary>
+        public const string ScanReferencedEndpointsAttributeFullName =
+            Namespace + "." + ScanReferencedEndpointsAttributeName;
 
         /// <summary>
         /// Every endpoint mapping attribute plus the group attribute, by fully-qualified metadata

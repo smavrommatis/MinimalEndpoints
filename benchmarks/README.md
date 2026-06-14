@@ -35,6 +35,13 @@ It also includes `GenerateEndpoints_100_Incremental`, a **warm** run: a driver i
 incremental-generator caching rather than cold generation, and is the closest proxy in the suite to
 an IDE / `dotnet watch` rebuild.
 
+It also includes the **cross-assembly scan** benchmarks `Scan_Off_Referenced_100`,
+`Scan_On_Referenced_100`, and `Scan_On_Referenced_100_Incremental`: the host compilation references a
+compiled library of 100 endpoints (emitted to a PE image), and the generator runs with
+`[assembly: ScanReferencedEndpoints]` absent (off — the scan short-circuits), present (on, cold — all 100
+re-derived from metadata), and warm after an unrelated edit. Together they show the cost of opting in and
+that the warm path stays cached.
+
 ### `AnalyzerPerformanceBenchmarks`
 
 Measures analyzer execution. It builds a `CompilationWithAnalyzers` over the

@@ -501,7 +501,7 @@ internal class InternalEndpoint
     {
         // Arrange
         Func<AttributeData, bool> predicate = _ => true;
-        Func<INamedTypeSymbol, AttributeData, SymbolDefinition> create = (_, _) => null!;
+        Func<INamedTypeSymbol, AttributeData, AccessibilityScope, SymbolDefinition> create = (_, _, _) => null!;
 
         // Act
         var factory = new SymbolDefinitionFactory(predicate, create);
@@ -515,13 +515,13 @@ internal class InternalEndpoint
     {
         // Arrange
         Func<AttributeData, bool> predicate = _ => true;
-        Func<INamedTypeSymbol, AttributeData, SymbolDefinition> create = (_, _) => null!;
+        Func<INamedTypeSymbol, AttributeData, AccessibilityScope, SymbolDefinition> create = (_, _, _) => null!;
 
         // Act
         var factory = new SymbolDefinitionFactory(predicate, create);
 
-        // Assert
-        Assert.Same(create, factory.Create);
+        // Assert — the Create method delegates to the supplied function (returns its result).
+        Assert.Null(factory.Create(null!, null!));
     }
 }
 

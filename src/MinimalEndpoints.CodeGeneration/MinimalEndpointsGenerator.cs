@@ -6,6 +6,7 @@ using MinimalEndpoints.CodeGeneration.Endpoints.Models;
 using MinimalEndpoints.CodeGeneration.Groups;
 using MinimalEndpoints.CodeGeneration.Groups.Models;
 using MinimalEndpoints.CodeGeneration.Models;
+using MinimalEndpoints.CodeGeneration.Utilities;
 
 namespace MinimalEndpoints.CodeGeneration;
 
@@ -19,6 +20,13 @@ public class MinimalEndpointsGenerator : IIncrementalGenerator
     /// </summary>
     internal const string MergedProviderTrackingName = "MinimalEndpointsMergedDefinitions";
 
+    /// <summary>
+    /// Tracking name of the gated cross-assembly scan provider (referenced-assembly definitions).
+    /// Exposed so caching tests can assert it is served from cache across unrelated edits — i.e. that
+    /// the structural comparer prevents the CompilationProvider-fed node from cascading.
+    /// </summary>
+    internal const string ReferencedProviderTrackingName = "MinimalEndpointsReferencedDefinitions";
+
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         // Register one ForAttributeWithMetadataName provider per mapping attribute. FAWMN
@@ -28,7 +36,8 @@ public class MinimalEndpointsGenerator : IIncrementalGenerator
         // multi-attribute combinations are all resolved identically regardless of which provider
         // fired (or deferred to the analyzers' MINEP002/MINEP007). Duplicate definitions across
         // providers are collapsed by FQN in GenerateEndpointExtensions.
-        var merged = WellKnownTypes.Annotations.AllMapAttributeMetadataNames
+        // Host-local definitions discovered from source via FAWMN (the existing, cache-friendly path).
+        var source = WellKnownTypes.Annotations.AllMapAttributeMetadataNames
             .Select(metadataName => context.SyntaxProvider.ForAttributeWithMetadataName(
                     metadataName,
                     predicate: static (node, _) => node is ClassDeclarationSyntax,
@@ -38,7 +47,24 @@ public class MinimalEndpointsGenerator : IIncrementalGenerator
                 .Where(static def => def is not null)
                 .Collect())
             .Aggregate((accumulated, next) =>
-                accumulated.Combine(next).Select(static (pair, _) => pair.Left.AddRange(pair.Right)))
+                accumulated.Combine(next).Select(static (pair, _) => pair.Left.AddRange(pair.Right)));
+
+        // Cross-assembly definitions re-derived from referenced compiled assemblies' metadata, gated by
+        // the host's [assembly: ScanReferencedEndpoints] opt-in. CompilationProvider re-runs on every
+        // edit, so the structural comparer is LOAD-BEARING: it keeps an unchanged scan result from
+        // cascading into a full regeneration (the scan body still runs, but its equal output is served
+        // from cache). With no opt-in, ReferencedAssemblyScanner.Scan returns Empty at zero cost, so the
+        // default path is byte-identical to before.
+        var referenced = context.CompilationProvider
+            .Select(static (compilation, cancellationToken) =>
+                ReferencedAssemblyScanner.Scan(compilation, cancellationToken))
+            .WithComparer(SymbolDefinitionArrayComparer.Instance)
+            .WithTrackingName(ReferencedProviderTrackingName);
+
+        // Source definitions are added first, so the FQN de-dup in GenerateEndpointExtensions resolves a
+        // (rare) source/referenced collision in favour of the source definition.
+        var merged = source.Combine(referenced)
+            .Select(static (pair, _) => pair.Left.AddRange(pair.Right))
             .WithTrackingName(MergedProviderTrackingName);
 
         context.RegisterSourceOutput(

@@ -21,6 +21,13 @@ public class GeneratorPerformanceBenchmarks
     private GeneratorDriver _warmDriver = null!;
     private Compilation _touched100 = null!;
 
+    // Cross-assembly scan: a host referencing a compiled library of 100 endpoints, scanning OFF vs ON,
+    // plus an opted-in warm driver for the incremental case.
+    private Compilation _hostScanOff100 = null!;
+    private Compilation _hostScanOn100 = null!;
+    private GeneratorDriver _warmScanOnDriver = null!;
+    private Compilation _touchedScanOn100 = null!;
+
     [GlobalSetup]
     public void Setup()
     {
@@ -34,6 +41,12 @@ public class GeneratorPerformanceBenchmarks
         _warmDriver = CSharpGeneratorDriver.Create(new MinimalEndpointsGenerator())
             .RunGenerators(_compilation100);
         _touched100 = _compilation100.AddSyntaxTrees(CSharpSyntaxTree.ParseText("// incremental touch"));
+
+        _hostScanOff100 = CreateHostReferencingCompiledLibrary(100, optedIn: false);
+        _hostScanOn100 = CreateHostReferencingCompiledLibrary(100, optedIn: true);
+        _warmScanOnDriver = CSharpGeneratorDriver.Create(new MinimalEndpointsGenerator())
+            .RunGenerators(_hostScanOn100);
+        _touchedScanOn100 = _hostScanOn100.AddSyntaxTrees(CSharpSyntaxTree.ParseText("// incremental touch"));
     }
 
     // Each method targets a pre-built compilation; the previous [Arguments(N)] on these parameterless
@@ -54,6 +67,21 @@ public class GeneratorPerformanceBenchmarks
     // a cold generation. Only meaningful because the pipeline models are symbol-free on this branch.
     [Benchmark]
     public void GenerateEndpoints_100_Incremental() => _warmDriver.RunGenerators(_touched100);
+
+    // --- Cross-assembly scan: scanning OFF vs ON, comparing the cost of [assembly: ScanReferencedEndpoints] ---
+
+    // Baseline: host references the 100-endpoint library but does NOT opt in, so the scan short-circuits.
+    [Benchmark]
+    public void Scan_Off_Referenced_100() => RunGenerator(_hostScanOff100);
+
+    // Opted in: the host re-derives all 100 referenced endpoints from metadata (cold cost of the scan).
+    [Benchmark]
+    public void Scan_On_Referenced_100() => RunGenerator(_hostScanOn100);
+
+    // Opted in, warm second run after an unrelated touch: the structural comparer should keep the scan
+    // result cached, so this stays close to a no-op rather than re-paying the full Scan_On cost.
+    [Benchmark]
+    public void Scan_On_Referenced_100_Incremental() => _warmScanOnDriver.RunGenerators(_touchedScanOn100);
 
     private static void RunGenerator(Compilation compilation)
     {
@@ -87,24 +115,7 @@ public class Endpoint{i}
 
         var syntaxTree = CSharpSyntaxTree.ParseText(sb.ToString());
 
-        // Reference everything the generated registration code needs (ServiceLifetime, the routing
-        // builders, Results) so the input compilation is error-free and the benchmark measures real
-        // generation work rather than degraded error-recovery.
-        var references = new[]
-        {
-            MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
-            MetadataReference.CreateFromFile(typeof(Console).Assembly.Location),
-            MetadataReference.CreateFromFile(typeof(IResult).Assembly.Location),
-            MetadataReference.CreateFromFile(typeof(Results).Assembly.Location),
-            MetadataReference.CreateFromFile(typeof(MinimalEndpoints.Annotations.MapGetAttribute).Assembly.Location),
-            MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.DependencyInjection.ServiceLifetime).Assembly.Location),
-            MetadataReference.CreateFromFile(typeof(Microsoft.AspNetCore.Builder.IApplicationBuilder).Assembly.Location),
-            MetadataReference.CreateFromFile(typeof(Microsoft.AspNetCore.Routing.RouteGroupBuilder).Assembly.Location),
-            MetadataReference.CreateFromFile(AppDomain.CurrentDomain.GetAssemblies()
-                .Single(a => a.GetName().Name == "System.Runtime").Location),
-            MetadataReference.CreateFromFile(AppDomain.CurrentDomain.GetAssemblies()
-                .Single(a => a.GetName().Name == "Microsoft.AspNetCore.Http.Abstractions").Location),
-        };
+        var references = CreateReferences();
 
         var compilation = CSharpCompilation.Create(
             $"BenchmarkAssembly_{count}",
@@ -123,5 +134,59 @@ public class Endpoint{i}
         }
 
         return compilation;
+    }
+
+    // Reference everything the generated registration code needs (ServiceLifetime, the routing
+    // builders, Results) so input compilations are error-free and the benchmark measures real
+    // generation work rather than degraded error-recovery. Shared by the source and host compilations.
+    private static MetadataReference[] CreateReferences() =>
+    [
+        MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
+        MetadataReference.CreateFromFile(typeof(Console).Assembly.Location),
+        MetadataReference.CreateFromFile(typeof(IResult).Assembly.Location),
+        MetadataReference.CreateFromFile(typeof(Results).Assembly.Location),
+        MetadataReference.CreateFromFile(typeof(MinimalEndpoints.Annotations.MapGetAttribute).Assembly.Location),
+        MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.DependencyInjection.ServiceLifetime).Assembly.Location),
+        MetadataReference.CreateFromFile(typeof(Microsoft.AspNetCore.Builder.IApplicationBuilder).Assembly.Location),
+        MetadataReference.CreateFromFile(typeof(Microsoft.AspNetCore.Routing.RouteGroupBuilder).Assembly.Location),
+        MetadataReference.CreateFromFile(AppDomain.CurrentDomain.GetAssemblies()
+            .Single(a => a.GetName().Name == "System.Runtime").Location),
+        MetadataReference.CreateFromFile(AppDomain.CurrentDomain.GetAssemblies()
+            .Single(a => a.GetName().Name == "Microsoft.AspNetCore.Http.Abstractions").Location),
+    ];
+
+    /// <summary>
+    /// Builds a host compilation that references a compiled library of <paramref name="count"/>
+    /// endpoints (emitted to a PE image, so the host sees metadata only — no syntax). When
+    /// <paramref name="optedIn"/> is true the host carries <c>[assembly: ScanReferencedEndpoints]</c>,
+    /// so every discovered endpoint comes from the referenced library, isolating the scan's cost.
+    /// </summary>
+    private static Compilation CreateHostReferencingCompiledLibrary(int count, bool optedIn)
+    {
+        var library = CreateCompilationWithEndpoints(count);
+
+        using var peStream = new MemoryStream();
+        var emitResult = library.Emit(peStream);
+        if (!emitResult.Success)
+        {
+            throw new InvalidOperationException(
+                "Benchmark library failed to emit: " +
+                string.Join("; ", emitResult.Diagnostics
+                    .Where(d => d.Severity == DiagnosticSeverity.Error)
+                    .Select(d => d.GetMessage())));
+        }
+
+        MetadataReference[] references =
+            [.. CreateReferences(), MetadataReference.CreateFromImage(peStream.ToArray())];
+
+        var hostSource = optedIn
+            ? "[assembly: MinimalEndpoints.Annotations.ScanReferencedEndpoints]"
+            : "// cross-assembly scanning disabled";
+
+        return CSharpCompilation.Create(
+            "BenchmarkHost",
+            [CSharpSyntaxTree.ParseText(hostSource)],
+            references,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
     }
 }

@@ -19,16 +19,25 @@ public class EndpointsAnalyzer : DiagnosticAnalyzer
             Diagnostics.MultipleAttributesDetected,
             Diagnostics.ServiceTypeMissingEntryPoint,
             Diagnostics.InvalidGroupType,
-            Diagnostics.UnsupportedEndpointShape);
+            Diagnostics.UnsupportedEndpointShape,
+            Diagnostics.CrossAssemblyGroupNotScanned);
 
     public override void Initialize(AnalysisContext context)
     {
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
         context.EnableConcurrentExecution();
-        context.RegisterSyntaxNodeAction(AnalyzeClassDeclaration, SyntaxKind.ClassDeclaration);
+
+        // Resolve the cross-assembly opt-in ONCE per compilation (a per-compilation constant) and share
+        // it with every class-declaration callback, instead of re-parsing it per node.
+        context.RegisterCompilationStartAction(static start =>
+        {
+            var optIn = ScanReferencedEndpointsOptIn.Resolve(start.Compilation);
+            start.RegisterSyntaxNodeAction(
+                nodeContext => AnalyzeClassDeclaration(nodeContext, optIn), SyntaxKind.ClassDeclaration);
+        });
     }
 
-    private static void AnalyzeClassDeclaration(SyntaxNodeAnalysisContext context)
+    private static void AnalyzeClassDeclaration(SyntaxNodeAnalysisContext context, ScanReferencedEndpointsOptIn optIn)
     {
         var classDeclaration = (ClassDeclarationSyntax)context.Node;
 
@@ -167,7 +176,7 @@ public class EndpointsAnalyzer : DiagnosticAnalyzer
         var groupTypeSymbol = GetGroupTypeSymbol(attributes[0]);
         if (groupTypeSymbol != null)
         {
-            ValidateGroupType(context, classDeclaration, namedTypeSymbol, groupTypeSymbol);
+            ValidateGroupType(context, optIn, classDeclaration, namedTypeSymbol, groupTypeSymbol);
         }
     }
 
@@ -223,6 +232,7 @@ public class EndpointsAnalyzer : DiagnosticAnalyzer
 
     private static void ValidateGroupType(
         SyntaxNodeAnalysisContext context,
+        ScanReferencedEndpointsOptIn optIn,
         ClassDeclarationSyntax classDeclaration,
         INamedTypeSymbol endpointSymbol,
         INamedTypeSymbol groupTypeSymbol)
@@ -244,6 +254,20 @@ public class EndpointsAnalyzer : DiagnosticAnalyzer
             );
 
             context.ReportDiagnostic(diagnostic);
+            return;
+        }
+
+        // MINEP009: the Group is a valid, PUBLIC [MapGroup] in a referenced assembly the host won't scan,
+        // so it is never discovered and this endpoint would be silently mapped without the group's prefix
+        // and configuration. (A non-public referenced group is excluded — its typeof is already CS0122.)
+        if (ScanReferencedEndpointsOptIn.IsReferencedButNotScanned(context.Compilation, optIn, groupTypeSymbol))
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                Diagnostics.CrossAssemblyGroupNotScanned,
+                classDeclaration.Identifier.GetLocation(),
+                endpointSymbol.Name,
+                groupTypeSymbol.Name,
+                groupTypeSymbol.ContainingAssembly.Name));
         }
     }
 

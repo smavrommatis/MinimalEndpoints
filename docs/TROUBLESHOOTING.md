@@ -57,13 +57,36 @@ Common issues and their solutions when using MinimalEndpoints.
    </Project>
    ```
 
-5. **Check for Multiple Projects**
+5. **Endpoints in another project / referenced assembly**
 
-   Make sure you're referencing the correct project:
+   The generator discovers endpoints declared in the **current project's source**. If your
+   `AddMinimalEndpoints()`/`UseMinimalEndpoints()` call is in the same project as the endpoints, just
+   reference the generated namespace:
    ```csharp
-   // In the project that has endpoints
-   using MinimalEndpoints.Generated; // This should work
+   using MinimalEndpoints.Generated; // resolves to THIS project's generated extensions
    ```
+
+   Endpoints defined in a **referenced compiled assembly** (another project or a NuGet package) are
+   **not** discovered by default. To register them, opt in once on the host assembly:
+   ```csharp
+   [assembly: MinimalEndpoints.Annotations.ScanReferencedEndpoints]
+   ```
+   The host then scans its referenced assemblies (only those that reference MinimalEndpoints) and
+   registers their endpoints/groups as if they were local — composing groups across the boundary too.
+
+   To enable it across many host projects at once, emit the attribute from MSBuild instead:
+   ```xml
+   <!-- Directory.Build.props -->
+   <ItemGroup>
+     <AssemblyAttribute Include="MinimalEndpoints.Annotations.ScanReferencedEndpointsAttribute" />
+   </ItemGroup>
+   ```
+
+   **Requirements:** referenced endpoint/group classes must be `public` (the host references them
+   across the assembly boundary); non-public ones are skipped. A non-public `ServiceType` is ignored —
+   the endpoint is registered as its concrete class. Only assemblies the host references **directly**
+   are scanned (purely transitive package references are not). Endpoints in the **same** project may
+   remain `internal`.
 
 ### View Generated Code
 

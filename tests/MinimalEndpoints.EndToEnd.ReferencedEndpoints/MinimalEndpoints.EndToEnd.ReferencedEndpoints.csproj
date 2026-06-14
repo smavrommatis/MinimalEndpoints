@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Runtime attributes only. This is a plain COMPILED endpoint library: it does NOT run the
+         generator. The host re-derives these endpoints/groups from this assembly's metadata, which is
+         exactly what [assembly: ScanReferencedEndpoints] enables. -->
+    <ProjectReference Include="..\..\src\MinimalEndpoints\MinimalEndpoints.csproj" />
+  </ItemGroup>
+
+</Project>

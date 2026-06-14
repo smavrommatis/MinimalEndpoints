@@ -113,6 +113,45 @@ public class EndToEndHttpTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.Equal("true", Assert.Single(response.Headers.GetValues("X-Configured")));
     }
 
+    [Fact]
+    public async Task ReferencedLibraryEndpoint_RespondsUnderComposedPrefix()
+    {
+        var client = _factory.CreateClient();
+
+        // Endpoint defined in a referenced COMPILED assembly, in a referenced group → /lib/ping.
+        var response = await client.GetAsync("/lib/ping");
+
+        response.EnsureSuccessStatusCode();
+        Assert.Contains("referenced-library", await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task ReferencedGroupConfigureHook_IsApplied()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync("/lib/ping");
+
+        response.EnsureSuccessStatusCode();
+        // Proves IConfigurableGroup.ConfigureGroup on a REFERENCED group is invoked across assemblies.
+        Assert.Equal("lib", Assert.Single(response.Headers.GetValues("X-Lib-Group")));
+    }
+
+    [Fact]
+    public async Task HostEndpointInReferencedGroup_RespondsUnderComposedPrefix()
+    {
+        var client = _factory.CreateClient();
+
+        // A HOST endpoint with Group = typeof(referenced LibGroup): cross-assembly group composition.
+        var response = await client.GetAsync("/lib/host-in-lib");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("host-in-referenced-group", await response.Content.ReadAsStringAsync());
+
+        // It is only mapped under the referenced group's prefix, never at the unprefixed path.
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/host-in-lib")).StatusCode);
+    }
+
     private static async Task<int> ReadCountAsync(HttpClient client, string path)
     {
         var response = await client.GetAsync(path);

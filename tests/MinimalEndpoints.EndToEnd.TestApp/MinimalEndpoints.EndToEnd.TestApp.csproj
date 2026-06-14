@@ -8,6 +8,8 @@
     <!-- Runtime library + the generator referenced as an analyzer (same pattern as the samples). -->
     <ProjectReference Include="..\..\src\MinimalEndpoints\MinimalEndpoints.csproj" />
     <ProjectReference Include="..\..\src\MinimalEndpoints.CodeGeneration\MinimalEndpoints.CodeGeneration.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <!-- A compiled endpoint library, discovered via [assembly: ScanReferencedEndpoints] (CrossAssembly.cs). -->
+    <ProjectReference Include="..\MinimalEndpoints.EndToEnd.ReferencedEndpoints\MinimalEndpoints.EndToEnd.ReferencedEndpoints.csproj" />
   </ItemGroup>
 
 </Project>

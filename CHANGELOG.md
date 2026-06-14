@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Cross-assembly endpoint & group discovery.** A host can now opt in with
+  `[assembly: ScanReferencedEndpoints]` to register `[Map*]` endpoints and `[MapGroup]` groups defined
+  in *referenced compiled assemblies* (project or package references) — previously only endpoints in the
+  current project were discovered. Groups compose across the assembly boundary (an endpoint or group in
+  one assembly can join a group defined in another). Discovery stays fully compile-time with no runtime
+  reflection; the default (no-attribute) build is byte-identical and zero-cost. Referenced endpoint/group
+  types must be `public` (the host's generated code references them across the assembly boundary); a
+  non-public `ServiceType` is ignored and the concrete class is registered. Only **directly**-referenced
+  assemblies are scanned. Pass marker types to scan only specific assemblies —
+  `[assembly: ScanReferencedEndpoints(typeof(SomeTypeInThatAssembly))]`; with no arguments, all referenced
+  assemblies that use MinimalEndpoints are scanned.
+- **MINEP009** — warns when an endpoint's `Group` (or a group's `ParentGroup`) refers to a public
+  `[MapGroup]` type in a referenced assembly that cross-assembly scanning won't cover, so the group would
+  be silently dropped (the endpoint mapped without its prefix/configuration). Tells you to add (or widen
+  the targets of) `[assembly: ScanReferencedEndpoints]`.
+
 ### Documentation
 - Documented that **route parameters in a group prefix** — e.g. `[MapGroup("/v{version}")]`, including
   constraints (`{version:int}`) and tokens inherited from parent groups — bind into endpoint handler

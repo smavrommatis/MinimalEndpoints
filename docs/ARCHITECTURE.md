@@ -399,6 +399,12 @@ internal class ParameterInfo
 - Reuses cached results for repeated calls
 - Avoids expensive SymbolDisplayFormat operations
 
+### 5. Cross-Assembly Scan (opt-in)
+- `[assembly: ScanReferencedEndpoints]` enables a `CompilationProvider` step that re-derives endpoints/groups from referenced assemblies' **metadata** (no runtime reflection — the host emits the wiring at compile time)
+- `CompilationProvider` re-runs on every edit, so the scan node carries a **structural comparer** (`SymbolDefinitionArrayComparer`) over the value-equatable `SymbolDefinition`s: an unchanged scan result is served from cache instead of cascading into regeneration
+- Pruned to assemblies that reference MinimalEndpoints, so the BCL/ASP.NET are never enumerated; when the opt-in attribute is absent the step short-circuits to empty at zero cost, leaving the default pipeline byte-identical
+- Referenced types are re-derived through the **same** `SymbolDefinitionFactory` (symbol-only) in `External` accessibility scope (public-only), and fold into the FQN-keyed `GroupHierarchy` so groups compose across assemblies
+
 ---
 
 ## 🧪 Testing Architecture

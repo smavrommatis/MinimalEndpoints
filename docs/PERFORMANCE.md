@@ -76,6 +76,31 @@ row is a warm second run after a single-line source edit, exercising Roslyn's in
 - **Incremental re-builds are ~5× cheaper** - a warm re-run after one edit takes ~0.44 ms at 100 endpoints
 - **Allocation scales linearly** - roughly ~15 KB per generated endpoint
 
+### Cross-Assembly Scanning
+
+`[assembly: ScanReferencedEndpoints]` re-derives endpoints/groups from referenced **compiled**
+assemblies at compile time (no runtime reflection). The benchmark references a compiled library of 100
+endpoints and runs the host generator in each mode. All four rows below are from a **single local run**
+so they are directly comparable to each other — treat absolutes as illustrative (see the
+[Benchmarks README](../benchmarks/README.md#methodology-and-known-limitations)); they are not from the
+same run as the tables above.
+
+| Mode (host over a 100-endpoint referenced library)          | Mean     | Allocated | vs. cold generate-100 |
+|-------------------------------------------------------------|----------|-----------|-----------------------|
+| Default — no `[assembly: ScanReferencedEndpoints]`          | ~85 μs   | ~78 KB    | ~0.05×                |
+| Scanning **on**, cold                                       | ~1.65 ms | ~1.45 MB  | ~0.9×                 |
+| Scanning **on**, warm (after an unrelated edit)             | ~326 μs  | ~292 KB   | ~0.18×                |
+| _reference:_ cold generate 100 **local** endpoints (same run) | ~1.87 ms | ~1.47 MB  | 1.00×                 |
+
+**Key Insights:**
+- **Opt-out is effectively free** — with the attribute absent the scan short-circuits before touching any
+  references (~1/20th of a cold 100-endpoint generation); the default build is byte-identical to before.
+- **Scanning on (cold) costs about the same as generating those endpoints locally** — re-deriving 100
+  referenced endpoints ≈ generating 100 local ones.
+- **Warm rebuilds stay cached (~5× cheaper than cold)** — the `CompilationProvider`-fed scan node re-runs on
+  every edit, but its structural comparer serves an unchanged result from cache, so an unrelated edit does
+  not re-pay the scan (mirroring the local generator's incremental speedup).
+
 ### Build Time Impact
 
 Generation cost added per compilation (measured cold via the Roslyn driver — see the

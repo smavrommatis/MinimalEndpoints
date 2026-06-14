@@ -436,6 +436,27 @@ Semantics (these are exactly what the generator emits):
 - A `false` result on an endpoint skips just that endpoint; a `false` result on a group skips the group **and every endpoint and child group beneath it**.
 - It is evaluated once during `UseMinimalEndpoints()`.
 
+### Endpoints in a Referenced Library
+
+By default the generator only discovers endpoints and groups in the **current project**. To register those defined in a **referenced compiled assembly** (another project or a NuGet package), opt in once on the host assembly:
+
+```csharp
+[assembly: MinimalEndpoints.Annotations.ScanReferencedEndpoints]
+```
+
+`AddMinimalEndpoints()`/`UseMinimalEndpoints()` then also register everything from referenced assemblies that use MinimalEndpoints — and **groups compose across the boundary**, so an endpoint in one assembly can join a `[MapGroup]` defined in another. Discovery stays entirely at compile time (no runtime reflection); when the attribute is absent the build is byte-identical to before.
+
+Referenced endpoint/group classes must be `public` (the host's generated code references them across the assembly boundary); a non-public `ServiceType` is ignored and the endpoint registers as its concrete class. Only assemblies the host references **directly** are scanned. Endpoints in the **same** project may remain `internal`.
+
+To enable scanning across many host projects at once, emit the attribute from MSBuild instead of writing it in each project:
+
+```xml
+<!-- Directory.Build.props -->
+<ItemGroup>
+  <AssemblyAttribute Include="MinimalEndpoints.Annotations.ScanReferencedEndpointsAttribute" />
+</ItemGroup>
+```
+
 ---
 
 ## 🔗 Integration with ASP.NET Core
@@ -916,6 +937,19 @@ public class GetItemsEndpoint<T>
 ```
 
 [Learn more →](docs/diagnostics/MINEP008.md)
+
+### MINEP009: Referenced Group Is Not Scanned
+Warns when an endpoint's `Group` (or a group's `ParentGroup`) points to a `[MapGroup]` in a referenced assembly that cross-assembly scanning won't cover — so the group is silently dropped and the endpoint is mapped without its prefix/configuration.
+
+```csharp
+// LibGroup is in a referenced assembly, and the host hasn't opted in
+[MapGet("/x", Group = typeof(LibGroup))]   // ⚠️ MINEP009: mapped WITHOUT the group
+public class HostEndpoint { public IResult Handle() => Results.Ok(); }
+
+// Fix: add [assembly: ScanReferencedEndpoints] (optionally targeting LibGroup's assembly)
+```
+
+[Learn more →](docs/diagnostics/MINEP009.md)
 
 ---
 

@@ -11,9 +11,9 @@ internal sealed class EndpointDefinition : SymbolDefinition
     public static readonly SymbolDefinitionFactory Factory = new(
         predicate: attributeData => attributeData?.AttributeClass != null &&
                                     attributeData.AttributeClass.IsMapMethodsAttribute(),
-        create: (symbol, attributeData) =>
+        create: (symbol, attributeData, scope) =>
         {
-            var mapMethodsAttributeInfo = attributeData.GetMapMethodAttributeDefinition();
+            var mapMethodsAttributeInfo = attributeData.GetMapMethodAttributeDefinition(scope);
 
             if (mapMethodsAttributeInfo == null)
             {
@@ -22,17 +22,62 @@ internal sealed class EndpointDefinition : SymbolDefinition
 
             var entryPoint = symbol.FindEntryPointMethod(mapMethodsAttributeInfo.EntryPoint);
 
-            return entryPoint == null
-                ? null
-                : Create(symbol, entryPoint, mapMethodsAttributeInfo);
+            if (entryPoint == null)
+            {
+                return null;
+            }
+
+            // Cross-assembly: the host emits the handler delegate by name, so every type in the
+            // handler signature must be public in the referenced assembly. If not, skip the endpoint
+            // rather than emit host code that fails to compile (CS0122). (ServiceType is handled
+            // separately in GetMapMethodAttributeDefinition — it degrades to concrete registration.)
+            if (scope == AccessibilityScope.External && !EntryPointSurfaceIsPublic(entryPoint))
+            {
+                return null;
+            }
+
+            return Create(symbol, entryPoint, mapMethodsAttributeInfo);
         }
     );
+
+    // Every type the host emits by name from the handler signature must be public in the referenced
+    // assembly. A public entry point's parameter/return TYPES are already guaranteed public by the C#
+    // compiler (CS0050/CS0051), so those checks are defensive; a parameter ATTRIBUTE type is NOT so
+    // constrained and would be emitted onto the generated handler parameter and fail with CS0122.
+    private static bool EntryPointSurfaceIsPublic(IMethodSymbol entryPoint)
+    {
+        if (!SymbolDefinitionFactory.IsPubliclyAccessible(entryPoint.ReturnType))
+        {
+            return false;
+        }
+
+        foreach (var parameter in entryPoint.Parameters)
+        {
+            if (!SymbolDefinitionFactory.IsPubliclyAccessible(parameter.Type))
+            {
+                return false;
+            }
+
+            foreach (var attribute in parameter.GetAttributes())
+            {
+                if (attribute.AttributeClass is { } attributeClass &&
+                    !SymbolDefinitionFactory.IsPubliclyAccessible(attributeClass))
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
 
     private EndpointDefinition()
     {
     }
 
     public TypeDefinition ClassType { get; private set; }
+
+    public override string FullName => ClassType.FullName;
 
     public bool IsConfigurable { get; private set; }
 

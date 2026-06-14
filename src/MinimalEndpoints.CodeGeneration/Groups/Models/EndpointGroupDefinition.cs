@@ -10,7 +10,7 @@ internal class EndpointGroupDefinition : SymbolDefinition
     public static readonly SymbolDefinitionFactory Factory = new(
         predicate: attributeData => attributeData?.AttributeClass != null &&
                                     attributeData.AttributeClass.IsMapGroupAttribute(),
-        create: (symbol, attributeData) => new EndpointGroupDefinition(symbol, attributeData));
+        create: (symbol, attributeData, _) => new EndpointGroupDefinition(symbol, attributeData));
 
     private readonly string _equalityKey;
 
@@ -54,6 +54,8 @@ internal class EndpointGroupDefinition : SymbolDefinition
     public string Prefix { get; }
 
     public TypeDefinition ClassType { get; }
+
+    public override string FullName => ClassType.FullName;
 
     /// <summary>
     /// The fully-qualified name of this group's parent group (the <c>ParentGroup = typeof(...)</c>

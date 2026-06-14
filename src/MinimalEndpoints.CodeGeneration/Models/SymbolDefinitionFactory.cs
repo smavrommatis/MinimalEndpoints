@@ -8,25 +8,39 @@ namespace MinimalEndpoints.CodeGeneration.Models;
 internal class SymbolDefinitionFactory
 {
     public Func<AttributeData, bool> Predicate { get; }
-    public Func<INamedTypeSymbol, AttributeData, SymbolDefinition> Create { get; }
+
+    private readonly Func<INamedTypeSymbol, AttributeData, AccessibilityScope, SymbolDefinition> _create;
 
     public SymbolDefinitionFactory(
         Func<AttributeData, bool> predicate,
-        Func<INamedTypeSymbol, AttributeData, SymbolDefinition> create
+        Func<INamedTypeSymbol, AttributeData, AccessibilityScope, SymbolDefinition> create
     )
     {
         Predicate = predicate;
-        Create = create;
+        _create = create;
     }
 
-    public static SymbolDefinition TryCreateSymbol(INamedTypeSymbol symbol)
+    /// <summary>
+    /// Creates the definition for <paramref name="symbol"/>. <paramref name="scope"/> defaults to
+    /// <see cref="AccessibilityScope.SameAssembly"/>; the cross-assembly scan passes
+    /// <see cref="AccessibilityScope.External"/> so the emitted surface is gated for public accessibility.
+    /// </summary>
+    public SymbolDefinition Create(
+        INamedTypeSymbol symbol,
+        AttributeData attributeData,
+        AccessibilityScope scope = AccessibilityScope.SameAssembly)
+        => _create(symbol, attributeData, scope);
+
+    public static SymbolDefinition TryCreateSymbol(
+        INamedTypeSymbol symbol, AccessibilityScope scope = AccessibilityScope.SameAssembly)
     {
-        // Symbol-level discovery gate, shared by the generator (via ForAttributeWithMetadataName)
-        // and the analyzers so all consumers agree by construction. Non-class kinds and any
-        // rejected shape (abstract / open generic / file-local / inaccessible) are skipped — the
-        // emitter cannot legally reference them, so generating for them would produce non-compiling
-        // code. The analyzers surface MINEP008 for the non-abstract rejections via ClassifyShape.
-        if (symbol.TypeKind != TypeKind.Class || ClassifyShape(symbol) != ShapeRejection.None)
+        // Symbol-level discovery gate, shared by the generator (via ForAttributeWithMetadataName),
+        // the cross-assembly scan, and the analyzers so all consumers agree by construction. Non-class
+        // kinds and any rejected shape (abstract / open generic / file-local / inaccessible for the
+        // given scope) are skipped — the emitter cannot legally reference them, so generating for them
+        // would produce non-compiling code. The analyzers surface MINEP008 for the non-abstract
+        // rejections via ClassifyShape.
+        if (symbol.TypeKind != TypeKind.Class || ClassifyShape(symbol, scope) != ShapeRejection.None)
         {
             return null;
         }
@@ -42,12 +56,12 @@ internal class SymbolDefinitionFactory
         {
             if (classification.EndpointAttributes.Length == 1 && classification.GroupAttributes.Length == 0)
             {
-                return EndpointDefinition.Factory.Create(symbol, classification.EndpointAttributes[0]);
+                return EndpointDefinition.Factory.Create(symbol, classification.EndpointAttributes[0], scope);
             }
 
             if (classification.GroupAttributes.Length == 1 && classification.EndpointAttributes.Length == 0)
             {
-                return EndpointGroupDefinition.Factory.Create(symbol, classification.GroupAttributes[0]);
+                return EndpointGroupDefinition.Factory.Create(symbol, classification.GroupAttributes[0], scope);
             }
         }
         catch
@@ -70,7 +84,8 @@ internal class SymbolDefinitionFactory
     /// code. Abstract classes are a legitimate, never-mapped base pattern (rejected here but NOT
     /// surfaced as a diagnostic). Shared by the generator gate and the analyzers' MINEP008 reporting.
     /// </summary>
-    public static ShapeRejection ClassifyShape(INamedTypeSymbol symbol)
+    public static ShapeRejection ClassifyShape(
+        INamedTypeSymbol symbol, AccessibilityScope scope = AccessibilityScope.SameAssembly)
     {
         if (symbol.IsAbstract)
         {
@@ -87,7 +102,12 @@ internal class SymbolDefinitionFactory
             return ShapeRejection.FileLocal;
         }
 
-        return IsReferenceableFromGeneratedCode(symbol) ? ShapeRejection.None : ShapeRejection.Inaccessible;
+        // Same-assembly generated code may reference internal types; cross-assembly (External) host code
+        // can only reference types that are public all the way up the nesting chain.
+        var accessible = scope == AccessibilityScope.External
+            ? IsPubliclyAccessible(symbol)
+            : IsReferenceableFromGeneratedCode(symbol);
+        return accessible ? ShapeRejection.None : ShapeRejection.Inaccessible;
     }
 
     /// <summary>
@@ -102,9 +122,9 @@ internal class SymbolDefinitionFactory
     };
 
     /// <summary>
-    /// True when the type (and every containing type) is at least <c>internal</c>. Generated code
-    /// lives in the same assembly, so <c>internal</c> and <c>protected internal</c> are referenceable;
-    /// <c>private</c>, <c>protected</c>, and <c>private protected</c> nesting are not.
+    /// True when the type (and every containing type) is at least <c>internal</c> — referenceable by
+    /// SAME-assembly generated code (<c>private</c>/<c>protected</c>/<c>private protected</c> nesting is
+    /// not). The cross-assembly (External) gate uses <see cref="IsPubliclyAccessible"/> instead.
     /// </summary>
     private static bool IsReferenceableFromGeneratedCode(INamedTypeSymbol symbol)
     {
@@ -122,6 +142,47 @@ internal class SymbolDefinitionFactory
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// True when <paramref name="type"/> can be named from a DIFFERENT (host) assembly — i.e. it is
+    /// <c>public</c> all the way up its nesting chain AND every generic type argument and array/pointer
+    /// element is likewise publicly accessible (so <c>Task&lt;InternalDto&gt;</c> is rejected). Used by
+    /// the External gate for the endpoint/group type, by MINEP009 for a referenced group, and by the
+    /// endpoint factory for the emitted handler surface (return type, parameter types, ServiceType).
+    /// Type parameters and intrinsic/special types are always accessible.
+    /// </summary>
+    public static bool IsPubliclyAccessible(ITypeSymbol type)
+    {
+        switch (type)
+        {
+            case IArrayTypeSymbol array:
+                return IsPubliclyAccessible(array.ElementType);
+            case IPointerTypeSymbol pointer:
+                return IsPubliclyAccessible(pointer.PointedAtType);
+            case ITypeParameterSymbol:
+                return true;
+            case INamedTypeSymbol named:
+                for (INamedTypeSymbol current = named; current != null; current = current.ContainingType)
+                {
+                    if (current.DeclaredAccessibility != Accessibility.Public)
+                    {
+                        return false;
+                    }
+                }
+
+                foreach (var argument in named.TypeArguments)
+                {
+                    if (!IsPubliclyAccessible(argument))
+                    {
+                        return false;
+                    }
+                }
+
+                return true;
+            default:
+                return true;
+        }
     }
 
     /// <summary>
@@ -189,4 +250,16 @@ internal enum ShapeRejection
     Generic,
     FileLocal,
     Inaccessible
+}
+
+/// <summary>
+/// Where the generated code that references a discovered type will live, which decides the minimum
+/// accessibility the type must have. <see cref="SameAssembly"/> is the default FAWMN/source path
+/// (generated code is in the same assembly, so <c>internal</c> is fine). <see cref="External"/> is the
+/// cross-assembly scan (the host re-derives a referenced type, so it must be <c>public</c>).
+/// </summary>
+internal enum AccessibilityScope
+{
+    SameAssembly,
+    External
 }

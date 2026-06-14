@@ -23,7 +23,8 @@ public class GroupsAnalyzer : DiagnosticAnalyzer
             Diagnostics.AmbiguousRoutes,
             Diagnostics.CyclicGroupHierarchy,
             Diagnostics.InvalidSymbolKind,
-            Diagnostics.UnsupportedEndpointShape);
+            Diagnostics.UnsupportedEndpointShape,
+            Diagnostics.CrossAssemblyGroupNotScanned);
 
     // Compiled once and reused rather than re-parsed on every Regex.Replace call. Collapses runs of
     // interior slashes ("a//b" -> "a/b").
@@ -49,6 +50,10 @@ public class GroupsAnalyzer : DiagnosticAnalyzer
         // which is already lightweight (name/prefix/parent strings only).
         var endpointFacts = new ConcurrentDictionary<INamedTypeSymbol, EndpointRouteFacts>(SymbolEqualityComparer.Default);
         var groups = new ConcurrentDictionary<INamedTypeSymbol, EndpointGroupDefinition>(SymbolEqualityComparer.Default);
+
+        // Resolved once per compilation (a per-compilation constant) and shared with the per-symbol
+        // callback below, rather than re-parsing the opt-in attribute for every parented group.
+        var optIn = ScanReferencedEndpointsOptIn.Resolve(context.Compilation);
 
         context.RegisterSymbolAction(symbolContext =>
         {
@@ -129,6 +134,23 @@ public class GroupsAnalyzer : DiagnosticAnalyzer
 
                 var group = new EndpointGroupDefinition(namedTypeSymbol, classification.GroupAttributes[0]);
                 groups.TryAdd(namedTypeSymbol, group);
+
+                // MINEP009: a source group whose ParentGroup is a [MapGroup] in a referenced assembly the
+                // host won't scan — the parent link is silently dropped (this group becomes a root and
+                // loses the parent's prefix).
+                var parentGroupSymbol = GetParentGroupSymbol(classification.GroupAttributes[0]);
+                if (parentGroupSymbol != null &&
+                    parentGroupSymbol.GetAttributes().Any(EndpointGroupDefinition.Factory.Predicate) &&
+                    ScanReferencedEndpointsOptIn.IsReferencedButNotScanned(
+                        symbolContext.Compilation, optIn, parentGroupSymbol))
+                {
+                    symbolContext.ReportDiagnostic(Diagnostic.Create(
+                        Diagnostics.CrossAssemblyGroupNotScanned,
+                        namedTypeSymbol.Locations.FirstOrDefault(),
+                        namedTypeSymbol.Name,
+                        parentGroupSymbol.Name,
+                        parentGroupSymbol.ContainingAssembly.Name));
+                }
             }
 
             // Anything else (e.g. multiple endpoint attributes) is left to the EndpointsAnalyzer.
@@ -168,6 +190,19 @@ public class GroupsAnalyzer : DiagnosticAnalyzer
         }
 
         return false;
+    }
+
+    private static INamedTypeSymbol GetParentGroupSymbol(AttributeData groupAttribute)
+    {
+        foreach (var namedArgument in groupAttribute.NamedArguments)
+        {
+            if (namedArgument.Key == "ParentGroup" && namedArgument.Value.Value is INamedTypeSymbol parentGroup)
+            {
+                return parentGroup;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>

@@ -22,9 +22,11 @@ public class CompilationBuilder
     private readonly HashSet<string> _addedAssemblies = new(StringComparer.OrdinalIgnoreCase);
     private bool _hasMvcReferences;
     private bool _hasComponentModelReferences;
+    private readonly string _assemblyName;
 
-    public CompilationBuilder(string source)
+    public CompilationBuilder(string source, string assemblyName = "TestAssembly")
     {
+        _assemblyName = assemblyName;
         _sources.Add(source);
 
         // Add minimal required references
@@ -52,6 +54,32 @@ public class CompilationBuilder
     public CompilationBuilder WithTypeAssembly(Type type)
     {
         AddReferenceIfNotExists(type.Assembly);
+        return this;
+    }
+
+    /// <summary>
+    /// Emits <paramref name="referenced"/> to an in-memory PE image and adds it as a metadata
+    /// reference. This reproduces a real "referenced compiled assembly": the resulting compilation
+    /// sees only metadata symbols with NO syntax trees — exactly the condition under which
+    /// <c>ForAttributeWithMetadataName</c> cannot discover the referenced endpoints/groups. A
+    /// <see cref="CompilationReference"/> would keep the source compilation (and its syntax) attached
+    /// and would NOT reproduce that condition, so it is deliberately not used here.
+    /// </summary>
+    public CompilationBuilder WithReferencedAssembly(CSharpCompilation referenced)
+    {
+        using var peStream = new MemoryStream();
+        var emitResult = referenced.Emit(peStream);
+
+        if (!emitResult.Success)
+        {
+            var errors = emitResult.Diagnostics
+                .Where(d => d.Severity == DiagnosticSeverity.Error)
+                .Select(e => $"{e.Id}: {e.GetMessage()}");
+            throw new InvalidOperationException(
+                $"Referenced compilation failed to emit:{Environment.NewLine}{string.Join(Environment.NewLine, errors)}");
+        }
+
+        _references.Add(MetadataReference.CreateFromImage(peStream.ToArray()));
         return this;
     }
 
@@ -156,7 +184,7 @@ public class CompilationBuilder
         syntaxTrees.Add(globalUsingsSyntaxTree);
 
         var compilation = CSharpCompilation.Create(
-            "TestAssembly",
+            _assemblyName,
             syntaxTrees,
             _references,
             new CSharpCompilationOptions(

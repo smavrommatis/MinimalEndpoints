@@ -23,7 +23,8 @@ internal static class MapMethodsUtilities
                 { WellKnownTypes.Annotations.MapHeadAttributeName, ("HEAD", "MapMethods") }
             };
 
-    public static MapMethodsAttributeDefinition GetMapMethodAttributeDefinition(this AttributeData attributeData)
+    public static MapMethodsAttributeDefinition GetMapMethodAttributeDefinition(
+        this AttributeData attributeData, AccessibilityScope scope = AccessibilityScope.SameAssembly)
     {
         // A mid-typing / malformed attribute (e.g. '[MapGet]' before its pattern is typed) still
         // resolves its AttributeClass, so the factory predicate passes — but it has no valid
@@ -36,8 +37,8 @@ internal static class MapMethodsUtilities
         }
 
         return WellKnownTypes.Annotations.MapMethodsAttributeName.Equals(attributeData.AttributeClass!.Name)
-            ? GetAttributeDataForMultipleMethods(attributeData)
-            : GetAttributeDataForSingleMethod(attributeData);
+            ? GetAttributeDataForMultipleMethods(attributeData, scope)
+            : GetAttributeDataForSingleMethod(attributeData, scope);
     }
 
     public static bool IsMapMethodsAttribute(this INamedTypeSymbol type)
@@ -47,7 +48,8 @@ internal static class MapMethodsUtilities
                && type.ContainingNamespace.ToDisplayString() == WellKnownTypes.Annotations.Namespace;
     }
 
-    private static MapMethodsAttributeDefinition GetAttributeDataForSingleMethod(AttributeData attributeData)
+    private static MapMethodsAttributeDefinition GetAttributeDataForSingleMethod(
+        AttributeData attributeData, AccessibilityScope scope)
     {
         // Single-method ctor is (string pattern, ServiceLifetime lifetime). Guard against an
         // error-state attribute whose arguments are short or in error (the lifetime defaults to
@@ -71,11 +73,13 @@ internal static class MapMethodsUtilities
             pattern: pattern,
             lifetime: lifetime,
             endpointBuilderMethodName: attributeDefinition.EndpointBuilderMethodName,
-            methods: [attributeDefinition.Method]
+            methods: [attributeDefinition.Method],
+            scope: scope
         );
     }
 
-    private static MapMethodsAttributeDefinition GetAttributeDataForMultipleMethods(AttributeData attributeData)
+    private static MapMethodsAttributeDefinition GetAttributeDataForMultipleMethods(
+        AttributeData attributeData, AccessibilityScope scope)
     {
         // MapMethods ctor is (string pattern, string[] methods, ServiceLifetime lifetime). Guard
         // against a short/error-state attribute: a missing or null methods array (e.g.
@@ -104,7 +108,8 @@ internal static class MapMethodsUtilities
             pattern: pattern,
             lifetime: lifetime,
             "MapMethods",
-            methods: methods
+            methods: methods,
+            scope: scope
         );
     }
 
@@ -113,7 +118,8 @@ internal static class MapMethodsUtilities
         string pattern,
         ServiceLifetime lifetime,
         string endpointBuilderMethodName,
-        string[] methods
+        string[] methods,
+        AccessibilityScope scope
     )
     {
         string entryPoint = null;
@@ -128,9 +134,14 @@ internal static class MapMethodsUtilities
                     entryPoint = entry;
                     break;
                 case "ServiceType" when namedArg.Value.Value is INamedTypeSymbol serviceType:
-                    // Render via the same TypeDefinition path every other emitted type uses (keyword
-                    // aliases, nested/generic handling), so type rendering has one audited policy.
-                    serviceName = new TypeDefinition(serviceType).FullName;
+                    // Cross-assembly: a non-public ServiceType can't be named by the host, so fall back
+                    // to registering the concrete (public) endpoint class rather than emitting CS0122.
+                    serviceName = scope == AccessibilityScope.External &&
+                                  !SymbolDefinitionFactory.IsPubliclyAccessible(serviceType)
+                        ? null
+                        // Otherwise render via the same TypeDefinition path every other emitted type
+                        // uses (keyword aliases, nested/generic handling) — one audited policy.
+                        : new TypeDefinition(serviceType).FullName;
                     break;
                 // Capture the group reference as a fully-qualified-name string (via the same
                 // TypeDefinition path the group uses for its own identity), not the symbol — the

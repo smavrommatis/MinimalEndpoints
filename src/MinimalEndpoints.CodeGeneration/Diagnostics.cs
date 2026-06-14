@@ -127,6 +127,24 @@ internal static class Diagnostics
         helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/blob/main/docs/diagnostics/MINEP008.md"
     );
 
+    public static readonly DiagnosticDescriptor CrossAssemblyGroupNotScanned = new DiagnosticDescriptor(
+        id: "MINEP009",
+        title: "Referenced group is not scanned",
+        messageFormat:
+        "'{0}' references group '{1}' from referenced assembly '{2}', which is not scanned for endpoints. " +
+        "The group's route prefix and configuration will not be applied — '{0}' is mapped without the group. " +
+        "Add [assembly: ScanReferencedEndpoints] to the host (optionally targeting it with " +
+        "[assembly: ScanReferencedEndpoints(typeof(...))]).",
+        category: "MinimalEndpoints",
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: "When an endpoint's Group (or a group's ParentGroup) refers to a public MapGroup type in a " +
+        "referenced assembly that cross-assembly scanning does not cover, the group is never discovered, so it " +
+        "cannot be composed: the endpoint is silently mapped without the group's route prefix and configuration. " +
+        "Enable scanning of that assembly with [assembly: ScanReferencedEndpoints], optionally targeting it by type.",
+        helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/blob/main/docs/diagnostics/MINEP009.md"
+    );
+
     /// <summary>
     /// Reported by the GENERATOR (not an analyzer) when the output step throws unexpectedly. It
     /// turns an opaque CS8785 ("generator failed to generate source") into an actionable build

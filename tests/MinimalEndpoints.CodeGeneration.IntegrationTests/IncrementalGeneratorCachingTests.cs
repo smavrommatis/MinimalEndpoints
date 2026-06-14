@@ -25,6 +25,18 @@ public class TestEndpoint
 
     private const string UnrelatedSource = "public class Unrelated { }";
 
+    private const string ReferencedEndpointLibrarySource = @"
+namespace Ext.Lib;
+
+[MapGet(""/ext"")]
+public class ExtEndpoint
+{
+    public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok());
+}";
+
+    private const string OptInHostSource =
+        "[assembly: MinimalEndpoints.Annotations.ScanReferencedEndpoints]\n" + EndpointSource;
+
     private const string GroupSource = @"
 namespace TestApp;
 
@@ -373,6 +385,76 @@ public class AttributedParamEndpoint
         Assert.Equal(firstText, secondText);
     }
 
+    [Fact]
+    public void ReferencedScan_OptedIn_UnrelatedEdit_ReportsCachedOutputs()
+    {
+        // The load-bearing test for the scan node's structural comparer. With the host opted in and a
+        // referenced endpoint present, the scan result is a NON-empty, freshly-allocated array on every
+        // run (CompilationProvider re-fires on each edit). Editing an unrelated tree must still leave all
+        // outputs Cached/Unchanged — which only holds because the comparer compares the rebuilt
+        // definitions by value. Drop .WithComparer and this fails (Modified cascade).
+        var lib = new CompilationBuilder(ReferencedEndpointLibrarySource, assemblyName: "Ext.Lib")
+            .WithMvcReferences()
+            .Build();
+
+        var compilation = new CompilationBuilder(OptInHostSource)
+            .WithAdditionalSource(UnrelatedSource)
+            .WithMvcReferences()
+            .WithReferencedAssembly(lib)
+            .Build(validateCompilation: false);
+
+        var driver = CreateTrackingDriver();
+        driver = driver.RunGenerators(compilation);
+        var firstText = GetGeneratedText(driver);
+
+        // Sanity: the referenced endpoint really was discovered, so the scan result is non-empty.
+        Assert.Contains("Map__Ext_Lib_ExtEndpoint", firstText);
+
+        var unrelatedTree = compilation.SyntaxTrees.Single(t => t.ToString() == UnrelatedSource);
+        var editedCompilation = compilation.ReplaceSyntaxTree(
+            unrelatedTree,
+            CSharpSyntaxTree.ParseText("public class Unrelated { /* edit */ }"));
+
+        driver = driver.RunGenerators(editedCompilation);
+        var secondText = GetGeneratedText(driver);
+
+        AssertAllOutputsCached(driver);
+        Assert.Equal(firstText, secondText);
+    }
+
+    [Fact]
+    public void ReferencedScan_NotOptedIn_WithReference_UnrelatedEdit_ReportsCachedOutputs()
+    {
+        // Default path with a referenced endpoint assembly present but NO opt-in: the scan
+        // short-circuits to Empty and the whole pipeline stays cached across an unrelated edit.
+        var lib = new CompilationBuilder(ReferencedEndpointLibrarySource, assemblyName: "Ext.Lib")
+            .WithMvcReferences()
+            .Build();
+
+        var compilation = new CompilationBuilder(EndpointSource)
+            .WithAdditionalSource(UnrelatedSource)
+            .WithMvcReferences()
+            .WithReferencedAssembly(lib)
+            .Build(validateCompilation: false);
+
+        var driver = CreateTrackingDriver();
+        driver = driver.RunGenerators(compilation);
+        var firstText = GetGeneratedText(driver);
+
+        Assert.DoesNotContain("ExtEndpoint", firstText);
+
+        var unrelatedTree = compilation.SyntaxTrees.Single(t => t.ToString() == UnrelatedSource);
+        var editedCompilation = compilation.ReplaceSyntaxTree(
+            unrelatedTree,
+            CSharpSyntaxTree.ParseText("public class Unrelated { /* edit */ }"));
+
+        driver = driver.RunGenerators(editedCompilation);
+        var secondText = GetGeneratedText(driver);
+
+        AssertAllOutputsCached(driver);
+        Assert.Equal(firstText, secondText);
+    }
+
     private static GeneratorDriver CreateTrackingDriver() =>
         CSharpGeneratorDriver.Create(
             generators: new[] { new MinimalEndpointsGenerator().AsSourceGenerator() },
@@ -412,5 +494,20 @@ public class AttributedParamEndpoint
             Assert.True(
                 output.Reason is IncrementalStepRunReason.Cached or IncrementalStepRunReason.Unchanged,
                 $"Expected the merged-definitions step Cached/Unchanged but it reported {output.Reason}."));
+
+        // The cross-assembly scan node is fed by CompilationProvider, which re-runs on EVERY edit. It
+        // must still report Cached/Unchanged — that is the whole job of its structural comparer. If the
+        // comparer were dropped, the freshly-allocated result array would be reference-unequal and this
+        // step would flip to Modified (and cascade into the merged step and the output).
+        Assert.True(
+            result.TrackedSteps.TryGetValue(MinimalEndpointsGenerator.ReferencedProviderTrackingName, out var referencedRuns),
+            $"Expected a tracked step named '{MinimalEndpointsGenerator.ReferencedProviderTrackingName}'.");
+
+        var referencedOutputs = referencedRuns.SelectMany(run => run.Outputs).ToList();
+        Assert.NotEmpty(referencedOutputs);
+        Assert.All(referencedOutputs, output =>
+            Assert.True(
+                output.Reason is IncrementalStepRunReason.Cached or IncrementalStepRunReason.Unchanged,
+                $"Expected the referenced-scan step Cached/Unchanged but it reported {output.Reason}."));
     }
 }

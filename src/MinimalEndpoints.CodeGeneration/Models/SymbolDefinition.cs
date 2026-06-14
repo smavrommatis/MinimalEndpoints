@@ -21,6 +21,12 @@ internal abstract class SymbolDefinition : IEquatable<SymbolDefinition>
     /// </remarks>
     protected abstract string EqualityKey { get; }
 
+    /// <summary>
+    /// The fully-qualified name of the discovered type (its <c>ClassType.FullName</c>). Exposed on the
+    /// base so callers can key/sort definitions without switching on the concrete kind.
+    /// </summary>
+    public abstract string FullName { get; }
+
     public bool Equals(SymbolDefinition other) =>
         other is not null && GetType() == other.GetType() && EqualityKey == other.EqualityKey;
 
