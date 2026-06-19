@@ -45,12 +45,12 @@ Performance of diagnostic analysis across different project sizes:
 
 | Endpoints | Mean     | Error     | StdDev    | Ratio | Gen0     | Gen1    | Allocated  | Alloc Ratio |
 |-----------|----------|-----------|-----------|-------|----------|---------|------------|-------------|
-| 10        | 1.359 ms | 0.603 ms  | 0.399 ms  | 1.07  | 15.6250  | -       | 345.29 KB  | 1.00        |
-| 50        | 2.819 ms | 1.027 ms  | 0.680 ms  | 2.23  | 54.6875  | 7.8125  | 1314.10 KB | 3.81        |
-| 100       | 6.320 ms | 3.490 ms  | 2.308 ms  | 4.99  | 62.5000  | 15.6250 | 2512.93 KB | 7.28        |
+| 10        | 1.216 ms | 0.353 ms  | 0.234 ms  | 1.03  | 15.6250  | -       | 353.55 KB  | 1.00        |
+| 50        | 2.747 ms | 1.123 ms  | 0.743 ms  | 2.33  | 62.5000  | 15.6250 | 1351.06 KB | 3.82        |
+| 100       | 5.134 ms | 1.682 ms  | 1.001 ms  | 4.35  | 62.5000  | 15.6250 | 2569.02 KB | 7.27        |
 
 **Key Insights:**
-- Sub-7ms analysis time for 100 endpoints (~6.3 ms)
+- Sub-6ms analysis time for 100 endpoints (~5.1 ms)
 - Roughly linear scaling with endpoint count
 - Allocations grow with the endpoint count (~2.5 MB at 100 endpoints)
 
@@ -60,11 +60,11 @@ Performance of source code generation:
 
 | Scenario          | Mean       | Error     | StdDev    | Ratio | Gen0     | Allocated  | Alloc Ratio |
 |-------------------|------------|-----------|-----------|-------|----------|------------|-------------|
-| 10 (cold)         | 329.5 μs   | 44.85 μs  | 26.69 μs  | 1.01  | 11.7188  | 245.99 KB  | 1.00        |
-| 50 (cold)         | 1,069.6 μs | 100.77 μs | 52.70 μs  | 3.26  | 39.0625  | 821.77 KB  | 3.34        |
-| 100 (cold)        | 2,321.7 μs | 280.33 μs | 146.62 μs | 7.08  | 62.5000  | 1538.35 KB | 6.25        |
-| 500 (cold)        | 8,999.8 μs | 177.88 μs | 117.66 μs | 27.46 | 171.8750 | 7259.79 KB | 29.51       |
-| 100 (incremental) | 444.0 μs   | 3.30 μs   | 2.18 μs   | 1.35  | 19.5313  | 387.52 KB  | 1.58        |
+| 10 (cold)         | 331.8 μs   | 28.31 μs  | 14.81 μs  | 1.00  | 11.7188  | 259.35 KB  | 1.00        |
+| 50 (cold)         | 1,262.7 μs | 149.95 μs | 78.42 μs  | 3.81  | 39.0625  | 864.30 KB  | 3.33        |
+| 100 (cold)        | 2,103.4 μs | 97.68 μs  | 58.13 μs  | 6.35  | 78.1250  | 1617.17 KB | 6.24        |
+| 500 (cold)        | 9,677.5 μs | 302.60 μs | 200.15 μs | 29.22 | 156.2500 | 7634.15 KB | 29.44       |
+| 100 (incremental) | 416.9 μs   | 19.42 μs  | 12.85 μs  | 1.26  | 5.8594   | 345.08 KB  | 1.33        |
 
 *Cold* runs build a fresh generator driver over a clean N-endpoint compilation. The *incremental*
 row is a warm second run after a single-line source edit, exercising Roslyn's incremental caching.
@@ -72,32 +72,32 @@ row is a warm second run after a single-line source edit, exercising Roslyn's in
 
 **Key Insights:**
 - **Sub-millisecond cold generation** only for very small projects (~0.33 ms at 10 endpoints)
-- **Cold generation scales roughly linearly** - ~2.3 ms at 100 endpoints, ~9 ms at 500
-- **Incremental re-builds are ~5× cheaper** - a warm re-run after one edit takes ~0.44 ms at 100 endpoints
+- **Cold generation scales roughly linearly** - ~2.1 ms at 100 endpoints, ~9.7 ms at 500
+- **Incremental re-builds are ~5× cheaper** - a warm re-run after one edit takes ~0.42 ms at 100 endpoints
 - **Allocation scales linearly** - roughly ~15 KB per generated endpoint
 
 ### Cross-Assembly Scanning
 
 `[assembly: ScanReferencedEndpoints]` re-derives endpoints/groups from referenced **compiled**
 assemblies at compile time (no runtime reflection). The benchmark references a compiled library of 100
-endpoints and runs the host generator in each mode. All four rows below are from a **single local run**
-so they are directly comparable to each other — treat absolutes as illustrative (see the
-[Benchmarks README](../benchmarks/README.md#methodology-and-known-limitations)); they are not from the
-same run as the tables above.
+endpoints and runs the host generator in each mode. These rows are part of the **same benchmark run** as
+the Code Generation table above, so they are directly comparable to each other and to it — treat
+absolutes as illustrative (see the
+[Benchmarks README](../benchmarks/README.md#methodology-and-known-limitations)).
 
 | Mode (host over a 100-endpoint referenced library)          | Mean     | Allocated | vs. cold generate-100 |
 |-------------------------------------------------------------|----------|-----------|-----------------------|
-| Default — no `[assembly: ScanReferencedEndpoints]`          | ~85 μs   | ~78 KB    | ~0.05×                |
-| Scanning **on**, cold                                       | ~1.65 ms | ~1.45 MB  | ~0.9×                 |
-| Scanning **on**, warm (after an unrelated edit)             | ~326 μs  | ~292 KB   | ~0.18×                |
-| _reference:_ cold generate 100 **local** endpoints (same run) | ~1.87 ms | ~1.47 MB  | 1.00×                 |
+| Default — no `[assembly: ScanReferencedEndpoints]`          | ~83 μs   | ~80 KB    | ~0.04×                |
+| Scanning **on**, cold                                       | ~1.79 ms | ~1.55 MB  | ~0.85×                |
+| Scanning **on**, warm (after an unrelated edit)             | ~392 μs  | ~329 KB   | ~0.19×                |
+| _reference:_ cold generate 100 **local** endpoints (same run) | ~2.10 ms | ~1.58 MB  | 1.00×                 |
 
 **Key Insights:**
 - **Opt-out is effectively free** — with the attribute absent the scan short-circuits before touching any
-  references (~1/20th of a cold 100-endpoint generation); the default build is byte-identical to before.
+  references (~1/25th of a cold 100-endpoint generation); the default build is byte-identical to before.
 - **Scanning on (cold) costs about the same as generating those endpoints locally** — re-deriving 100
   referenced endpoints ≈ generating 100 local ones.
-- **Warm rebuilds stay cached (~5× cheaper than cold)** — the `CompilationProvider`-fed scan node re-runs on
+- **Warm rebuilds stay cached (~4.5× cheaper than cold)** — the `CompilationProvider`-fed scan node re-runs on
   every edit, but its structural comparer serves an unchanged result from cache, so an unrelated edit does
   not re-pay the scan (mirroring the local generator's incremental speedup).
 
@@ -108,16 +108,16 @@ Generation cost added per compilation (measured cold via the Roslyn driver — s
 
 | Project Size  | Cold Generation | Incremental (warm) | Allocated |
 |---------------|-----------------|--------------------|-----------|
-| 10 endpoints  | ~330 μs         | —                  | ~246 KB   |
-| 50 endpoints  | ~1.07 ms        | —                  | ~822 KB   |
-| 100 endpoints | ~2.32 ms        | ~0.44 ms           | ~1.5 MB   |
-| 500 endpoints | ~9.0 ms         | —                  | ~7.3 MB   |
+| 10 endpoints  | ~332 μs         | —                  | ~259 KB   |
+| 50 endpoints  | ~1.26 ms        | —                  | ~864 KB   |
+| 100 endpoints | ~2.10 ms        | ~0.42 ms           | ~1.6 MB   |
+| 500 endpoints | ~9.7 ms         | —                  | ~7.6 MB   |
 
 The incremental (warm) figure is only benchmarked for the 100-endpoint case; the other sizes' warm
 cost is not separately measured. Real `dotnet build`/IDE rebuilds benefit from incremental caching
 and are expected to track the warm column far more closely than the cold one.
 
-**For a typical project (50-100 endpoints): ~1-2.3 ms cold, and well under 0.5 ms on warm rebuilds** ✅
+**For a typical project (50-100 endpoints): ~1.3-2.1 ms cold, and well under 0.5 ms on warm rebuilds** ✅
 
 ### Incremental Generation
 
@@ -128,8 +128,8 @@ MinimalEndpoints uses **incremental source generation**:
 3. **Code Generation (Fast)** - Generate extension methods
 
 ```
-Full (cold) generation:   [████████████] ~2.32 ms (100 endpoints)
-Warm re-build (1 edit):   [██          ] ~0.44 ms
+Full (cold) generation:   [████████████] ~2.10 ms (100 endpoints)
+Warm re-build (1 edit):   [██          ] ~0.42 ms
 No Changes:               [            ] ~0 (fully cached)
 ```
 

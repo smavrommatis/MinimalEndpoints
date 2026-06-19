@@ -648,6 +648,6 @@ Potential areas for expansion (ambiguous-route detection already ships as MINEP0
 
 ---
 
-**Version**: 1.3.0
+**Version**: 1.4.0
 **Last Updated**: 2026-06-20
 

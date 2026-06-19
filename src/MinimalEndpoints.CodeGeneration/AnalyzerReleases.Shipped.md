@@ -35,3 +35,11 @@ MINEP011 | MinimalEndpoints | Error | EndpointsAnalyzer
 MINEP012 | MinimalEndpoints | Error | EndpointsAnalyzer
 MINEP013 | MinimalEndpoints | Warning | GroupsAnalyzer
 MINEP014 | MinimalEndpoints | Warning | EndpointsAnalyzer
+
+## Release 1.4.0
+
+### New Rules
+
+Rule ID | Category | Severity | Notes
+--------|----------|----------|-------
+MINEP015 | MinimalEndpoints | Error | EndpointsAnalyzer

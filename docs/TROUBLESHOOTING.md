@@ -42,7 +42,7 @@ Common issues and their solutions when using MinimalEndpoints.
 
    Should show:
    ```
-   > Blackeye.MinimalEndpoints    1.3.0
+   > Blackeye.MinimalEndpoints    1.4.0
    ```
 
 4. **Verify Project Configuration**

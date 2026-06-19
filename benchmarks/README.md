@@ -80,7 +80,7 @@ Results are written to the console and to `BenchmarkDotNet.Artifacts/` in the wo
   those numbers describe a clean compilation rather than the warm, incremental rebuilds that Roslyn's
   incremental-generator caching is designed to accelerate. The single `GenerateEndpoints_100_Incremental`
   benchmark is the exception: it measures a warm re-run and lands roughly 5× faster than the cold
-  100-endpoint run (~0.44 ms vs ~2.3 ms), which is about what incremental caching buys you in a real
+  100-endpoint run (~0.42 ms vs ~2.1 ms), which is about what incremental caching buys you in a real
   IDE or `dotnet watch` session.
 - **Synthetic compilations.** The benchmark inputs are generated endpoint classes, not real
   application code, so they exercise generator/analyzer throughput rather than any particular

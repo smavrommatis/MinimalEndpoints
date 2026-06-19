@@ -1105,29 +1105,29 @@ Source generator execution time and memory usage:
 
 | Endpoints | Mean     | Error     | StdDev    | Gen0     | Gen1    | Allocated  |
 |-----------|----------|-----------|-----------|----------|---------|------------|
-| 10        | 1.359 ms | 0.603 ms  | 0.399 ms  | 15.6250  | -       | 345.29 KB  |
-| 50        | 2.819 ms | 1.027 ms  | 0.680 ms  | 54.6875  | 7.8125  | 1314.10 KB |
-| 100       | 6.320 ms | 3.490 ms  | 2.308 ms  | 62.5000  | 15.6250 | 2512.93 KB |
+| 10        | 1.216 ms | 0.353 ms  | 0.234 ms  | 15.6250  | -       | 353.55 KB  |
+| 50        | 2.747 ms | 1.123 ms  | 0.743 ms  | 62.5000  | 15.6250 | 1351.06 KB |
+| 100       | 5.134 ms | 1.682 ms  | 1.001 ms  | 62.5000  | 15.6250 | 2569.02 KB |
 
 #### Code Generation Performance
 
 | Scenario          | Mean       | Error     | StdDev    | Gen0     | Allocated  |
 |-------------------|------------|-----------|-----------|----------|------------|
-| 10 (cold)         | 329.5 μs   | 44.85 μs  | 26.69 μs  | 11.7188  | 245.99 KB  |
-| 50 (cold)         | 1,069.6 μs | 100.77 μs | 52.70 μs  | 39.0625  | 821.77 KB  |
-| 100 (cold)        | 2,321.7 μs | 280.33 μs | 146.62 μs | 62.5000  | 1538.35 KB |
-| 500 (cold)        | 8,999.8 μs | 177.88 μs | 117.66 μs | 171.8750 | 7259.79 KB |
-| 100 (incremental) | 444.0 μs   | 3.30 μs   | 2.18 μs   | 19.5313  | 387.52 KB  |
+| 10 (cold)         | 331.8 μs   | 28.31 μs  | 14.81 μs  | 11.7188  | 259.35 KB  |
+| 50 (cold)         | 1,262.7 μs | 149.95 μs | 78.42 μs  | 39.0625  | 864.30 KB  |
+| 100 (cold)        | 2,103.4 μs | 97.68 μs  | 58.13 μs  | 78.1250  | 1617.17 KB |
+| 500 (cold)        | 9,677.5 μs | 302.60 μs | 200.15 μs | 156.2500 | 7634.15 KB |
+| 100 (incremental) | 416.9 μs   | 19.42 μs  | 12.85 μs  | 5.8594   | 345.08 KB  |
 
 _**Cold** = a fresh generator driver over a clean N-endpoint compilation. **Incremental** = a warm
-re-run after a single-line edit, exercising Roslyn's incremental caching. The 500-endpoint cold run
-also triggers Gen1/Gen2 collections; see the [detailed report](benchmarks/README.md)._
+re-run after a single-line edit, exercising Roslyn's incremental caching. The 100- and 500-endpoint
+cold runs also trigger Gen1/Gen2 collections; see the [detailed report](benchmarks/README.md)._
 
 **Key Takeaways:**
-- ⚡ **Fast cold generation** — ~0.33 ms for 10 endpoints, scaling roughly linearly to ~9 ms for 500
-- ✅ **Incremental re-builds are ~5× cheaper** — a warm re-run after a one-line edit on a 100-endpoint project takes ~0.44 ms vs ~2.3 ms cold
+- ⚡ **Fast cold generation** — ~0.33 ms for 10 endpoints, scaling roughly linearly to ~9.7 ms for 500
+- ✅ **Incremental re-builds are ~5× cheaper** — a warm re-run after a one-line edit on a 100-endpoint project takes ~0.42 ms vs ~2.1 ms cold
 - 💾 **Allocation scales linearly** at roughly ~15 KB per generated endpoint
-- 🔍 **Analyzer diagnostics** stay under ~7 ms for 100 endpoints
+- 🔍 **Analyzer diagnostics** stay under ~6 ms for 100 endpoints
 
 **Why Zero Runtime Overhead?**
 

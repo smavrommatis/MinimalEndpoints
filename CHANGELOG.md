@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-06-20
+
 ### Added
 - **MINEP015** (error) — flags an endpoint whose Map attribute is malformed (a null route pattern or an
   empty HTTP-method set, e.g. `[MapMethods("/x", new string[0])]`); the generator declines such endpoints.
@@ -287,7 +289,8 @@ app.Run();
 
 ---
 
-[Unreleased]: https://github.com/smavrommatis/MinimalEndpoints/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/smavrommatis/MinimalEndpoints/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/smavrommatis/MinimalEndpoints/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/smavrommatis/MinimalEndpoints/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/smavrommatis/MinimalEndpoints/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/smavrommatis/MinimalEndpoints/compare/v1.0.0...v1.1.0
