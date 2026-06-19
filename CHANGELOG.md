@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **MINEP015** (error) — flags an endpoint whose Map attribute is malformed (a null route pattern or an
+  empty HTTP-method set, e.g. `[MapMethods("/x", new string[0])]`); the generator declines such endpoints.
+- **Record-class endpoints and groups** are now supported (`record class` declarations are recognized
+  alongside plain classes).
+
+### Fixed
+- **MINEP004** diagnostics are now emitted in a deterministic order.
+- Generated-file line endings are now deterministic.
+- Using-directive ordering is now culture-invariant.
+- Generator discovery now has widened exception safety so a malformed referenced assembly cannot crash it.
+- **MINEP011** no longer cascades extra diagnostics from the same endpoint.
+- Catch-all route segments are now considered in route-overlap (MINEP004) analysis.
+- The code-fix Fix-All no longer duplicates using directives.
+- Corrected the `IConfigurableGroup` XML-doc example (`RequireRateLimiting`) and the
+  `ScanReferencedEndpoints` XML-doc structure.
+
 ## [1.3.0] - 2026-06-20
 
 ### Added
@@ -270,6 +287,9 @@ app.Run();
 
 ---
 
-[1.1.0]: https://github.com/smavrommatis/MinimalEndpoints/releases/tag/v1.1.0
+[Unreleased]: https://github.com/smavrommatis/MinimalEndpoints/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/smavrommatis/MinimalEndpoints/compare/v1.2.0...v1.3.0
+[1.2.0]: https://github.com/smavrommatis/MinimalEndpoints/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/smavrommatis/MinimalEndpoints/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/smavrommatis/MinimalEndpoints/releases/tag/v1.0.0
 

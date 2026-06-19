@@ -135,7 +135,7 @@ Source generators run inside the compiler, so `Console`/`Trace` output is unreli
 
   The generated `MinimalEndpointExtensions.g.cs` is written under `obj/.../Generated/` for inspection.
 
-- **Build-time errors are surfaced as diagnostics.** Diagnostics are the generator's logging channel: user-facing problems are reported as `MINEP001`–`MINEP008`, and an unexpected generator failure is reported as **[MINEP999](diagnostics/MINEP999.md)** (with the exception type and message) instead of an opaque `CS8785`.
+- **Build-time errors are surfaced as diagnostics.** Diagnostics are the generator's logging channel: user-facing problems are reported as `MINEP001`–`MINEP015`, and an unexpected generator failure is reported as **[MINEP999](diagnostics/MINEP999.md)** (with the exception type and message) instead of an opaque `CS8785`.
 
 - **Step through the generator.** Add `System.Diagnostics.Debugger.Launch();` at the top of `MinimalEndpointsGenerator.Initialize` (temporarily, for local debugging only) and build the consuming project to attach a debugger.
 
@@ -530,6 +530,13 @@ Format: `type(scope): subject`
 - `perf`: Performance improvement
 - `test`: Adding missing tests
 - `chore`: Maintenance tasks
+
+### Releasing
+
+Releases are tag-triggered and cut as a single `Release X.Y.Z` commit (version bump + changelog +
+shipped diagnostics + refreshed benchmark numbers + version-stamped docs), then a `vX.Y.Z` tag that
+publishes to NuGet. The full step-by-step runbook is [`docs/RELEASING.md`](RELEASING.md) — follow it
+exactly when cutting a release.
 
 ---
 

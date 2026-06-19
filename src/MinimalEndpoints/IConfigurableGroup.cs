@@ -25,7 +25,7 @@ namespace MinimalEndpoints;
 ///     {
 ///         group.RequireAuthorization()
 ///              .WithOpenApi()
-///              .WithRateLimiter("fixed");
+///              .RequireRateLimiting("fixed");
 ///     }
 /// }
 ///

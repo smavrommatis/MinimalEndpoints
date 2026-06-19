@@ -169,30 +169,32 @@ internal sealed class GroupHierarchy
 
         var parent = _parent[fqn];
         var ownPrefix = _byName[fqn].Prefix;
-        prefix = parent == null ? ownPrefix : JoinPrefix(ComputeFullPrefix(parent), ownPrefix);
+        prefix = parent == null ? ownPrefix : JoinWithSingleSlash(ComputeFullPrefix(parent), ownPrefix);
         _fullPrefix[fqn] = prefix;
         return prefix;
     }
 
     /// <summary>
-    /// Joins a parent group's full prefix to a child's own prefix with exactly one separating slash,
-    /// matching how ASP.NET combines nested <c>MapGroup</c> prefixes at runtime. A direct
-    /// concatenation turned a child prefix lacking a leading slash ("v1") plus its parent ("/api")
-    /// into "/apiv1", desyncing the analyzer's computed full route from the real "/api/v1" route and
-    /// hiding genuine MINEP004 conflicts. (Any residual doubled slash is collapsed downstream by the
-    /// route normalizer, so only the MISSING-slash case needs handling here.)
+    /// Joins a route prefix and a following segment (a parent group's full prefix to a child's own
+    /// prefix, or a group prefix to an endpoint pattern) with exactly one separating slash, matching
+    /// how ASP.NET combines nested <c>MapGroup</c> prefixes at runtime. A direct concatenation turned a
+    /// right side lacking a leading slash ("v1") plus its left ("/api") into "/apiv1", desyncing the
+    /// analyzer's computed full route from the real "/api/v1" route and hiding genuine MINEP004
+    /// conflicts. (Any residual doubled slash is collapsed downstream by the route normalizer, so only
+    /// the MISSING-slash case needs handling here.) Shared by <see cref="GroupHierarchy"/> and the
+    /// route-overlap analyzer so the two never diverge in how they join routes.
     /// </summary>
-    private static string JoinPrefix(string parentPrefix, string ownPrefix)
+    internal static string JoinWithSingleSlash(string left, string right)
     {
-        var left = (parentPrefix ?? string.Empty).TrimEnd('/');
-        var right = ownPrefix ?? string.Empty;
+        var leftTrimmed = (left ?? string.Empty).TrimEnd('/');
+        var rightValue = right ?? string.Empty;
 
-        if (right.Length == 0)
+        if (rightValue.Length == 0)
         {
-            return left;
+            return leftTrimmed;
         }
 
-        return right[0] == '/' ? left + right : left + "/" + right;
+        return rightValue[0] == '/' ? leftTrimmed + rightValue : leftTrimmed + "/" + rightValue;
     }
 
     private bool ComputeHierarchyConditional(string fqn)

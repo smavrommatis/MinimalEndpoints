@@ -38,6 +38,8 @@ internal static class StringExtensions
         var indentation = Indent(level);
         var lines = code.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
         var indentedLines = lines.Select(line => indentation + line);
+        // Join with bare "\n"; CSharpFileScope.Build normalizes the whole file's newlines to "\n" at the
+        // end, so this stays consistent with the StringBuilder.AppendLine sections rather than mixing EOLs.
         return string.Join("\n", indentedLines);
     }
 }

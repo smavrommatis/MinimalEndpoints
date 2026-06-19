@@ -564,7 +564,7 @@ public class GetUserEndpoint
 
 ### Version 1.0.x → Future Versions
 
-Currently on stable release (1.1.0). Future breaking changes will be documented here.
+Currently on stable release (1.3.0). Future breaking changes will be documented here.
 
 **Framework support:**
 - The package multi-targets `net8.0`, `net9.0`, and `net10.0`, so the minimum requirement is **.NET 8.0 or later** (see `src/MinimalEndpoints/MinimalEndpoints.csproj` `<TargetFrameworks>` for the authoritative list). Any change to the supported frameworks will be documented here.

@@ -8,8 +8,15 @@ on:
 
 jobs:
   build-test:
-    name: Build & test (coverage gate)
-    runs-on: ubuntu-latest
+    name: Build & test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # Run every OS even if one fails, so an OS-specific regression is visible in isolation.
+      fail-fast: false
+      matrix:
+        # The determinism / line-ending / path handling is OS-sensitive, and the package multi-targets,
+        # so exercise the full suite (including the multi-TFM end-to-end tests) on all three platforms.
+        os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -19,6 +26,11 @@ jobs:
       - name: Set up .NET
         uses: actions/setup-dotnet@v4
         with:
+          # Pin the build SDK via global.json, and additionally install the net8.0 (LTS) and net9.0
+          # runtimes so the multi-targeted end-to-end tests can actually execute on every shipped TFM.
+          dotnet-version: |
+            8.0.x
+            9.0.x
           global-json-file: global.json
 
       - name: Restore
@@ -27,16 +39,24 @@ jobs:
       - name: Build
         run: dotnet build MinimalEndpoints.slnx --configuration Release --no-restore
 
-      # The >= 60% coverage gate lives here, not in the test csprojs, so the gate is owned by CI and a
-      # local `dotnet test` stays ungated. It is checked ONCE on the MERGED total across all test
-      # projects, never per-project: the integration tests drive the generator while the unit tests
-      # drive the analyzers, so neither alone covers 60% of the whole assembly, but their union far
-      # exceeds it. Each project accumulates coverage into one file via coverlet's MergeWith, and the
-      # threshold is enforced only on the final run against that union. coverlet.msbuild instruments
-      # during this build, so we intentionally do NOT pass --no-build. The exclusions drop the runtime
-      # library and the test-helper assembly. Commas in multi-value props are %2C-escaped: a literal
-      # comma is split by the dotnet CLI argument parser (MSB1006), and MSBuild un-escapes %2C back.
-      - name: Test with merged coverage gate
+      # Run the whole suite on every OS and every shipped TFM (the end-to-end tests multi-target
+      # net8.0/net9.0/net10.0, so `dotnet test` boots the generated wiring on each runtime here).
+      - name: Test (all target frameworks)
+        run: dotnet test MinimalEndpoints.slnx --configuration Release --no-build
+
+      # The >= 70% coverage gate lives here, not in the test csprojs, so the gate is owned by CI and a
+      # local `dotnet test`/build stays ungated. It runs once (on Linux — coverage is OS-independent)
+      # and is checked ONCE on the MERGED total across all test projects, never per-project: the
+      # integration tests drive the generator while the unit tests drive the analyzers, so neither alone
+      # covers 70% of the whole assembly, but their union far exceeds it. Each project accumulates
+      # coverage into one file via coverlet's MergeWith, and the threshold is enforced only on the final
+      # run against that union. coverlet.msbuild instruments during this build, so we intentionally do
+      # NOT pass --no-build. Coverage is measured on net10.0 only (`-f`) so the multi-targeted end-to-end
+      # project does not fan the merge out across TFMs. The exclusions drop the runtime library and the
+      # test-helper assembly. Commas in multi-value props are %2C-escaped: a literal comma is split by
+      # the dotnet CLI argument parser (MSB1006), and MSBuild un-escapes %2C back.
+      - name: Merged coverage gate (>= 70%)
+        if: matrix.os == 'ubuntu-latest'
         run: |
           set -euo pipefail
           dir="$PWD/artifacts/coverage"
@@ -50,9 +70,9 @@ jobs:
           last=$(( ${#projects[@]} - 1 ))
           for i in "${!projects[@]}"; do
             args=(
-              test "${projects[$i]}" --configuration Release --no-restore
+              test "${projects[$i]}" --configuration Release --no-restore -f net10.0
               -p:CollectCoverage=true
-              "-p:CoverletOutput=$dir/"
+              "-p:CoverletOutput=$dir/coverage.json"
               -p:ExcludeByFile="**/obj/**/*.*%2C**/bin/**/*.*"
               -p:Exclude="[MinimalEndpoints]*%2C[MinimalEndpoints.Tests.Common]*"
             )
@@ -63,7 +83,7 @@ jobs:
               # Final run: emit the merged cobertura and enforce the gate on the union.
               args+=(
                 -p:CoverletOutputFormat="json%2Ccobertura"
-                -p:Threshold=60
+                -p:Threshold=70
                 -p:ThresholdType=line%2Cbranch%2Cmethod
                 -p:ThresholdStat=total
               )
@@ -74,14 +94,17 @@ jobs:
           done
 
       # Pack only the runtime package (the Roslyn/sample/benchmark/test projects are IsPackable=false),
-      # with deterministic ContinuousIntegrationBuild so SourceLink/snupkg are meaningful.
+      # with deterministic ContinuousIntegrationBuild so SourceLink/snupkg are meaningful. Pack/upload
+      # run once (on Linux); the package is OS-independent, and a single artifact name avoids collisions.
       - name: Pack
+        if: matrix.os == 'ubuntu-latest'
         run: >
           dotnet pack src/MinimalEndpoints/MinimalEndpoints.csproj
           --configuration Release
           -p:ContinuousIntegrationBuild=true
 
       - name: Upload package artifact
+        if: matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v4
         with:
           name: nupkg

@@ -79,6 +79,8 @@ The sample listens on `https://localhost:7207` and `http://localhost:5160`.
 | GET | `/api/v1/products` | List all products |
 | GET | `/api/v1/products/{id:int}` | Get product by ID |
 | POST | `/api/v1/products` | Create new product |
+| PUT | `/api/v1/products/{id:int}` | Update an existing product |
+| DELETE | `/api/v1/products/{id:int}` | Delete a product |
 
 ## Example Requests
 
@@ -114,6 +116,8 @@ A successful create returns `201 Created` with a `Location` header pointing at t
   - `ListProductsEndpoint.cs` - GET `/api/v1/products`
   - `GetProductEndpoint.cs` - GET `/api/v1/products/{id:int}`
   - `CreateProductEndpoint.cs` - POST `/api/v1/products`
+  - `UpdateProductEndpoint.cs` - PUT `/api/v1/products/{id:int}`
+  - `DeleteProductEndpoint.cs` - DELETE `/api/v1/products/{id:int}`
 - `Groups/` - Route group hierarchy
   - `ApiV1Group.cs` - `/api/v1` prefix, shared configuration, conditional mapping
   - `ProductsGroup.cs` - `/products` child group (parent: `ApiV1Group`)

@@ -24,7 +24,8 @@ public class EndpointsAnalyzer : DiagnosticAnalyzer
             Diagnostics.GenericEntryPoint,
             Diagnostics.UnsupportedParameterModifier,
             Diagnostics.EndpointNotAssignableToServiceType,
-            Diagnostics.GroupShapeNotMapped);
+            Diagnostics.GroupShapeNotMapped,
+            Diagnostics.MalformedEndpointAttribute);
 
     public override void Initialize(AnalysisContext context)
     {
@@ -36,14 +37,18 @@ public class EndpointsAnalyzer : DiagnosticAnalyzer
         context.RegisterCompilationStartAction(static start =>
         {
             var optIn = ScanReferencedEndpointsOptIn.Resolve(start.Compilation);
+            // Both class and record-class declarations can be endpoints (a record class is TypeKind.Class).
+            // Record structs (SyntaxKind.RecordStructDeclaration) are intentionally not registered — the
+            // generator rejects them via its TypeKind.Class gate, like any struct.
             start.RegisterSyntaxNodeAction(
-                nodeContext => AnalyzeClassDeclaration(nodeContext, optIn), SyntaxKind.ClassDeclaration);
+                nodeContext => AnalyzeClassDeclaration(nodeContext, optIn),
+                SyntaxKind.ClassDeclaration, SyntaxKind.RecordDeclaration);
         });
     }
 
     private static void AnalyzeClassDeclaration(SyntaxNodeAnalysisContext context, ScanReferencedEndpointsOptIn optIn)
     {
-        var classDeclaration = (ClassDeclarationSyntax)context.Node;
+        var classDeclaration = (TypeDeclarationSyntax)context.Node;
 
         // Early exit before binding the semantic model: a part with zero attribute lists can never
         // carry a Map attribute (attributes live only on declarations), so it cannot be an endpoint.
@@ -128,6 +133,20 @@ public class EndpointsAnalyzer : DiagnosticAnalyzer
             return;
         }
 
+        // MINEP015: a null route pattern or an empty HTTP-method set ([MapMethods("/x", new string[0])])
+        // yields no routable endpoint, so the generator declines it. Report and stop — the entry-point,
+        // service-type, and group checks below would describe a mapping that will never exist.
+        var malformedReason = DescribeMalformedAttribute(mapMethodsAttributeDefinition);
+        if (malformedReason != null)
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                Diagnostics.MalformedEndpointAttribute,
+                classDeclaration.Identifier.GetLocation(),
+                namedTypeSymbol.Name,
+                malformedReason));
+            return;
+        }
+
         var entryPoint = namedTypeSymbol.FindEntryPointMethod(mapMethodsAttributeDefinition.EntryPoint);
 
         if (entryPoint == null)
@@ -167,10 +186,12 @@ public class EndpointsAnalyzer : DiagnosticAnalyzer
         // MINEP011: ASP.NET cannot bind a by-ref (ref/out/in) or pointer entry-point parameter, and the
         // generated handler delegate cannot carry the modifier, so the generator declines the endpoint.
         // Surface an actionable error per offending parameter.
+        var hasUnsupportedParameterModifier = false;
         foreach (var parameter in entryPoint.Parameters)
         {
             if (parameter.RefKind != RefKind.None || parameter.Type is IPointerTypeSymbol)
             {
+                hasUnsupportedParameterModifier = true;
                 context.ReportDiagnostic(Diagnostic.Create(
                     Diagnostics.UnsupportedParameterModifier,
                     classDeclaration.Identifier.GetLocation(),
@@ -178,6 +199,13 @@ public class EndpointsAnalyzer : DiagnosticAnalyzer
                     entryPoint.Name,
                     namedTypeSymbol.Name));
             }
+        }
+
+        // The generator declines an endpoint that has such a parameter, so the ServiceType / Group
+        // checks below would describe a mapping that never exists — stop after reporting MINEP011.
+        if (hasUnsupportedParameterModifier)
+        {
+            return;
         }
 
         if (!string.IsNullOrEmpty(mapMethodsAttributeDefinition.ServiceName))
@@ -230,12 +258,12 @@ public class EndpointsAnalyzer : DiagnosticAnalyzer
     /// Used to report each diagnostic once (on a Map-attributed part) rather than once per part.
     /// </summary>
     private static bool CurrentPartCarriesMapAttribute(
-        ClassDeclarationSyntax declaration, AttributeData[] mapAttributes, CancellationToken cancellationToken)
+        TypeDeclarationSyntax declaration, AttributeData[] mapAttributes, CancellationToken cancellationToken)
     {
         foreach (var attribute in mapAttributes)
         {
             var syntax = attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken);
-            if (syntax != null && syntax.FirstAncestorOrSelf<ClassDeclarationSyntax>() == declaration)
+            if (syntax != null && syntax.FirstAncestorOrSelf<TypeDeclarationSyntax>() == declaration)
             {
                 return true;
             }
@@ -249,7 +277,7 @@ public class EndpointsAnalyzer : DiagnosticAnalyzer
     /// Lets MINEP002 fire exactly once when the duplicate Map attributes are split across parts.
     /// </summary>
     private static bool CurrentPartHasFirstMapAttribute(
-        ClassDeclarationSyntax declaration, AttributeData[] mapAttributes, CancellationToken cancellationToken)
+        TypeDeclarationSyntax declaration, AttributeData[] mapAttributes, CancellationToken cancellationToken)
     {
         SyntaxNode firstSyntax = null;
         foreach (var attribute in mapAttributes)
@@ -266,7 +294,7 @@ public class EndpointsAnalyzer : DiagnosticAnalyzer
             }
         }
 
-        return firstSyntax != null && firstSyntax.FirstAncestorOrSelf<ClassDeclarationSyntax>() == declaration;
+        return firstSyntax != null && firstSyntax.FirstAncestorOrSelf<TypeDeclarationSyntax>() == declaration;
     }
 
     private static bool ComesBeforeInSource(SyntaxNode left, SyntaxNode right)
@@ -278,7 +306,7 @@ public class EndpointsAnalyzer : DiagnosticAnalyzer
     private static void ValidateGroupType(
         SyntaxNodeAnalysisContext context,
         ScanReferencedEndpointsOptIn optIn,
-        ClassDeclarationSyntax classDeclaration,
+        TypeDeclarationSyntax classDeclaration,
         INamedTypeSymbol endpointSymbol,
         INamedTypeSymbol groupTypeSymbol)
     {
@@ -332,6 +360,26 @@ public class EndpointsAnalyzer : DiagnosticAnalyzer
                 groupTypeSymbol.Name,
                 groupTypeSymbol.ContainingAssembly.Name));
         }
+    }
+
+    /// <summary>
+    /// A reason phrase for MINEP015 when the Map attribute cannot produce a routable endpoint — a null
+    /// route pattern, or (for [MapMethods]) an empty HTTP-method set — or <c>null</c> when it is valid.
+    /// Mirrors the generator's decline guard in <c>EndpointDefinition.Factory</c>.
+    /// </summary>
+    private static string DescribeMalformedAttribute(MapMethodsAttributeDefinition definition)
+    {
+        if (definition.Pattern is null)
+        {
+            return "its route pattern is null";
+        }
+
+        if (definition.Methods is null or { Length: 0 })
+        {
+            return "its [MapMethods] attribute specifies no HTTP methods";
+        }
+
+        return null;
     }
 
     /// <summary>

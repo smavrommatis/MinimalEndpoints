@@ -73,8 +73,15 @@ internal sealed class CSharpFileScope
         BuildUsingsSection(sb);
         BuildNamespaceAndClass(sb);
 
-        return sb.ToString();
+        // Normalize to a single, OS-independent newline. StringBuilder.AppendLine emits
+        // Environment.NewLine ("\r\n" on Windows) while StringExtensions.Indent joins multi-line content
+        // with "\n"; without this the generated file would mix line endings (and differ byte-for-byte by
+        // host OS). Collapsing to "\n" here makes the generated output deterministic across platforms.
+        return NormalizeNewlines(sb.ToString());
     }
+
+    private static string NormalizeNewlines(string text) =>
+        text.Replace("\r\n", "\n").Replace("\r", "\n");
 
     /// <summary>
     /// Builds the header section (auto-generated comment, etc.)
@@ -93,7 +100,7 @@ internal sealed class CSharpFileScope
     /// </summary>
     private void BuildUsingsSection(StringBuilder sb)
     {
-        foreach (var @using in _usings.OrderBy(u => u))
+        foreach (var @using in _usings.OrderBy(u => u, StringComparer.Ordinal))
         {
             sb.AppendLine($"using {@using};");
         }

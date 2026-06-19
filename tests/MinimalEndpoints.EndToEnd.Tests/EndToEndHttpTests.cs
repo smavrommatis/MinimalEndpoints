@@ -152,6 +152,73 @@ public class EndToEndHttpTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/host-in-lib")).StatusCode);
     }
 
+    [Fact]
+    public async Task MapPut_RouteIdAndBody_Returns200()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.PutAsJsonAsync("/resource/abc", new { value = "v1" });
+
+        response.EnsureSuccessStatusCode();
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("abc", body);
+        Assert.Contains("PUT", body);
+        Assert.Contains("v1", body);
+    }
+
+    [Fact]
+    public async Task MapPatch_RouteIdAndBody_Returns200()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.PatchAsJsonAsync("/resource/abc", new { value = "v1" });
+
+        response.EnsureSuccessStatusCode();
+        Assert.Contains("PATCH", await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task MapDelete_Returns204()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.DeleteAsync("/resource/abc");
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task MapHead_EmittedViaMapMethods_Returns200()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.SendAsync(new HttpRequestMessage(HttpMethod.Head, "/resource"));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task VerbEndpoint_WrongVerb_Returns405()
+    {
+        var client = _factory.CreateClient();
+
+        // /resource/{id} is mapped for PUT/PATCH/DELETE only, so a GET to that template is a method
+        // mismatch (the route exists, the verb does not) → 405, not 404.
+        var response = await client.GetAsync("/resource/abc");
+
+        Assert.Equal(HttpStatusCode.MethodNotAllowed, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ScopedLifetime_ResolvesPerRequest()
+    {
+        var client = _factory.CreateClient();
+
+        // Scoped = a fresh instance per request scope, so the per-instance counter reads 1 each request.
+        Assert.Equal(1, await ReadCountAsync(client, "/lifetime/scoped"));
+        Assert.Equal(1, await ReadCountAsync(client, "/lifetime/scoped"));
+    }
+
     private static async Task<int> ReadCountAsync(HttpClient client, string path)
     {
         var response = await client.GetAsync(path);

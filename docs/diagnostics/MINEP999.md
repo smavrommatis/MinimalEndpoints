@@ -20,7 +20,7 @@ When this fires, **no `MinimalEndpointExtensions` is generated** — your `AddMi
 
 ## Cause
 
-An unhandled exception in the generator's output step. This indicates a bug in MinimalEndpoints (valid user code should never trigger it — malformed/ambiguous code is handled gracefully and reported via MINEP001–MINEP008).
+An unhandled exception in the generator's output step. This indicates a bug in MinimalEndpoints (valid user code should never trigger it — malformed/ambiguous code is handled gracefully and reported via MINEP001–MINEP015).
 
 ## How to Fix
 

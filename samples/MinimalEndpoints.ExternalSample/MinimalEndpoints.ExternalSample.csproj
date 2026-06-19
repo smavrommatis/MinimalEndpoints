@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Runtime attributes only: a plain COMPILED endpoint library that does NOT run the generator.
+         The AdvancedSample re-derives these endpoints/groups from this assembly's metadata via
+         [assembly: ScanReferencedEndpoints] — it does not reference the generator here. -->
+    <ProjectReference Include="..\..\src\MinimalEndpoints\MinimalEndpoints.csproj" />
+  </ItemGroup>
+
+</Project>

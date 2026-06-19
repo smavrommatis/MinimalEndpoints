@@ -34,26 +34,30 @@ internal class SymbolDefinitionFactory
     public static SymbolDefinition TryCreateSymbol(
         INamedTypeSymbol symbol, AccessibilityScope scope = AccessibilityScope.SameAssembly)
     {
-        // Symbol-level discovery gate, shared by the generator (via ForAttributeWithMetadataName),
-        // the cross-assembly scan, and the analyzers so all consumers agree by construction. Non-class
-        // kinds and any rejected shape (abstract / open generic / file-local / inaccessible for the
-        // given scope) are skipped — the emitter cannot legally reference them, so generating for them
-        // would produce non-compiling code. The analyzers surface MINEP008 for the non-abstract
-        // rejections via ClassifyShape.
-        if (symbol.TypeKind != TypeKind.Class || ClassifyShape(symbol, scope) != ShapeRejection.None)
-        {
-            return null;
-        }
-
-        var classification = Classify(symbol);
-
-        // Only an unambiguous single endpoint OR single group attribute yields a definition.
-        // Anything else — multiple endpoint attributes, an endpoint + a group attribute, a
-        // duplicated group attribute, or no recognized attribute — is left for the analyzers to
-        // diagnose. Discovery must never throw here, or it crashes the whole generator (CS8785)
-        // and drops every generated mapping, not just the offending class.
+        // Discovery must never throw, or it surfaces as CS8785/AD0001 and drops generation for the
+        // ENTIRE compilation — not just this symbol. The known mid-edit/error-state shapes are guarded
+        // individually, but the symbol probes below (GetAttributes via Classify, the shape/accessibility
+        // walks) run over potentially malformed mid-edit symbols, so the whole body is wrapped: an
+        // unanticipated throw skips just this symbol and degrades gracefully.
         try
         {
+            // Symbol-level discovery gate, shared by the generator (via ForAttributeWithMetadataName),
+            // the cross-assembly scan, and the analyzers so all consumers agree by construction. Non-class
+            // kinds and any rejected shape (abstract / open generic / file-local / inaccessible for the
+            // given scope) are skipped — the emitter cannot legally reference them, so generating for them
+            // would produce non-compiling code. The analyzers surface MINEP008 for the non-abstract
+            // rejections via ClassifyShape.
+            if (symbol.TypeKind != TypeKind.Class || ClassifyShape(symbol, scope) != ShapeRejection.None)
+            {
+                return null;
+            }
+
+            var classification = Classify(symbol);
+
+            // Only an unambiguous single endpoint OR single group attribute yields a definition.
+            // Anything else — multiple endpoint attributes, an endpoint + a group attribute, a
+            // duplicated group attribute, or no recognized attribute — is left for the analyzers to
+            // diagnose.
             if (classification.EndpointAttributes.Length == 1 && classification.GroupAttributes.Length == 0)
             {
                 return EndpointDefinition.Factory.Create(symbol, classification.EndpointAttributes[0], scope);
@@ -63,17 +67,13 @@ internal class SymbolDefinitionFactory
             {
                 return EndpointGroupDefinition.Factory.Create(symbol, classification.GroupAttributes[0], scope);
             }
+
+            return null;
         }
         catch
         {
-            // Defense in depth: discovery must never throw. The known mid-edit/error-state shapes
-            // are guarded individually, but an unanticipated exception here would surface as
-            // CS8785/AD0001 and drop generation for the ENTIRE compilation — not just this symbol.
-            // Skipping the symbol degrades gracefully instead.
             return null;
         }
-
-        return null;
     }
 
     /// <summary>

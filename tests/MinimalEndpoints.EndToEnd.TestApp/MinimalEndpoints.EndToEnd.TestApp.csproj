@@ -1,6 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
+    <!-- Multi-target so the generated wiring is booted on every shipped runtime TFM (net8.0 LTS,
+         net9.0, net10.0). Clear the repo-wide singular TargetFramework so TargetFrameworks takes effect. -->
+    <TargetFramework></TargetFramework>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 

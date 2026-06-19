@@ -223,7 +223,9 @@ public class CSharpFileScopeTests
         scope.AddMethod("public static", "void", "Method2", "").AddLine("// Method 2");
 
         var result = scope.Build();
-        var lines = result.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
+        // Build() normalizes generated output to a single "\n" line ending (deterministic across OS),
+        // so split on "\n" rather than the platform Environment.NewLine.
+        var lines = result.Split('\n');
 
         // Assert
         var method1EndIndex = -1;

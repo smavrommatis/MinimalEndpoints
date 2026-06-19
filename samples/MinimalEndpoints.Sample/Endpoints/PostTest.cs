@@ -3,7 +3,7 @@ using MinimalEndpoints.Annotations;
 namespace MinimalEndpoints.Sample.Endpoints;
 
 [MapPost("/test")]
-public class PostTest: IConfigurableEndpoint
+public class PostTest : IConfigurableEndpoint
 {
     public Task<IResult> HandleAsync()
     {

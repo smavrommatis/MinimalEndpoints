@@ -20,7 +20,6 @@ namespace MinimalEndpoints.Annotations;
 /// Only assemblies the host references DIRECTLY and that reference MinimalEndpoints are scanned; the
 /// BCL, ASP.NET Core, unrelated packages, and purely transitive references are never enumerated.
 /// </para>
-/// </remarks>
 /// <para>
 /// By default (no arguments) ALL referenced assemblies that use MinimalEndpoints are scanned. To
 /// restrict scanning to specific assemblies, pass one or more marker types — any type from each
@@ -39,6 +38,7 @@ namespace MinimalEndpoints.Annotations;
 /// // AddMinimalEndpoints()/UseMinimalEndpoints() with no further changes.
 /// </code>
 /// </example>
+/// </remarks>
 [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = false)]
 public sealed class ScanReferencedEndpointsAttribute : Attribute
 {

@@ -1175,5 +1175,106 @@ public class GetUserPostEndpoint
         Assert.NotNull(generatedCode);
         Assert.Contains("/users/{userId:int:min(1)}/posts/{postId:guid}", generatedCode);
     }
+
+    [Fact]
+    public void GeneratedCode_SupportsRecordEndpoint()
+    {
+        // A record class is TypeKind.Class, so it is a valid endpoint; the generator's predicate must
+        // discover record declarations, not only class declarations.
+        var code = @"
+namespace TestApp.Endpoints;
+
+[MapGet(""/record"")]
+public record RecordEndpoint
+{
+    public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok());
+}";
+
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
+
+        var (generatedCode, _) = CompilationUtilities.GenerateCodeAndCompile(compilation);
+
+        Assert.NotNull(generatedCode);
+        Assert.Contains("Map__TestApp_Endpoints_RecordEndpoint", generatedCode);
+        Assert.Contains("services.AddScoped<TestApp.Endpoints.RecordEndpoint>", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratedCode_DeclinesMalformedEndpoints_ButKeepsValidOnes()
+    {
+        // An empty [MapMethods] verb set and a null route pattern produce no routable endpoint, so the
+        // generator declines them (the analyzer reports MINEP015) instead of emitting MapMethods("/x",
+        // new string[]{}) or MapGet(""). A valid endpoint in the same file is unaffected.
+        var code = @"
+namespace TestApp.Endpoints;
+
+[MapMethods(""/empty"", new string[0])]
+public class EmptyVerbEndpoint
+{
+    public IResult Handle() => Results.Ok();
+}
+
+[MapGet(null)]
+public class NullPatternEndpoint
+{
+    public IResult Handle() => Results.Ok();
+}
+
+[MapGet(""/ok"")]
+public class OkEndpoint
+{
+    public IResult Handle() => Results.Ok();
+}";
+
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
+
+        var (generatedCode, _) = CompilationUtilities.GenerateCodeAndCompile(compilation);
+
+        Assert.NotNull(generatedCode);
+        Assert.Contains("OkEndpoint", generatedCode);
+        Assert.DoesNotContain("EmptyVerbEndpoint", generatedCode);
+        Assert.DoesNotContain("NullPatternEndpoint", generatedCode);
+        // The declined empty-verb endpoint must never emit an empty method array.
+        Assert.DoesNotContain("new string[] {  }", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratedCode_IsDeterministic_AndUsesLfLineEndings()
+    {
+        // Generated output must be byte-stable across runs and use a single, OS-independent newline
+        // ("\n") so it does not differ between platforms or churn in diffs.
+        var code = @"
+namespace TestApp.Endpoints;
+
+[MapGroup(""/api"")]
+public class ApiGroup { }
+
+[MapGet(""/a"", Group = typeof(ApiGroup))]
+public class EndpointA
+{
+    public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok());
+}
+
+[MapPost(""/b"")]
+public class EndpointB
+{
+    public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok());
+}";
+
+        var compilation = new CompilationBuilder(code)
+            .WithMvcReferences()
+            .Build();
+
+        var first = CompilationUtilities.GenerateCodeAndCompile(compilation).generatedCode;
+        var second = CompilationUtilities.GenerateCodeAndCompile(compilation).generatedCode;
+
+        Assert.NotNull(first);
+        Assert.Equal(first, second);
+        Assert.DoesNotContain("\r", first);
+    }
 }
 

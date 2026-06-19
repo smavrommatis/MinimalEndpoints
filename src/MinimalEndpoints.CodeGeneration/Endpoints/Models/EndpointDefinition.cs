@@ -23,6 +23,15 @@ internal sealed class EndpointDefinition : SymbolDefinition
                 return null;
             }
 
+            // Decline a malformed attribute rather than emit a broken mapping: a null route pattern
+            // (which EscapeStringContent would otherwise turn into the empty route "") or an empty
+            // HTTP-method set (a non-routable [MapMethods]). The analyzer reports MINEP015.
+            if (mapMethodsAttributeInfo.Pattern is null ||
+                mapMethodsAttributeInfo.Methods is null or { Length: 0 })
+            {
+                return null;
+            }
+
             var entryPoint = symbol.FindEntryPointMethod(mapMethodsAttributeInfo.EntryPoint);
 
             if (entryPoint == null)

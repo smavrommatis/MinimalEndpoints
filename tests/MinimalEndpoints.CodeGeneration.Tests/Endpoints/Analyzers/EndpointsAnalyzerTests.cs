@@ -1214,5 +1214,107 @@ public class Outer<T>
 
     #endregion
 
+    #region MINEP011 cascade / MINEP015 malformed attribute / records
+
+    [Fact]
+    public void RefParameter_WithBadServiceType_ReportsOnlyMinep011_NoCascade()
+    {
+        // An endpoint with an unsupported-modifier parameter is declined by the generator, so the
+        // ServiceType checks must not also fire — MINEP011 short-circuits before MINEP012 / MINEP003.
+        var code = @"
+namespace TestApp;
+
+public interface IOther { }
+
+[MapGet(""/test"", ServiceType = typeof(IOther))]
+public class TestEndpoint
+{
+    public IResult Handle(ref int id) => Results.Ok();
+}";
+
+        var diagnostics = GetDiagnostics(code);
+
+        Assert.Single(diagnostics, d => d.Id == "MINEP011");
+        Assert.DoesNotContain(diagnostics, d => d.Id == "MINEP012");
+        Assert.DoesNotContain(diagnostics, d => d.Id == "MINEP003");
+    }
+
+    [Fact]
+    public void MapMethods_EmptyMethodsArray_ReportsMinep015_NoMinep001()
+    {
+        var code = @"
+namespace TestApp;
+
+[MapMethods(""/test"", new string[0])]
+public class TestEndpoint
+{
+    public IResult Handle() => Results.Ok();
+}";
+
+        var diagnostics = GetDiagnostics(code);
+
+        var error = Assert.Single(diagnostics, d => d.Id == "MINEP015");
+        Assert.Equal(DiagnosticSeverity.Error, error.Severity);
+        Assert.Contains("TestEndpoint", error.GetMessage());
+        // The malformed endpoint is declined, so the entry-point check must not also fire.
+        Assert.DoesNotContain(diagnostics, d => d.Id == "MINEP001");
+    }
+
+    [Fact]
+    public void NullPattern_ReportsMinep015()
+    {
+        var code = @"
+namespace TestApp;
+
+[MapGet(null)]
+public class TestEndpoint
+{
+    public IResult Handle() => Results.Ok();
+}";
+
+        var diagnostics = GetDiagnostics(code);
+
+        var error = Assert.Single(diagnostics, d => d.Id == "MINEP015");
+        Assert.Contains("route pattern", error.GetMessage());
+    }
+
+    [Fact]
+    public void MapMethods_ValidMethods_DoesNotReportMinep015()
+    {
+        var code = @"
+namespace TestApp;
+
+[MapMethods(""/test"", new[] { ""GET"", ""POST"" })]
+public class TestEndpoint
+{
+    public IResult Handle() => Results.Ok();
+}";
+
+        var diagnostics = GetDiagnostics(code);
+
+        Assert.DoesNotContain(diagnostics, d => d.Id == "MINEP015");
+    }
+
+    [Fact]
+    public void RecordEndpoint_MissingEntryPoint_ReportsMinep001()
+    {
+        // A record class is a valid endpoint shape, so the analyzer must analyze record declarations too
+        // (it previously registered only ClassDeclaration and would have stayed silent here).
+        var code = @"
+namespace TestApp;
+
+[MapGet(""/test"")]
+public record TestEndpoint
+{
+    public void NotAnEntryPoint() { }
+}";
+
+        var diagnostics = GetDiagnostics(code);
+
+        Assert.Single(diagnostics, d => d.Id == "MINEP001");
+    }
+
+    #endregion
+
 }
 

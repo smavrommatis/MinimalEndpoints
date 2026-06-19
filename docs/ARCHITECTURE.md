@@ -78,7 +78,7 @@ public class GetUsersEndpoint
 
 **Location**: `src/MinimalEndpoints.CodeGeneration/`
 
-The analyzer layer provides compile-time diagnostics and validation. There are **two** analyzers, split by what they validate. The full diagnostic catalog is MINEP001–MINEP008 plus MINEP999 (the generator-reported failure diagnostic, see below).
+The analyzer layer provides compile-time diagnostics and validation. There are **two** analyzers, split by what they validate. The full diagnostic catalog is MINEP001–MINEP015 plus MINEP999 (the generator-reported failure diagnostic, see below).
 
 #### EndpointsAnalyzer
 
@@ -90,6 +90,12 @@ The analyzer layer provides compile-time diagnostics and validation. There are *
 - **MINEP003**: `ServiceType` interface missing entry point method
 - **MINEP005**: Invalid endpoint group type (the `Group` type is not decorated with `[MapGroup]`)
 - **MINEP008**: Endpoint or group class has an unsupported shape (open generic, file-local, or below-`internal` accessibility)
+- **MINEP009**: Referenced `Group` is a public `[MapGroup]` type not covered by cross-assembly scanning
+- **MINEP010**: Entry point method must not be generic
+- **MINEP011**: Entry point parameter uses an unsupported `ref`/`out`/`in`/pointer modifier
+- **MINEP012**: Endpoint is not assignable to its `ServiceType`
+- **MINEP014**: Endpoint `Group` is a valid `[MapGroup]` but has an unsupported shape
+- **MINEP015**: Endpoint has a malformed Map attribute (null route pattern or empty HTTP-method set)
 
 **Flow**:
 ```
@@ -115,9 +121,12 @@ Report diagnostics to IDE
 
 **Diagnostics** (`SupportedDiagnostics`):
 - **MINEP004**: Ambiguous route pattern detected (same HTTP method + normalized route across endpoints, accounting for group prefixes)
+- **MINEP005**: Invalid group type (a group's `ParentGroup` references a type without `[MapGroup]`)
 - **MINEP006**: Cyclic group hierarchy detected
 - **MINEP007**: A class is marked as both an endpoint and a group
 - **MINEP008**: Unsupported group shape (reported here for group classes; `EndpointsAnalyzer` owns MINEP008 for endpoint classes, so they are not double-reported)
+- **MINEP009**: Referenced `ParentGroup` is a public `[MapGroup]` type not covered by cross-assembly scanning
+- **MINEP013**: Multiple endpoints register the same `ServiceType`
 
 **Flow**:
 ```
@@ -639,6 +648,6 @@ Potential areas for expansion (ambiguous-route detection already ships as MINEP0
 
 ---
 
-**Version**: 1.1.0
-**Last Updated**: 2026-06-13
+**Version**: 1.3.0
+**Last Updated**: 2026-06-20
 

@@ -1,3 +1,4 @@
+using System;
 using Microsoft.CodeAnalysis;
 using System.Globalization;
 using MinimalEndpoints.CodeGeneration.Models;
@@ -61,7 +62,7 @@ internal sealed class AttributeDefinition
         var attributeTypeName = AttributeType.ToDisplayString(availableUsings);
 
         // Remove "Attribute" suffix if present
-        if (attributeTypeName.EndsWith("Attribute"))
+        if (attributeTypeName.EndsWith("Attribute", StringComparison.Ordinal))
         {
             attributeTypeName = attributeTypeName.Substring(0, attributeTypeName.Length - "Attribute".Length);
         }

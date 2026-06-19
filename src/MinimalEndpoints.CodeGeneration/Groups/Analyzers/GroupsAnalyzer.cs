@@ -354,7 +354,12 @@ public class GroupsAnalyzer : DiagnosticAnalyzer
 
         foreach (var group in endpointsByPath)
         {
-            var endpointList = group.ToList();
+            // Order each bucket deterministically before pairing so the reported location and message
+            // ("X conflicts with Y" at X's location) are stable across builds — the source endpoints
+            // arrive in unspecified ConcurrentDictionary order, which previously made the blame flap.
+            var endpointList = group
+                .OrderBy(e => e.Symbol.ToDisplayString(), StringComparer.Ordinal)
+                .ToList();
 
             for (var i = 0; i < endpointList.Count; i++)
             {
@@ -423,25 +428,9 @@ public class GroupsAnalyzer : DiagnosticAnalyzer
             return facts.Pattern ?? string.Empty;
         }
 
-        return JoinRoute(hierarchy.FullPrefixOf(groupDefinition), facts.Pattern);
-    }
-
-    /// <summary>
-    /// Joins a group prefix and an endpoint pattern with exactly one separating slash, so a trailing
-    /// slash on the prefix (or a leading slash on the pattern) does not produce a phantom "//"
-    /// segment that would hide a real conflict (e.g. "/api/" + "/users" must equal "/api/users").
-    /// </summary>
-    private static string JoinRoute(string prefix, string pattern)
-    {
-        var left = (prefix ?? string.Empty).TrimEnd('/');
-        var right = pattern ?? string.Empty;
-
-        if (right.Length == 0)
-        {
-            return left;
-        }
-
-        return right[0] == '/' ? left + right : left + "/" + right;
+        // Shared with GroupHierarchy's own prefix-joining so the analyzer's computed full route can
+        // never diverge from the generator's (a single audited slash-join policy).
+        return GroupHierarchy.JoinWithSingleSlash(hierarchy.FullPrefixOf(groupDefinition), facts.Pattern);
     }
 
     /// <summary>
@@ -461,9 +450,10 @@ public class GroupsAnalyzer : DiagnosticAnalyzer
     }
 
     /// <summary>
-    /// When <paramref name="path"/> ends with an OPTIONAL route parameter — "{name?}" or a defaulted
-    /// "{name=value}" — yields the path with that final segment removed (the route the endpoint also
-    /// matches). A required "{name}" or a literal segment is not omittable and yields nothing.
+    /// When <paramref name="path"/> ends with an OPTIONAL route parameter — "{name?}", a defaulted
+    /// "{name=value}", or a catch-all "{*name}"/"{**name}" (all of which also match the path with that
+    /// final segment absent) — yields the path with that final segment removed (the route the endpoint
+    /// also matches). A required "{name}" or a literal segment is not omittable and yields nothing.
     /// </summary>
     private static bool TryStripTrailingOptionalSegment(string path, out string barePath)
     {
@@ -485,12 +475,14 @@ public class GroupsAnalyzer : DiagnosticAnalyzer
             return false;
         }
 
-        // A trailing parameter is omittable when it is optional ("{id?}") or has a default ("{id=5}",
-        // "{id:int=5}"). The default '=' is at the TOP LEVEL of the token; an '=' inside a constraint's
-        // parentheses (e.g. "{id:regex(^a=b$)}") is NOT a default and must not make the route look optional
-        // (which previously produced a phantom bare-path occupancy and a false MINEP004).
+        // A trailing parameter is omittable when it is optional ("{id?}"), has a default ("{id=5}",
+        // "{id:int=5}"), or is a catch-all ("{*slug}"/"{**slug}", which also matches zero segments). The
+        // default '=' is at the TOP LEVEL of the token; an '=' inside a constraint's parentheses (e.g.
+        // "{id:regex(^a=b$)}") is NOT a default and must not make the route look optional (which
+        // previously produced a phantom bare-path occupancy and a false MINEP004).
         var inner = lastSegment.Substring(1, lastSegment.Length - 2);
-        var isOptional = lastSegment[lastSegment.Length - 2] == '?' || ContainsTopLevelEquals(inner);
+        var isCatchAll = inner.Length > 0 && inner[0] == '*';
+        var isOptional = lastSegment[lastSegment.Length - 2] == '?' || ContainsTopLevelEquals(inner) || isCatchAll;
         if (!isOptional)
         {
             return false;

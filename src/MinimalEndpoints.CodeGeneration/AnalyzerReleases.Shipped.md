@@ -11,7 +11,7 @@ MINEP001 | MinimalEndpoints | Error | EndpointsAnalyzer
 MINEP002 | MinimalEndpoints | Error | EndpointsAnalyzer
 MINEP003 | MinimalEndpoints | Error | EndpointsAnalyzer
 MINEP004 | MinimalEndpoints | Warning | GroupsAnalyzer
-MINEP005 | MinimalEndpoints | Error | EndpointsAnalyzer
+MINEP005 | MinimalEndpoints | Error | EndpointsAnalyzer, GroupsAnalyzer
 MINEP006 | MinimalEndpoints | Error | GroupsAnalyzer
 MINEP007 | MinimalEndpoints | Error | GroupsAnalyzer
 MINEP008 | MinimalEndpoints | Warning | EndpointsAnalyzer, GroupsAnalyzer

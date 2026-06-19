@@ -32,5 +32,7 @@ internal abstract class SymbolDefinition : IEquatable<SymbolDefinition>
 
     public override bool Equals(object obj) => Equals(obj as SymbolDefinition);
 
-    public override int GetHashCode() => EqualityKey.GetHashCode();
+    // Null-safe to stay consistent with Equals (which compares EqualityKey with ==, tolerating null):
+    // a GetHashCode that dereferenced a null key would throw while Equals did not.
+    public override int GetHashCode() => EqualityKey?.GetHashCode() ?? 0;
 }

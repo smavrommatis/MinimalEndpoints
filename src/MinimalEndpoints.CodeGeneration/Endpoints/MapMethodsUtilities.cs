@@ -37,7 +37,7 @@ internal static class MapMethodsUtilities
             return null;
         }
 
-        return WellKnownTypes.Annotations.MapMethodsAttributeName.Equals(attributeData.AttributeClass!.Name)
+        return attributeData.AttributeClass!.Name == WellKnownTypes.Annotations.MapMethodsAttributeName
             ? GetAttributeDataForMultipleMethods(attributeData, scope, endpointSymbol)
             : GetAttributeDataForSingleMethod(attributeData, scope, endpointSymbol);
     }
@@ -45,7 +45,7 @@ internal static class MapMethodsUtilities
     public static bool IsMapMethodsAttribute(this INamedTypeSymbol type)
     {
         return (s_mapMethodAttributes.ContainsKey(type.Name) ||
-                WellKnownTypes.Annotations.MapMethodsAttributeName.Equals(type.Name))
+                type.Name == WellKnownTypes.Annotations.MapMethodsAttributeName)
                && type.ContainingNamespace.ToDisplayString() == WellKnownTypes.Annotations.Namespace;
     }
 

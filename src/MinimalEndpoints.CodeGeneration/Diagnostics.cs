@@ -216,6 +216,21 @@ internal static class Diagnostics
         helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/blob/main/docs/diagnostics/MINEP014.md"
     );
 
+    public static readonly DiagnosticDescriptor MalformedEndpointAttribute = new DiagnosticDescriptor(
+        id: "MINEP015",
+        title: "Endpoint has a malformed Map attribute",
+        messageFormat:
+        "Endpoint '{0}' cannot be mapped because {1}, so it is skipped. Fix the Map attribute to map the endpoint.",
+        category: "MinimalEndpoints",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "An endpoint's Map attribute must specify a non-null route pattern and, for [MapMethods], " +
+        "at least one HTTP method. An empty (or all-null) method array or a null pattern yields no routable " +
+        "endpoint, so the generator declines it. Provide a valid pattern and at least one HTTP method, or use a " +
+        "verb-specific attribute such as [MapGet] or [MapPost].",
+        helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/blob/main/docs/diagnostics/MINEP015.md"
+    );
+
     /// <summary>
     /// Reported by the GENERATOR (not an analyzer) when the output step throws unexpectedly. It
     /// turns an opaque CS8785 ("generator failed to generate source") into an actionable build

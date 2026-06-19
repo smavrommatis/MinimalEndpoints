@@ -377,4 +377,120 @@ public class EntryPointCodeFixProviderTests
             CodeActionEquivalenceKey = "AddHandleMethod",
         }.RunAsync();
     }
+
+    [Fact] // Coverage gap: the async fix branch combined with a custom EntryPoint. It must emit
+           // `public Task<IResult> {EntryPoint}()` (custom name, Task return) and resolve MINEP001.
+    public async Task CustomEntryPoint_AsyncFix_GeneratesNamedTaskMethod_ResolvesMinep001()
+    {
+        const string test = """
+            using MinimalEndpoints.Annotations;
+
+            namespace TestApp;
+
+            [MapGet("/test", EntryPoint = "Execute")]
+            public class {|MINEP001:TestEndpoint|}
+            {
+            }
+            """;
+
+        const string fixedCode = """
+            using MinimalEndpoints.Annotations;
+            using Microsoft.AspNetCore.Http;
+            using System.Threading.Tasks;
+
+            namespace TestApp;
+
+            [MapGet("/test", EntryPoint = "Execute")]
+            public class TestEndpoint
+            {
+                public Task<IResult> Execute()
+                {
+                    return Task.FromResult(Results.Ok());
+                }
+            }
+            """;
+
+        await new MinEndpointsCodeFixTest
+        {
+            TestCode = test.ReplaceLineEndings(),
+            FixedCode = fixedCode.ReplaceLineEndings(),
+            CodeActionEquivalenceKey = "AddHandleAsyncMethod",
+        }.RunAsync();
+    }
+
+    [Fact] // The code fix now resolves the enclosing type as TypeDeclarationSyntax, so it fixes a
+           // record-class endpoint too (records are valid endpoints).
+    public async Task AddHandle_RecordEndpoint_ResolvesMinep001()
+    {
+        const string test = """
+            using MinimalEndpoints.Annotations;
+
+            namespace TestApp;
+
+            [MapGet("/test")]
+            public record {|MINEP001:TestEndpoint|}
+            {
+            }
+            """;
+
+        const string fixedCode = """
+            using MinimalEndpoints.Annotations;
+            using Microsoft.AspNetCore.Http;
+
+            namespace TestApp;
+
+            [MapGet("/test")]
+            public record TestEndpoint
+            {
+                public IResult Handle()
+                {
+                    return Results.Ok();
+                }
+            }
+            """;
+
+        await new MinEndpointsCodeFixTest
+        {
+            TestCode = test.ReplaceLineEndings(),
+            FixedCode = fixedCode.ReplaceLineEndings(),
+            CodeActionEquivalenceKey = "AddHandleMethod",
+        }.RunAsync();
+    }
+
+    [Fact] // A semicolon-bodied positional record has no member-list braces, so the fix must give it a
+           // braced body before adding the method — a bare AddMembers would emit uncompilable text.
+    public async Task AddHandle_PositionalRecordEndpoint_AddsBracedBody_ResolvesMinep001()
+    {
+        const string test = """
+            using MinimalEndpoints.Annotations;
+
+            namespace TestApp;
+
+            [MapGet("/test")]
+            public record {|MINEP001:TestEndpoint|}(int X);
+            """;
+
+        const string fixedCode = """
+            using MinimalEndpoints.Annotations;
+            using Microsoft.AspNetCore.Http;
+
+            namespace TestApp;
+
+            [MapGet("/test")]
+            public record TestEndpoint(int X)
+            {
+                public IResult Handle()
+                {
+                    return Results.Ok();
+                }
+            }
+            """;
+
+        await new MinEndpointsCodeFixTest
+        {
+            TestCode = test.ReplaceLineEndings(),
+            FixedCode = fixedCode.ReplaceLineEndings(),
+            CodeActionEquivalenceKey = "AddHandleMethod",
+        }.RunAsync();
+    }
 }

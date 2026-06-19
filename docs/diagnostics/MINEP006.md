@@ -272,20 +272,16 @@ public class GetProductsDirect { }
 // ⚠️ MINEP004: Ambiguous routes detected!
 ```
 
-### Note: Invalid ParentGroup Is Not Diagnosed
-MINEP005 applies only to the `Group` property on an **endpoint's** Map* attribute — it
-fires when that property references a type without `[MapGroup]`. A `ParentGroup` that points
-at a type without `[MapGroup]` (or at any unknown type) is **not** currently diagnosed: the
-group silently loses its intended parent prefix and is treated as a root group, with no
-compiler feedback.
+### Invalid ParentGroup Is Diagnosed (MINEP005)
+MINEP005 covers both the `Group` property on an **endpoint's** Map* attribute and the
+`ParentGroup` property on a **group's** `[MapGroup]` attribute. As of 1.3.0, a `ParentGroup`
+that points at a type without `[MapGroup]` is reported by `GroupsAnalyzer` as **MINEP005**
+("Invalid group type") instead of silently dropping the parent link.
 
 ```csharp
-[MapGroup("/api", ParentGroup = typeof(InvalidGroup))]  // ⚠️ Not diagnosed — silently treated as a root group
+[MapGroup("/api", ParentGroup = typeof(InvalidGroup))]  // ⚠️ MINEP005: InvalidGroup is not a [MapGroup] type
 public class ApiGroup : IConfigurableGroup { }
 ```
-
-> A future diagnostic may cover invalid `ParentGroup` references. For now, verify your
-> `ParentGroup` types are real `[MapGroup]`-decorated groups.
 
 ## Debugging Tips
 

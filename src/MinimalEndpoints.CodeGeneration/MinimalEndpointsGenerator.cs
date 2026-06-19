@@ -40,11 +40,15 @@ public class MinimalEndpointsGenerator : IIncrementalGenerator
         var source = WellKnownTypes.Annotations.AllMapAttributeMetadataNames
             .Select(metadataName => context.SyntaxProvider.ForAttributeWithMetadataName(
                     metadataName,
-                    predicate: static (node, _) => node is ClassDeclarationSyntax,
+                    // record classes are TypeKind.Class and are accepted by TryCreateSymbol, so include
+                    // RecordDeclarationSyntax here (a record struct slips through but is rejected downstream
+                    // by the TypeKind.Class gate, exactly as a plain struct would be).
+                    predicate: static (node, _) => node is ClassDeclarationSyntax or RecordDeclarationSyntax,
                     transform: static (ctx, _) => ctx.TargetSymbol is INamedTypeSymbol symbol
                         ? SymbolDefinitionFactory.TryCreateSymbol(symbol)
                         : null)
                 .Where(static def => def is not null)
+                .Select(static (def, _) => def!)
                 .Collect())
             .Aggregate((accumulated, next) =>
                 accumulated.Combine(next).Select(static (pair, _) => pair.Left.AddRange(pair.Right)));
@@ -69,7 +73,7 @@ public class MinimalEndpointsGenerator : IIncrementalGenerator
 
         context.RegisterSourceOutput(
             merged,
-            static (sourceContext, definitions) => { GenerateEndpointExtensions(sourceContext, definitions!); });
+            static (sourceContext, definitions) => { GenerateEndpointExtensions(sourceContext, definitions); });
     }
 
     /// <summary>

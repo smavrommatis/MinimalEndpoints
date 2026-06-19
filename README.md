@@ -675,6 +675,7 @@ While you type, Roslyn analyzers check for common mistakes:
 - ✅ **MINEP012**: Errors when an endpoint is not assignable to its `ServiceType`
 - ✅ **MINEP013**: Warns when multiple endpoints register the same `ServiceType`
 - ✅ **MINEP014**: Warns when a group's shape prevents it from being applied
+- ✅ **MINEP015**: Errors on a malformed Map attribute (null route pattern or empty HTTP-method set)
 
 All validation happens at design-time with helpful error messages and quick fixes.
 
@@ -1028,6 +1029,17 @@ public class GetItemsEndpoint { public IResult Handle() => Results.Ok(); }
 ```
 
 [Learn more →](docs/diagnostics/MINEP014.md)
+
+### MINEP015: Malformed Map Attribute
+Errors when a Map attribute has a null route pattern or an empty HTTP-method set, so the endpoint cannot be mapped; the generator declines such endpoints.
+
+```csharp
+// ⚠️ Error: empty HTTP-method set -> endpoint cannot be mapped
+[MapMethods("/x", new string[0])]
+public class BrokenEndpoint { public IResult Handle() => Results.Ok(); }
+```
+
+[Learn more →](docs/diagnostics/MINEP015.md)
 
 ---
 

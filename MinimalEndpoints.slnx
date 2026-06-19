@@ -8,6 +8,7 @@
     <File Path="docs/EXAMPLES.md" />
     <File Path="docs/MIGRATION.md" />
     <File Path="docs/PERFORMANCE.md" />
+    <File Path="docs/RELEASING.md" />
     <File Path="docs/TROUBLESHOOTING.md" />
   </Folder>
   <Folder Name="/docs/diagnostics/">
@@ -18,6 +19,15 @@
     <File Path="docs/diagnostics/MINEP005.md" />
     <File Path="docs/diagnostics/MINEP006.md" />
     <File Path="docs/diagnostics/MINEP007.md" />
+    <File Path="docs/diagnostics/MINEP008.md" />
+    <File Path="docs/diagnostics/MINEP009.md" />
+    <File Path="docs/diagnostics/MINEP010.md" />
+    <File Path="docs/diagnostics/MINEP011.md" />
+    <File Path="docs/diagnostics/MINEP012.md" />
+    <File Path="docs/diagnostics/MINEP013.md" />
+    <File Path="docs/diagnostics/MINEP014.md" />
+    <File Path="docs/diagnostics/MINEP015.md" />
+    <File Path="docs/diagnostics/MINEP999.md" />
   </Folder>
   <Folder Name="/docs/examples/">
     <File Path="docs/examples/01-getting-started.md" />
@@ -28,6 +38,7 @@
   <Folder Name="/samples/">
     <File Path="samples/README.md" />
     <Project Path="samples/MinimalEndpoints.AdvancedSample/MinimalEndpoints.AdvancedSample.csproj" />
+    <Project Path="samples/MinimalEndpoints.ExternalSample/MinimalEndpoints.ExternalSample.csproj" />
     <Project Path="samples/MinimalEndpoints.Sample/MinimalEndpoints.Sample.csproj" />
   </Folder>
   <Folder Name="/src/">
