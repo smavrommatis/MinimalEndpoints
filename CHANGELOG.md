@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-06-20
+
 ### Added
 - **MINEP010** (error) — the entry point method must not be generic; a generic `Handle<T>()` cannot be
   mapped because the generated handler cannot supply type arguments.
