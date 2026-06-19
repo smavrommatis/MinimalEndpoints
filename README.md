@@ -669,6 +669,12 @@ While you type, Roslyn analyzers check for common mistakes:
 - ✅ **MINEP006**: Detects cyclic group hierarchies
 - ✅ **MINEP007**: Prevents classes from being both endpoint and group
 - ✅ **MINEP008**: Flags endpoint/group classes with an unsupported shape (open generic, file-local, or below `internal`)
+- ✅ **MINEP009**: Warns when a referenced group/parent-group is not covered by cross-assembly scanning
+- ✅ **MINEP010**: Errors on a generic entry point method
+- ✅ **MINEP011**: Errors on a `ref`/`out`/`in`/pointer entry point parameter
+- ✅ **MINEP012**: Errors when an endpoint is not assignable to its `ServiceType`
+- ✅ **MINEP013**: Warns when multiple endpoints register the same `ServiceType`
+- ✅ **MINEP014**: Warns when a group's shape prevents it from being applied
 
 All validation happens at design-time with helpful error messages and quick fixes.
 
@@ -950,6 +956,78 @@ public class HostEndpoint { public IResult Handle() => Results.Ok(); }
 ```
 
 [Learn more →](docs/diagnostics/MINEP009.md)
+
+### MINEP010: Entry Point Method Must Not Be Generic
+Errors when the entry point is generic (`Handle<T>()`); the generated handler cannot supply type arguments.
+
+```csharp
+// ❌ Error: generic entry point
+[MapGet("/items")]
+public class GetItemsEndpoint
+{
+    public Task<IResult> HandleAsync<T>() => Task.FromResult(Results.Ok());
+}
+```
+
+[Learn more →](docs/diagnostics/MINEP010.md)
+
+### MINEP011: Entry Point Parameter Uses an Unsupported Modifier
+Errors when an entry point parameter uses `ref`/`out`/`in` or a pointer — ASP.NET Core cannot model-bind it.
+
+```csharp
+// ❌ Error: by-ref parameter
+[MapGet("/items/{id}")]
+public class GetItemEndpoint
+{
+    public IResult Handle(ref int id) => Results.Ok(id);
+}
+```
+
+[Learn more →](docs/diagnostics/MINEP011.md)
+
+### MINEP012: Endpoint Is Not Assignable to Its ServiceType
+Errors when the endpoint does not implement/inherit its `ServiceType` (the registration would not compile).
+
+```csharp
+public interface IGetItem { Task<IResult> HandleAsync(); }
+
+// ❌ Error: GetItemEndpoint does not implement IGetItem
+[MapGet("/items", ServiceType = typeof(IGetItem))]
+public class GetItemEndpoint
+{
+    public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok());
+}
+```
+
+[Learn more →](docs/diagnostics/MINEP012.md)
+
+### MINEP013: Multiple Endpoints Register the Same ServiceType
+Warns when two endpoints share a `ServiceType` — DI keeps only the last registration, so one route runs the other's class.
+
+```csharp
+// ⚠️ Warning: same ServiceType on two endpoints
+[MapGet("/a", ServiceType = typeof(IEndpoint))]
+public class EndpointA : IEndpoint { public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok()); }
+
+[MapGet("/b", ServiceType = typeof(IEndpoint))]
+public class EndpointB : IEndpoint { public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok()); }
+```
+
+[Learn more →](docs/diagnostics/MINEP013.md)
+
+### MINEP014: Group Cannot Be Applied Because of Its Shape
+Warns when a group is a valid `[MapGroup]` but has an unsupported shape, so the endpoint is mapped without its prefix.
+
+```csharp
+// ⚠️ Warning: abstract group is never mapped -> endpoint loses the prefix
+[MapGroup("/api")]
+public abstract class ApiGroup { }
+
+[MapGet("/items", Group = typeof(ApiGroup))]
+public class GetItemsEndpoint { public IResult Handle() => Results.Ok(); }
+```
+
+[Learn more →](docs/diagnostics/MINEP014.md)
 
 ---
 

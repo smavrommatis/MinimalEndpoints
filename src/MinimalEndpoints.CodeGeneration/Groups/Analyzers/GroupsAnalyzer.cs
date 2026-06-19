@@ -24,7 +24,9 @@ public class GroupsAnalyzer : DiagnosticAnalyzer
             Diagnostics.CyclicGroupHierarchy,
             Diagnostics.InvalidSymbolKind,
             Diagnostics.UnsupportedEndpointShape,
-            Diagnostics.CrossAssemblyGroupNotScanned);
+            Diagnostics.CrossAssemblyGroupNotScanned,
+            Diagnostics.InvalidGroupType,
+            Diagnostics.DuplicateServiceType);
 
     // Compiled once and reused rather than re-parsed on every Regex.Replace call. Collapses runs of
     // interior slashes ("a//b" -> "a/b").
@@ -50,6 +52,9 @@ public class GroupsAnalyzer : DiagnosticAnalyzer
         // which is already lightweight (name/prefix/parent strings only).
         var endpointFacts = new ConcurrentDictionary<INamedTypeSymbol, EndpointRouteFacts>(SymbolEqualityComparer.Default);
         var groups = new ConcurrentDictionary<INamedTypeSymbol, EndpointGroupDefinition>(SymbolEqualityComparer.Default);
+        // Endpoint -> its ServiceType (when one is specified); used at compilation-end to flag two endpoints
+        // registering the same ServiceType (MINEP013).
+        var endpointServiceTypes = new ConcurrentDictionary<INamedTypeSymbol, INamedTypeSymbol>(SymbolEqualityComparer.Default);
 
         // Resolved once per compilation (a per-compilation constant) and shared with the per-symbol
         // callback below, rather than re-parsing the opt-in attribute for every parented group.
@@ -105,6 +110,12 @@ public class GroupsAnalyzer : DiagnosticAnalyzer
                 if (facts.HasValue)
                 {
                     endpointFacts.TryAdd(namedTypeSymbol, facts.Value);
+
+                    var serviceType = GetServiceTypeSymbol(classification.EndpointAttributes[0]);
+                    if (serviceType != null)
+                    {
+                        endpointServiceTypes.TryAdd(namedTypeSymbol, serviceType);
+                    }
                 }
 
                 return;
@@ -135,21 +146,32 @@ public class GroupsAnalyzer : DiagnosticAnalyzer
                 var group = new EndpointGroupDefinition(namedTypeSymbol, classification.GroupAttributes[0]);
                 groups.TryAdd(namedTypeSymbol, group);
 
-                // MINEP009: a source group whose ParentGroup is a [MapGroup] in a referenced assembly the
-                // host won't scan — the parent link is silently dropped (this group becomes a root and
-                // loses the parent's prefix).
                 var parentGroupSymbol = GetParentGroupSymbol(classification.GroupAttributes[0]);
-                if (parentGroupSymbol != null &&
-                    parentGroupSymbol.GetAttributes().Any(EndpointGroupDefinition.Factory.Predicate) &&
-                    ScanReferencedEndpointsOptIn.IsReferencedButNotScanned(
-                        symbolContext.Compilation, optIn, parentGroupSymbol))
+                if (parentGroupSymbol != null)
                 {
-                    symbolContext.ReportDiagnostic(Diagnostic.Create(
-                        Diagnostics.CrossAssemblyGroupNotScanned,
-                        namedTypeSymbol.Locations.FirstOrDefault(),
-                        namedTypeSymbol.Name,
-                        parentGroupSymbol.Name,
-                        parentGroupSymbol.ContainingAssembly.Name));
+                    if (!parentGroupSymbol.GetAttributes().Any(EndpointGroupDefinition.Factory.Predicate))
+                    {
+                        // MINEP005: ParentGroup must itself be a [MapGroup]. Otherwise the parent link is
+                        // silently dropped (this group becomes a root and loses the parent's prefix) — the
+                        // same defect MINEP005 already reports for an endpoint's Group.
+                        symbolContext.ReportDiagnostic(Diagnostic.Create(
+                            Diagnostics.InvalidGroupType,
+                            namedTypeSymbol.Locations.FirstOrDefault(),
+                            parentGroupSymbol.Name,
+                            namedTypeSymbol.Name));
+                    }
+                    // MINEP009: ParentGroup IS a [MapGroup] but lives in a referenced assembly the host won't
+                    // scan, so it is never discovered and the parent link is silently dropped.
+                    else if (ScanReferencedEndpointsOptIn.IsReferencedButNotScanned(
+                                 symbolContext.Compilation, optIn, parentGroupSymbol))
+                    {
+                        symbolContext.ReportDiagnostic(Diagnostic.Create(
+                            Diagnostics.CrossAssemblyGroupNotScanned,
+                            namedTypeSymbol.Locations.FirstOrDefault(),
+                            namedTypeSymbol.Name,
+                            parentGroupSymbol.Name,
+                            parentGroupSymbol.ContainingAssembly.Name));
+                    }
                 }
             }
 
@@ -176,6 +198,7 @@ public class GroupsAnalyzer : DiagnosticAnalyzer
 
             ReportAmbiguousRoutes(compilationContext, endpointFacts.Values, hierarchy);
             ReportCyclicGroupHierarchies(compilationContext, hierarchy, groupSymbolsByName);
+            ReportDuplicateServiceTypes(compilationContext, endpointServiceTypes);
         });
     }
 
@@ -203,6 +226,60 @@ public class GroupsAnalyzer : DiagnosticAnalyzer
         }
 
         return null;
+    }
+
+    private static INamedTypeSymbol GetServiceTypeSymbol(AttributeData endpointAttribute)
+    {
+        foreach (var namedArgument in endpointAttribute.NamedArguments)
+        {
+            if (namedArgument.Key == "ServiceType" && namedArgument.Value.Value is INamedTypeSymbol serviceType)
+            {
+                return serviceType;
+            }
+        }
+
+        return null;
+    }
+
+    private static void ReportDuplicateServiceTypes(
+        CompilationAnalysisContext context,
+        ConcurrentDictionary<INamedTypeSymbol, INamedTypeSymbol> endpointServiceTypes)
+    {
+        // Group endpoints by their ServiceType. When more than one endpoint registers the same ServiceType,
+        // the DI container resolves only the LAST registration, so one endpoint's route runs the other's class.
+        var byServiceType = new Dictionary<INamedTypeSymbol, List<INamedTypeSymbol>>(SymbolEqualityComparer.Default);
+        foreach (var pair in endpointServiceTypes)
+        {
+            if (!byServiceType.TryGetValue(pair.Value, out var endpoints))
+            {
+                byServiceType[pair.Value] = endpoints = new List<INamedTypeSymbol>();
+            }
+
+            endpoints.Add(pair.Key);
+        }
+
+        foreach (var entry in byServiceType)
+        {
+            if (entry.Value.Count < 2)
+            {
+                continue;
+            }
+
+            // Deterministic ordering so the blame/pairing is stable across builds.
+            var ordered = entry.Value
+                .OrderBy(s => s.ToDisplayString(), StringComparer.Ordinal)
+                .ToList();
+
+            for (var i = 1; i < ordered.Count; i++)
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    Diagnostics.DuplicateServiceType,
+                    ordered[i].Locations.FirstOrDefault(),
+                    ordered[0].Name,
+                    ordered[i].Name,
+                    entry.Key.Name));
+            }
+        }
     }
 
     /// <summary>
@@ -400,10 +477,20 @@ public class GroupsAnalyzer : DiagnosticAnalyzer
         var lastSlash = trimmed.LastIndexOf('/');
         var lastSegment = lastSlash >= 0 ? trimmed.Substring(lastSlash + 1) : trimmed;
 
-        var isOptional = lastSegment.Length > 2 &&
-                         lastSegment[0] == '{' &&
-                         lastSegment[lastSegment.Length - 1] == '}' &&
-                         (lastSegment[lastSegment.Length - 2] == '?' || lastSegment.Contains("="));
+        var isToken = lastSegment.Length > 2 &&
+                      lastSegment[0] == '{' &&
+                      lastSegment[lastSegment.Length - 1] == '}';
+        if (!isToken)
+        {
+            return false;
+        }
+
+        // A trailing parameter is omittable when it is optional ("{id?}") or has a default ("{id=5}",
+        // "{id:int=5}"). The default '=' is at the TOP LEVEL of the token; an '=' inside a constraint's
+        // parentheses (e.g. "{id:regex(^a=b$)}") is NOT a default and must not make the route look optional
+        // (which previously produced a phantom bare-path occupancy and a false MINEP004).
+        var inner = lastSegment.Substring(1, lastSegment.Length - 2);
+        var isOptional = lastSegment[lastSegment.Length - 2] == '?' || ContainsTopLevelEquals(inner);
         if (!isOptional)
         {
             return false;
@@ -411,6 +498,36 @@ public class GroupsAnalyzer : DiagnosticAnalyzer
 
         barePath = lastSlash >= 0 ? trimmed.Substring(0, lastSlash) : string.Empty;
         return true;
+    }
+
+    /// <summary>
+    /// True when <paramref name="token"/> contains an '=' that is NOT nested inside parentheses — the
+    /// route-parameter default-value separator ("{id=5}", "{id:int=5}"). An '=' inside a constraint's
+    /// parentheses (e.g. a regex constraint) is ignored, so a constraint is never mistaken for a default.
+    /// </summary>
+    private static bool ContainsTopLevelEquals(string token)
+    {
+        var depth = 0;
+        foreach (var ch in token)
+        {
+            switch (ch)
+            {
+                case '(':
+                    depth++;
+                    break;
+                case ')':
+                    if (depth > 0)
+                    {
+                        depth--;
+                    }
+
+                    break;
+                case '=' when depth == 0:
+                    return true;
+            }
+        }
+
+        return false;
     }
 
     private static string NormalizeRoutePattern(string pattern)

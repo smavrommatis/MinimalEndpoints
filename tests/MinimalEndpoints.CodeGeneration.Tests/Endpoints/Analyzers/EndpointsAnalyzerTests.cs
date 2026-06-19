@@ -1051,5 +1051,168 @@ public abstract class BaseEndpoint
 
     #endregion
 
+    #region Audit fixes (inheritance, MINEP010-014)
+
+    [Fact]
+    public void MissingEntryPoint_InheritedNonOverriddenMethod_NoError()
+    {
+        // The handler lives ONLY on a (non-abstract) base class and is NOT redeclared/overridden on the
+        // endpoint. FindEntryPointMethod must walk the base chain so the inherited method is found (distinct
+        // from MissingEntryPoint_InheritedMethod_NoError, which overrides — already a declared member).
+        var code = @"
+namespace TestApp;
+
+public class BaseEndpoint
+{
+    public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok());
+}
+
+[MapGet(""/test"")]
+public class TestEndpoint : BaseEndpoint
+{
+}";
+
+        var diagnostics = GetDiagnostics(code);
+
+        Assert.DoesNotContain(diagnostics, d => d.Id == "MINEP001");
+        Assert.DoesNotContain(diagnostics, d => d.Id == "MINEP010");
+    }
+
+    [Fact]
+    public void GenericEntryPoint_ReportsMinep010()
+    {
+        var code = @"
+namespace TestApp;
+
+[MapGet(""/test"")]
+public class TestEndpoint
+{
+    public Task<IResult> HandleAsync<T>() => Task.FromResult(Results.Ok());
+}";
+
+        var diagnostics = GetDiagnostics(code);
+
+        var error = Assert.Single(diagnostics, d => d.Id == "MINEP010");
+        Assert.Equal(DiagnosticSeverity.Error, error.Severity);
+        Assert.Contains("HandleAsync", error.GetMessage());
+        // The precise MINEP010 supersedes the generic MINEP001.
+        Assert.DoesNotContain(diagnostics, d => d.Id == "MINEP001");
+    }
+
+    [Fact]
+    public void RefParameter_ReportsMinep011()
+    {
+        var code = @"
+namespace TestApp;
+
+[MapGet(""/test"")]
+public class TestEndpoint
+{
+    public IResult Handle(ref int id) => Results.Ok();
+}";
+
+        var diagnostics = GetDiagnostics(code);
+
+        var error = Assert.Single(diagnostics, d => d.Id == "MINEP011");
+        Assert.Equal(DiagnosticSeverity.Error, error.Severity);
+        Assert.Contains("id", error.GetMessage());
+    }
+
+    [Fact]
+    public void InParameter_ReportsMinep011()
+    {
+        // `in` compiled silently before (it is optional at the call site); it is now flagged because
+        // ASP.NET still cannot model-bind it.
+        var code = @"
+namespace TestApp;
+
+[MapGet(""/test"")]
+public class TestEndpoint
+{
+    public IResult Handle(in int id) => Results.Ok();
+}";
+
+        var diagnostics = GetDiagnostics(code);
+
+        Assert.Single(diagnostics, d => d.Id == "MINEP011");
+    }
+
+    [Fact]
+    public void ServiceType_NotImplemented_ReportsMinep012()
+    {
+        // The interface HAS the entry point method, but the class does not implement it — the generated
+        // AddScoped<ITestEndpoint, TestEndpoint>() would be CS0311. MINEP003 must not fire here.
+        var code = @"
+namespace TestApp;
+
+public interface ITestEndpoint
+{
+    Task<IResult> HandleAsync();
+}
+
+[MapGet(""/test"", ServiceType = typeof(ITestEndpoint))]
+public class TestEndpoint
+{
+    public Task<IResult> HandleAsync() => Task.FromResult(Results.Ok());
+}";
+
+        var diagnostics = GetDiagnostics(code);
+
+        var error = Assert.Single(diagnostics, d => d.Id == "MINEP012");
+        Assert.Equal(DiagnosticSeverity.Error, error.Severity);
+        Assert.Contains("ITestEndpoint", error.GetMessage());
+        Assert.DoesNotContain(diagnostics, d => d.Id == "MINEP003");
+    }
+
+    [Fact]
+    public void Group_AbstractShape_ReportsMinep014()
+    {
+        // The group IS a [MapGroup] (so no MINEP005) but its shape (abstract) means it is never mapped, so
+        // the endpoint silently loses the prefix.
+        var code = @"
+namespace TestApp;
+
+[MapGroup(""/api"")]
+public abstract class ApiGroup { }
+
+[MapGet(""/test"", Group = typeof(ApiGroup))]
+public class TestEndpoint
+{
+    public IResult Handle() => Results.Ok();
+}";
+
+        var diagnostics = GetDiagnostics(code);
+
+        var warning = Assert.Single(diagnostics, d => d.Id == "MINEP014");
+        Assert.Equal(DiagnosticSeverity.Warning, warning.Severity);
+        Assert.DoesNotContain(diagnostics, d => d.Id == "MINEP005");
+    }
+
+    [Fact]
+    public void EndpointInOpenGenericContainer_ReportsMinep008()
+    {
+        // Outer<T>.Inner: ClassifyShape must reject a non-generic type nested in an open generic container,
+        // because the emitted reference would carry a free type parameter (CS0246).
+        var code = @"
+namespace TestApp;
+
+public class Outer<T>
+{
+    [MapGet(""/test"")]
+    public class Inner
+    {
+        public IResult Handle() => Results.Ok();
+    }
+}";
+
+        var diagnostics = GetDiagnostics(code);
+
+        var warning = Assert.Single(diagnostics, d => d.Id == "MINEP008");
+        Assert.Equal(DiagnosticSeverity.Warning, warning.Severity);
+        Assert.Contains("Inner", warning.GetMessage());
+    }
+
+    #endregion
+
 }
 

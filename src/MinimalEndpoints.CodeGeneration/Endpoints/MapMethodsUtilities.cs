@@ -24,7 +24,8 @@ internal static class MapMethodsUtilities
             };
 
     public static MapMethodsAttributeDefinition GetMapMethodAttributeDefinition(
-        this AttributeData attributeData, AccessibilityScope scope = AccessibilityScope.SameAssembly)
+        this AttributeData attributeData, AccessibilityScope scope = AccessibilityScope.SameAssembly,
+        INamedTypeSymbol endpointSymbol = null)
     {
         // A mid-typing / malformed attribute (e.g. '[MapGet]' before its pattern is typed) still
         // resolves its AttributeClass, so the factory predicate passes — but it has no valid
@@ -37,8 +38,8 @@ internal static class MapMethodsUtilities
         }
 
         return WellKnownTypes.Annotations.MapMethodsAttributeName.Equals(attributeData.AttributeClass!.Name)
-            ? GetAttributeDataForMultipleMethods(attributeData, scope)
-            : GetAttributeDataForSingleMethod(attributeData, scope);
+            ? GetAttributeDataForMultipleMethods(attributeData, scope, endpointSymbol)
+            : GetAttributeDataForSingleMethod(attributeData, scope, endpointSymbol);
     }
 
     public static bool IsMapMethodsAttribute(this INamedTypeSymbol type)
@@ -49,7 +50,7 @@ internal static class MapMethodsUtilities
     }
 
     private static MapMethodsAttributeDefinition GetAttributeDataForSingleMethod(
-        AttributeData attributeData, AccessibilityScope scope)
+        AttributeData attributeData, AccessibilityScope scope, INamedTypeSymbol endpointSymbol)
     {
         // Single-method ctor is (string pattern, ServiceLifetime lifetime). Guard against an
         // error-state attribute whose arguments are short or in error (the lifetime defaults to
@@ -74,12 +75,13 @@ internal static class MapMethodsUtilities
             lifetime: lifetime,
             endpointBuilderMethodName: attributeDefinition.EndpointBuilderMethodName,
             methods: [attributeDefinition.Method],
-            scope: scope
+            scope: scope,
+            endpointSymbol: endpointSymbol
         );
     }
 
     private static MapMethodsAttributeDefinition GetAttributeDataForMultipleMethods(
-        AttributeData attributeData, AccessibilityScope scope)
+        AttributeData attributeData, AccessibilityScope scope, INamedTypeSymbol endpointSymbol)
     {
         // MapMethods ctor is (string pattern, string[] methods, ServiceLifetime lifetime). Guard
         // against a short/error-state attribute: a missing or null methods array (e.g.
@@ -109,7 +111,8 @@ internal static class MapMethodsUtilities
             lifetime: lifetime,
             "MapMethods",
             methods: methods,
-            scope: scope
+            scope: scope,
+            endpointSymbol: endpointSymbol
         );
     }
 
@@ -119,7 +122,8 @@ internal static class MapMethodsUtilities
         ServiceLifetime lifetime,
         string endpointBuilderMethodName,
         string[] methods,
-        AccessibilityScope scope
+        AccessibilityScope scope,
+        INamedTypeSymbol endpointSymbol
     )
     {
         string entryPoint = null;
@@ -134,10 +138,17 @@ internal static class MapMethodsUtilities
                     entryPoint = entry;
                     break;
                 case "ServiceType" when namedArg.Value.Value is INamedTypeSymbol serviceType:
-                    // Cross-assembly: a non-public ServiceType can't be named by the host, so fall back
-                    // to registering the concrete (public) endpoint class rather than emitting CS0122.
-                    serviceName = scope == AccessibilityScope.External &&
-                                  !SymbolDefinitionFactory.IsPubliclyAccessible(serviceType)
+                    // Degrade to concrete (public) registration instead of emitting an inaccessible or
+                    // non-compiling service registration; the analyzer separately reports the cause:
+                    //  - cross-assembly + non-public ServiceType -> the host cannot name it (CS0122);
+                    //  - endpoint not assignable to the ServiceType -> AddX<Service, Endpoint>() is CS0311
+                    //    (MINEP012). endpointSymbol is supplied only on the GENERATOR path, so the analyzer's
+                    //    own GetMapMethodAttributeDefinition() (endpointSymbol == null) keeps ServiceName set
+                    //    and still reports MINEP012.
+                    var inaccessibleAcrossAssembly = scope == AccessibilityScope.External &&
+                                                     !SymbolDefinitionFactory.IsPubliclyAccessible(serviceType);
+                    var notAssignable = endpointSymbol != null && !IsAssignableTo(endpointSymbol, serviceType);
+                    serviceName = inaccessibleAcrossAssembly || notAssignable
                         ? null
                         // Otherwise render via the same TypeDefinition path every other emitted type
                         // uses (keyword aliases, nested/generic handling) — one audited policy.
@@ -163,5 +174,32 @@ internal static class MapMethodsUtilities
             ServiceName = serviceName,
             GroupTypeName = groupTypeName
         };
+    }
+
+    /// <summary>
+    /// True when <paramref name="type"/> is assignable to <paramref name="target"/> by identity, base-class
+    /// inheritance, or an implemented interface — i.e. a generated <c>AddX&lt;target, type&gt;()</c> would
+    /// satisfy the <c>where TImplementation : TService</c> constraint. Symbol-based (no Compilation needed);
+    /// when in doubt it returns false, which degrades to concrete registration (which always compiles).
+    /// </summary>
+    private static bool IsAssignableTo(INamedTypeSymbol type, INamedTypeSymbol target)
+    {
+        for (INamedTypeSymbol current = type; current != null; current = current.BaseType)
+        {
+            if (SymbolEqualityComparer.Default.Equals(current, target))
+            {
+                return true;
+            }
+        }
+
+        foreach (var @interface in type.AllInterfaces)
+        {
+            if (SymbolEqualityComparer.Default.Equals(@interface, target))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

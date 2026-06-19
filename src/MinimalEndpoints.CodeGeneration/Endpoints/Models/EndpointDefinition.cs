@@ -13,7 +13,10 @@ internal sealed class EndpointDefinition : SymbolDefinition
                                     attributeData.AttributeClass.IsMapMethodsAttribute(),
         create: (symbol, attributeData, scope) =>
         {
-            var mapMethodsAttributeInfo = attributeData.GetMapMethodAttributeDefinition(scope);
+            // Pass the endpoint symbol so the generator degrades a ServiceType the endpoint is not
+            // assignable to down to concrete registration (avoiding CS0311); the analyzer omits the symbol,
+            // so it still reports MINEP012.
+            var mapMethodsAttributeInfo = attributeData.GetMapMethodAttributeDefinition(scope, symbol);
 
             if (mapMethodsAttributeInfo == null)
             {
@@ -23,6 +26,15 @@ internal sealed class EndpointDefinition : SymbolDefinition
             var entryPoint = symbol.FindEntryPointMethod(mapMethodsAttributeInfo.EntryPoint);
 
             if (entryPoint == null)
+            {
+                return null;
+            }
+
+            // ASP.NET cannot model-bind a by-ref (ref/out/in) or pointer parameter, and the generated
+            // handler delegate cannot reproduce the modifier — emitting it produces CS1620/CS0214 (or, for
+            // `in`, silently wrong by-value binding). Decline the endpoint instead; the analyzer reports
+            // MINEP011. Mirrors the EntryPointSurfaceIsPublic guard below.
+            if (HasUnsupportedParameterModifier(entryPoint))
             {
                 return null;
             }
@@ -69,6 +81,24 @@ internal sealed class EndpointDefinition : SymbolDefinition
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// True when any entry-point parameter is by-reference (ref/out/in) or a pointer. Such parameters
+    /// cannot be bound by ASP.NET Core or carried through the generated handler delegate, so the endpoint
+    /// is declined here (the analyzer reports MINEP011) rather than emitting non-compiling code.
+    /// </summary>
+    private static bool HasUnsupportedParameterModifier(IMethodSymbol entryPoint)
+    {
+        foreach (var parameter in entryPoint.Parameters)
+        {
+            if (parameter.RefKind != RefKind.None || parameter.Type is IPointerTypeSymbol)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private EndpointDefinition()
@@ -127,6 +157,7 @@ internal sealed class EndpointDefinition : SymbolDefinition
                     Name = p.Name,
                     Type = new TypeDefinition(p.Type),
                     Nullable = p.NullableAnnotation == NullableAnnotation.Annotated,
+                    RefKind = p.RefKind,
                     DefaultValue = p.FormatDefaultValueLiteral(),
                     Attributes = p.GetAttributes()
                         .Select(AttributeDefinition.FromAttributeData)
@@ -153,7 +184,7 @@ internal sealed class EndpointDefinition : SymbolDefinition
         var attr = MapMethodsAttribute;
 
         var parameters = string.Join(";", EntryPoint.Parameters.Select(p =>
-            $"{p.Name}:{p.Type.FullName}:{p.Nullable}:{p.DefaultValue}:" +
+            $"{p.Name}:{p.Type.FullName}:{p.Nullable}:{p.RefKind}:{p.DefaultValue}:" +
             string.Join("+", p.Attributes.Select(a => a.ToDisplayString(s_emptyUsings)))));
 
         return

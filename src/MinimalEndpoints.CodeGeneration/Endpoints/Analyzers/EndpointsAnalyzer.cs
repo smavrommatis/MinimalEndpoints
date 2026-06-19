@@ -20,7 +20,11 @@ public class EndpointsAnalyzer : DiagnosticAnalyzer
             Diagnostics.ServiceTypeMissingEntryPoint,
             Diagnostics.InvalidGroupType,
             Diagnostics.UnsupportedEndpointShape,
-            Diagnostics.CrossAssemblyGroupNotScanned);
+            Diagnostics.CrossAssemblyGroupNotScanned,
+            Diagnostics.GenericEntryPoint,
+            Diagnostics.UnsupportedParameterModifier,
+            Diagnostics.EndpointNotAssignableToServiceType,
+            Diagnostics.GroupShapeNotMapped);
 
     public override void Initialize(AnalysisContext context)
     {
@@ -128,6 +132,20 @@ public class EndpointsAnalyzer : DiagnosticAnalyzer
 
         if (entryPoint == null)
         {
+            // A generic-only entry point (e.g. HandleAsync<T>) is excluded by FindEntryPointMethod; report
+            // the precise MINEP010 (naming the method) rather than the generic "missing entry point" MINEP001.
+            var genericCandidate =
+                namedTypeSymbol.FindGenericOnlyEntryPointCandidate(mapMethodsAttributeDefinition.EntryPoint);
+            if (genericCandidate != null)
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    Diagnostics.GenericEntryPoint,
+                    classDeclaration.Identifier.GetLocation(),
+                    genericCandidate.Name,
+                    namedTypeSymbol.Name));
+                return;
+            }
+
             // Hand the requested (custom) entry-point name to the code fix via the properties bag so it
             // can generate a method with that exact name instead of always emitting Handle/HandleAsync.
             var properties = string.IsNullOrEmpty(mapMethodsAttributeDefinition.EntryPoint)
@@ -146,28 +164,55 @@ public class EndpointsAnalyzer : DiagnosticAnalyzer
             return;
         }
 
+        // MINEP011: ASP.NET cannot bind a by-ref (ref/out/in) or pointer entry-point parameter, and the
+        // generated handler delegate cannot carry the modifier, so the generator declines the endpoint.
+        // Surface an actionable error per offending parameter.
+        foreach (var parameter in entryPoint.Parameters)
+        {
+            if (parameter.RefKind != RefKind.None || parameter.Type is IPointerTypeSymbol)
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    Diagnostics.UnsupportedParameterModifier,
+                    classDeclaration.Identifier.GetLocation(),
+                    parameter.Name,
+                    entryPoint.Name,
+                    namedTypeSymbol.Name));
+            }
+        }
+
         if (!string.IsNullOrEmpty(mapMethodsAttributeDefinition.ServiceName))
         {
             var serviceTypeSymbol = GetServiceTypeSymbol(attributes[0]);
             if (serviceTypeSymbol != null)
             {
-                // The generator types the resolved instance as the ServiceType and calls
-                // instance.{EntryPoint}(args). For that call to bind, the ServiceType must expose a
-                // method with the entry point's NAME and a COMPATIBLE signature — matching by name
-                // alone let an incompatible overload pass analysis yet miscompile the generated call.
-                var interfaceHasMethod = ServiceTypeHasCompatibleEntryPoint(serviceTypeSymbol, entryPoint);
+                // MINEP012 and MINEP003 are INDEPENDENT facts about the ServiceType — a wrong ServiceType
+                // can be both non-assignable AND lack the entry point, so report each that applies.
 
-                if (!interfaceHasMethod)
+                // MINEP012: the endpoint is registered as the ServiceType's implementation
+                // (services.AddX<ServiceType, Endpoint>()), which requires an implicit reference conversion
+                // from the endpoint to the ServiceType. MINEP003 only checks the method EXISTS, so without
+                // this a non-implementing class passed analysis yet miscompiled with CS0311.
+                if (!context.Compilation.ClassifyConversion(namedTypeSymbol, serviceTypeSymbol).IsImplicit)
                 {
-                    var serviceTypeDiagnostic = Diagnostic.Create(
+                    context.ReportDiagnostic(Diagnostic.Create(
+                        Diagnostics.EndpointNotAssignableToServiceType,
+                        classDeclaration.Identifier.GetLocation(),
+                        serviceTypeSymbol.Name,
+                        namedTypeSymbol.Name));
+                }
+
+                // The generator types the resolved instance as the ServiceType and calls
+                // instance.{EntryPoint}(args). For that call to bind, the ServiceType must expose a method
+                // with the entry point's NAME and a COMPATIBLE signature — matching by name alone let an
+                // incompatible overload pass analysis yet miscompile the generated call.
+                if (!ServiceTypeHasCompatibleEntryPoint(serviceTypeSymbol, entryPoint))
+                {
+                    context.ReportDiagnostic(Diagnostic.Create(
                         Diagnostics.ServiceTypeMissingEntryPoint,
                         classDeclaration.Identifier.GetLocation(),
                         serviceTypeSymbol.Name,
                         namedTypeSymbol.Name,
-                        entryPoint.Name
-                    );
-
-                    context.ReportDiagnostic(serviceTypeDiagnostic);
+                        entryPoint.Name));
                 }
             }
         }
@@ -255,6 +300,24 @@ public class EndpointsAnalyzer : DiagnosticAnalyzer
 
             context.ReportDiagnostic(diagnostic);
             return;
+        }
+
+        // MINEP014: the Group is a valid [MapGroup] but its shape (abstract/generic/generic-container/
+        // file-local/inaccessible) means the generator never maps it, so this endpoint is silently
+        // registered WITHOUT the group's prefix and configuration. Same-assembly only — a referenced
+        // bad-shape group is the scanner's concern (covered by MINEP009 / deferred #32).
+        if (SymbolEqualityComparer.Default.Equals(groupTypeSymbol.ContainingAssembly, context.Compilation.Assembly))
+        {
+            var groupShape = SymbolDefinitionFactory.ClassifyShape(groupTypeSymbol);
+            if (groupShape != ShapeRejection.None)
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    Diagnostics.GroupShapeNotMapped,
+                    classDeclaration.Identifier.GetLocation(),
+                    endpointSymbol.Name,
+                    groupTypeSymbol.Name,
+                    SymbolDefinitionFactory.DescribeShapeRejection(groupShape)));
+            }
         }
 
         // MINEP009: the Group is a valid, PUBLIC [MapGroup] in a referenced assembly the host won't scan,

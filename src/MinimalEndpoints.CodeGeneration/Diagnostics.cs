@@ -68,15 +68,15 @@ internal static class Diagnostics
 
     public static readonly DiagnosticDescriptor InvalidGroupType = new DiagnosticDescriptor(
         id: "MINEP005",
-        title: "Invalid endpoint group type",
+        title: "Invalid group type",
         messageFormat:
-        "The Group type '{0}' specified for endpoint '{1}' is not decorated with MapGroupAttribute. " +
-        "Ensure the group has the [MapGroup] attribute.",
+        "The type '{0}' referenced as a group by '{1}' is not decorated with MapGroupAttribute. " +
+        "Ensure the group type has the [MapGroup] attribute.",
         category: "MinimalEndpoints",
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
-        description: "Endpoint groups must be decorated with MapGroupAttribute. " +
-        "Example: [MapGroup(\"/api/v1\")] public class ApiV1Group { }.",
+        description: "A type used as an endpoint's Group or a group's ParentGroup must be decorated with " +
+        "MapGroupAttribute. Example: [MapGroup(\"/api/v1\")] public class ApiV1Group { }.",
         helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/blob/main/docs/diagnostics/MINEP005.md"
     );
 
@@ -143,6 +143,77 @@ internal static class Diagnostics
         "cannot be composed: the endpoint is silently mapped without the group's route prefix and configuration. " +
         "Enable scanning of that assembly with [assembly: ScanReferencedEndpoints], optionally targeting it by type.",
         helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/blob/main/docs/diagnostics/MINEP009.md"
+    );
+
+    public static readonly DiagnosticDescriptor GenericEntryPoint = new DiagnosticDescriptor(
+        id: "MINEP010",
+        title: "Entry point method must not be generic",
+        messageFormat:
+        "The entry point method '{0}' on endpoint '{1}' is generic. The generated handler cannot supply type " +
+        "arguments, so a generic entry point cannot be mapped. Make the entry point a non-generic method.",
+        category: "MinimalEndpoints",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "An endpoint's entry point method must be non-generic. ASP.NET Core cannot infer or " +
+        "supply type arguments for the generated route handler delegate.",
+        helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/blob/main/docs/diagnostics/MINEP010.md"
+    );
+
+    public static readonly DiagnosticDescriptor UnsupportedParameterModifier = new DiagnosticDescriptor(
+        id: "MINEP011",
+        title: "Entry point parameter uses an unsupported modifier",
+        messageFormat:
+        "Parameter '{0}' of entry point '{1}' on endpoint '{2}' uses a 'ref', 'out', 'in', or pointer modifier. " +
+        "ASP.NET Core cannot model-bind such a parameter and the generated handler cannot pass it; remove the modifier.",
+        category: "MinimalEndpoints",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "Entry point parameters must be passed by value. By-reference (ref/out/in) and pointer " +
+        "parameters cannot be model-bound by ASP.NET Core or reproduced by the generated handler delegate.",
+        helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/blob/main/docs/diagnostics/MINEP011.md"
+    );
+
+    public static readonly DiagnosticDescriptor EndpointNotAssignableToServiceType = new DiagnosticDescriptor(
+        id: "MINEP012",
+        title: "Endpoint is not assignable to its ServiceType",
+        messageFormat:
+        "Endpoint '{1}' specifies ServiceType '{0}' but does not implement or inherit it. The generated " +
+        "registration would not compile. Implement '{0}' on '{1}' or change the ServiceType.",
+        category: "MinimalEndpoints",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "When ServiceType is specified, the endpoint class must be assignable to it (implement the " +
+        "interface or derive from the base type), because it is registered as the implementation of that service.",
+        helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/blob/main/docs/diagnostics/MINEP012.md"
+    );
+
+    public static readonly DiagnosticDescriptor DuplicateServiceType = new DiagnosticDescriptor(
+        id: "MINEP013",
+        title: "Multiple endpoints register the same ServiceType",
+        messageFormat:
+        "Endpoints '{0}' and '{1}' both register ServiceType '{2}'. The DI container resolves only the last " +
+        "registration, so one endpoint's route will run the other endpoint's class. Use a distinct ServiceType per endpoint.",
+        category: "MinimalEndpoints",
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: "Each endpoint registered via ServiceType should use a distinct service type. When two " +
+        "endpoints register the same ServiceType, the last DI registration wins and both handlers resolve the same instance.",
+        helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/blob/main/docs/diagnostics/MINEP013.md",
+        customTags: WellKnownDiagnosticTags.CompilationEnd
+    );
+
+    public static readonly DiagnosticDescriptor GroupShapeNotMapped = new DiagnosticDescriptor(
+        id: "MINEP014",
+        title: "Group cannot be applied because of its shape",
+        messageFormat:
+        "Endpoint '{0}' references group '{1}', but '{1}' has an unsupported shape ({2}) and is not mapped. " +
+        "'{0}' is therefore registered without the group's route prefix and configuration.",
+        category: "MinimalEndpoints",
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: "A group that is abstract, generic, file-local, or insufficiently accessible is never mapped, " +
+        "so endpoints referencing it silently lose the group's route prefix and configuration. Give the group a supported shape.",
+        helpLinkUri: "https://github.com/smavrommatis/MinimalEndpoints/blob/main/docs/diagnostics/MINEP014.md"
     );
 
     /// <summary>

@@ -1,4 +1,4 @@
-# MINEP005: Invalid Endpoint Group Type
+# MINEP005: Invalid Group Type
 
 ## Diagnostic ID
 
@@ -10,15 +10,15 @@ Error
 
 ## Description
 
-The `Group` property on a mapping attribute references a type that isn't decorated with `[MapGroup]` attribute.
+A type referenced as a group — either an endpoint's `Group` or a group's `ParentGroup` — is not decorated with the `[MapGroup]` attribute.
 
 ## Message
 
-> The Group type '{0}' specified for endpoint '{1}' is not decorated with MapGroupAttribute. Ensure the group has the [MapGroup] attribute.
+> The type '{0}' referenced as a group by '{1}' is not decorated with MapGroupAttribute. Ensure the group type has the [MapGroup] attribute.
 
 ## Cause
 
-This error occurs when the `Group` property references a class without the `[MapGroup]` attribute.
+This error occurs when an endpoint's `Group` property — or a group's `ParentGroup` property — references a class that lacks the `[MapGroup]` attribute.
 
 ## How to Fix
 
@@ -75,6 +75,29 @@ If you don't need grouping:
 ```csharp
 [MapGet("/api/v1/products")]  // ✅ Include prefix in route
 public class GetProductsEndpoint { }
+```
+
+### Also applies to ParentGroup
+
+A group's `ParentGroup` must likewise reference a `[MapGroup]` type. Otherwise the parent link is silently
+dropped and the child group loses the parent's prefix.
+
+**❌ Incorrect:**
+```csharp
+public class ApiGroup { } // missing [MapGroup]
+
+[MapGroup("/v1", ParentGroup = typeof(ApiGroup))]
+public class V1Group { }
+```
+
+**✅ Correct:**
+```csharp
+[MapGroup("/api")]
+public class ApiGroup { }
+
+[MapGroup("/v1", ParentGroup = typeof(ApiGroup))]
+public class V1Group { }
+// Results in prefix: /api/v1
 ```
 
 ## Requirements for Endpoint Groups

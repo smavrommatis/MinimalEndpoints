@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **MINEP010** (error) — the entry point method must not be generic; a generic `Handle<T>()` cannot be
+  mapped because the generated handler cannot supply type arguments.
+- **MINEP011** (error) — an entry point parameter must not use a `ref`/`out`/`in` or pointer modifier
+  (ASP.NET Core cannot model-bind it); such endpoints are no longer emitted.
+- **MINEP012** (error) — the endpoint must be assignable to its `ServiceType` (implement the interface or
+  derive from the base type); previously a non-implementing class miscompiled with CS0311. The generator
+  now degrades a non-assignable `ServiceType` to concrete registration so the only error is MINEP012.
+- **MINEP013** (warning) — flags two endpoints registering the same `ServiceType` (the DI container keeps
+  only the last registration, so one route would run the other endpoint's class).
+- **MINEP014** (warning) — flags an endpoint whose `Group` is a valid `[MapGroup]` but has an unsupported
+  shape, so the endpoint is mapped without the group's prefix/configuration.
+
+### Fixed
+- An entry point **inherited** (not overridden) from a base class is now discovered instead of being
+  falsely reported as missing (MINEP001) — entry-point resolution walks the base-class chain.
+- A group's **`ParentGroup`** that is not a `[MapGroup]` type is now reported (the generalized **MINEP005**,
+  "Invalid group type") instead of silently dropping the parent link.
+- An endpoint/group **nested in an open generic type** (`Outer<T>.Inner`) is now reported as an unsupported
+  shape (**MINEP008**) instead of emitting non-compiling code.
+- The ambiguous-route check (**MINEP004**) no longer mistakes an `=` inside a route constraint
+  (e.g. `{id:regex(^a=b$)}`) for an optional/default segment, removing a false positive.
+
+### Changed
+- A handler parameter's by-reference modifier now participates in the incremental generator's cache key
+  (determinism hardening).
+
 ## [1.2.0] - 2026-06-14
 
 ### Added

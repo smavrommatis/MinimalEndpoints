@@ -73,9 +73,13 @@ internal static class EndpointUtilities
 
     public static IMethodSymbol FindEntryPointMethod(this INamedTypeSymbol symbol, string preferredMethodName)
     {
-        var publicMethods = symbol.GetMembers()
-            .OfType<IMethodSymbol>()
+        // Search the type AND its base-class chain (declared members per type, most-derived first) so an
+        // entry point inherited from a base class is found — the generated `instance.Handle(...)` call binds
+        // to inherited members. Generic methods are excluded: the generated handler cannot supply type
+        // arguments, so a generic `Handle<T>()` cannot be mapped (the analyzer reports MINEP010 for it).
+        var publicMethods = EnumerateSelfAndBaseMethods(symbol)
             .Where(x => !x.IsStatic)
+            .Where(x => !x.IsGenericMethod)
             .Where(x => x.DeclaredAccessibility == Accessibility.Public);
 
         if (string.IsNullOrEmpty(preferredMethodName))
@@ -91,5 +95,43 @@ internal static class EndpointUtilities
         }
 
         return publicMethods.FirstOrDefault();
+    }
+
+    /// <summary>
+    /// Yields the methods declared on <paramref name="symbol"/> and each of its base types, most-derived
+    /// first, so a derived class's own (or overriding) member is preferred over an inherited one of the
+    /// same name. Declared-members-only per type; the loop supplies the inheritance walk that
+    /// <see cref="INamedTypeSymbol.GetMembers()"/> does not.
+    /// </summary>
+    private static IEnumerable<IMethodSymbol> EnumerateSelfAndBaseMethods(INamedTypeSymbol symbol)
+    {
+        for (INamedTypeSymbol current = symbol; current != null; current = current.BaseType)
+        {
+            foreach (var method in current.GetMembers().OfType<IMethodSymbol>())
+            {
+                yield return method;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Returns the first public, non-static candidate for the requested entry point name when EVERY such
+    /// candidate is generic (so <see cref="FindEntryPointMethod"/> returned null only because the generic
+    /// ones were filtered out); otherwise null. Lets the analyzer report the precise MINEP010 — naming the
+    /// offending method — instead of the generic MINEP001.
+    /// </summary>
+    public static IMethodSymbol FindGenericOnlyEntryPointCandidate(
+        this INamedTypeSymbol symbol, string preferredMethodName)
+    {
+        bool nameMatches(IMethodSymbol m) => string.IsNullOrEmpty(preferredMethodName)
+            ? m.Name is DefaultEntryPointMethodName or DefaultAsyncMethodName
+            : m.Name == preferredMethodName;
+
+        var candidates = EnumerateSelfAndBaseMethods(symbol)
+            .Where(x => !x.IsStatic && x.DeclaredAccessibility == Accessibility.Public)
+            .Where(nameMatches)
+            .ToList();
+
+        return candidates.Count > 0 && candidates.All(x => x.IsGenericMethod) ? candidates[0] : null;
     }
 }

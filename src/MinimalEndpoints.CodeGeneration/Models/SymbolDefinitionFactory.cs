@@ -97,6 +97,17 @@ internal class SymbolDefinitionFactory
             return ShapeRejection.Generic;
         }
 
+        // A non-generic type nested in an open generic container (e.g. Outer<T>.Inner) cannot be named
+        // from generated code without binding the container's type parameter, so the emitted reference
+        // would carry a free type parameter and fail to compile. Arity above only covers the type itself.
+        for (INamedTypeSymbol container = symbol.ContainingType; container != null; container = container.ContainingType)
+        {
+            if (container.Arity > 0)
+            {
+                return ShapeRejection.GenericContainer;
+            }
+        }
+
         if (symbol.IsFileLocal)
         {
             return ShapeRejection.FileLocal;
@@ -115,7 +126,9 @@ internal class SymbolDefinitionFactory
     /// </summary>
     public static string DescribeShapeRejection(ShapeRejection rejection) => rejection switch
     {
+        ShapeRejection.Abstract => "an abstract type",
         ShapeRejection.Generic => "an open generic type",
+        ShapeRejection.GenericContainer => "nested in an open generic type",
         ShapeRejection.FileLocal => "a file-local type",
         ShapeRejection.Inaccessible => "less accessible than internal",
         _ => "an unsupported type"
@@ -248,6 +261,7 @@ internal enum ShapeRejection
     None,
     Abstract,
     Generic,
+    GenericContainer,
     FileLocal,
     Inaccessible
 }
